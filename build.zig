@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
     const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .sdl3 });
 
     const app_mod = b.createModule(.{
-        .root_source_file = b.path("src/app.zig"),
+        .root_source_file = b.path("src/App.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -63,6 +63,27 @@ pub fn build(b: *std.Build) void {
     // Or use a prelinked one:
     app_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
     app_mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
+
+    const dvui_sample_mod = b.createModule(.{
+        .root_source_file = b.path("src/app_sample.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const sample_exe = b.addExecutable(.{
+        .name = "dvui-sample",
+        .root_module = dvui_sample_mod,
+    });
+
+    dvui_sample_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+    dvui_sample_mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
+
+    const run_sample_step = b.step("run-sample", "Run the app");
+    const run_sample_cmd = b.addRunArtifact(sample_exe);
+    run_sample_step.dependOn(&run_sample_cmd.step);
+
+    // const assets_module = assetpack.pack(b, b.path("assets"), .{});
+    // exe.root_module.addImport("assets", assets_module)
 
     // const exe = b.addExecutable(.{
     //     .name = "inkz_editor",

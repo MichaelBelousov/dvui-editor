@@ -2,6 +2,23 @@
 const std = @import("std");
 const Io = std.Io;
 
+pub const App = @import("App.zig");
+pub const Editor = @import("Editor.zig");
+
+pub var app: *App = undefined;
+pub var editor: *Editor = undefined;
+
+pub const Internal = struct {
+    // pub const Animation = @import("internal/Animation.zig");
+    // pub const Atlas = @import("internal/Atlas.zig");
+    // pub const Buffers = @import("internal/Buffers.zig");
+    // pub const File = @import("internal/File.zig");
+    // pub const History = @import("internal/History.zig");
+    pub const Palette = @import("internal/Palette.zig");
+};
+
+pub const dvui = @import("dvui.zig");
+
 /// This is a documentation comment to explain the `printAnotherMessage` function below.
 ///
 /// Accepting an `Io.Writer` instance is a handy way to write reusable code.
