@@ -28,60 +28,67 @@ pub fn build(b: *std.Build) void {
     // to our consumers. We must give it a name because a Zig package can expose
     // multiple modules and consumers will need to be able to specify which
     // module they want to access.
-    const mod = b.addModule("inkz_editor", .{
-        // The root source file is the "entry point" of this module. Users of
-        // this module will only be able to access public declarations contained
-        // in this file, which means that if you have declarations that you
-        // intend to expose to consumers that were defined in other files part
-        // of this module, you will have to make sure to re-export them from
-        // the root file.
-        .root_source_file = b.path("src/root.zig"),
-        // Later on we'll use this module as the root module of a test executable
-        // which requires us to specify a target.
+    // const mod = b.addModule("inkz_editor", .{
+    //     // The root source file is the "entry point" of this module. Users of
+    //     // this module will only be able to access public declarations contained
+    //     // in this file, which means that if you have declarations that you
+    //     // intend to expose to consumers that were defined in other files part
+    //     // of this module, you will have to make sure to re-export them from
+    //     // the root file.
+    //     .root_source_file = b.path("src/root.zig"),
+    //     // Later on we'll use this module as the root module of a test executable
+    //     // which requires us to specify a target.
+    //     .target = target,
+    // });
+
+    const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .sdl3 });
+
+    const app_mod = b.createModule(.{
+        .root_source_file = b.path("src/app.zig"),
         .target = target,
+        .optimize = optimize,
     });
 
-    // Here we define an executable. An executable needs to have a root module
-    // which needs to expose a `main` function. While we could add a main function
-    // to the module defined above, it's sometimes preferable to split business
-    // logic and the CLI into two separate modules.
-    //
-    // If your goal is to create a Zig library for others to use, consider if
-    // it might benefit from also exposing a CLI tool. A parser library for a
-    // data serialization format could also bundle a CLI syntax checker, for example.
-    //
-    // If instead your goal is to create an executable, consider if users might
-    // be interested in also being able to embed the core functionality of your
-    // program in their own executable in order to avoid the overhead involved in
-    // subprocessing your CLI tool.
-    //
-    // If neither case applies to you, feel free to delete the declaration you
-    // don't need and to put everything under a single module.
     const exe = b.addExecutable(.{
-        .name = "inkz_editor",
-        .root_module = b.createModule(.{
-            // b.createModule defines a new module just like b.addModule but,
-            // unlike b.addModule, it does not expose the module to consumers of
-            // this package, which is why in this case we don't have to give it a name.
-            .root_source_file = b.path("src/main.zig"),
-            // Target and optimization levels must be explicitly wired in when
-            // defining an executable or library (in the root module), and you
-            // can also hardcode a specific target for an executable or library
-            // definition if desireable (e.g. firmware for embedded devices).
-            .target = target,
-            .optimize = optimize,
-            // List of modules available for import in source files part of the
-            // root module.
-            .imports = &.{
-                // Here "inkz_editor" is the name you will use in your source code to
-                // import this module (e.g. `@import("inkz_editor")`). The name is
-                // repeated because you are allowed to rename your imports, which
-                // can be extremely useful in case of collisions (which can happen
-                // importing modules from different packages).
-                .{ .name = "inkz_editor", .module = mod },
-            },
-        }),
+        .name = "inkz-editor",
+        .root_module = app_mod,
     });
+
+    // Can either link the backend ourselves:
+    // const dvui_mod = dvui_dep.module("dvui");
+    // const sdl3_mod = dvui_dep.module("sdl3");
+    // @import("dvui").linkBackend(dvui_mod, sdl3_mod);
+    // mod.addImport("dvui", dvui_mod);
+
+    // Or use a prelinked one:
+    app_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+    app_mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
+
+    // const exe = b.addExecutable(.{
+    //     .name = "inkz_editor",
+    //     .root_module = b.createModule(.{
+    //         // b.createModule defines a new module just like b.addModule but,
+    //         // unlike b.addModule, it does not expose the module to consumers of
+    //         // this package, which is why in this case we don't have to give it a name.
+    //         .root_source_file = b.path("src/main.zig"),
+    //         // Target and optimization levels must be explicitly wired in when
+    //         // defining an executable or library (in the root module), and you
+    //         // can also hardcode a specific target for an executable or library
+    //         // definition if desireable (e.g. firmware for embedded devices).
+    //         .target = target,
+    //         .optimize = optimize,
+    //         // List of modules available for import in source files part of the
+    //         // root module.
+    //         .imports = &.{
+    //             // Here "inkz_editor" is the name you will use in your source code to
+    //             // import this module (e.g. `@import("inkz_editor")`). The name is
+    //             // repeated because you are allowed to rename your imports, which
+    //             // can be extremely useful in case of collisions (which can happen
+    //             // importing modules from different packages).
+    //             .{ .name = "inkz_editor", .module = mod },
+    //         },
+    //     }),
+    // });
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
@@ -119,7 +126,7 @@ pub fn build(b: *std.Build) void {
     // Here `mod` needs to define a target, which is why earlier we made sure to
     // set the releative field.
     const mod_tests = b.addTest(.{
-        .root_module = mod,
+        .root_module = app_mod,
     });
 
     // A run step that will run the test executable.
