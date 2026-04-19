@@ -64,6 +64,14 @@ pub fn build(b: *std.Build) void {
     app_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
     app_mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
 
+    if (b.lazyDependency("icons", .{ .target = target, .optimize = optimize })) |dep| {
+        exe.root_module.addImport("icons", dep.module("icons"));
+    }
+
+    // const assetpack = @import("assetpack");
+    // const assets_module = assetpack.pack(b, b.path("assets"), .{});
+    // exe.root_module.addImport("assets", assets_module);
+
     const dvui_sample_mod = b.createModule(.{
         .root_source_file = b.path("src/app_sample.zig"),
         .target = target,

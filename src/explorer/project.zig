@@ -7,54 +7,56 @@ const inkz_editor = @import("../root.zig");
 
 pub fn draw() !void {
     if (inkz_editor.editor.folder) |folder| {
-        if (dvui.button(@src(), "Pack Project", .{ .draw_focus = false }, .{
-            .expand = .horizontal,
-            .style = .highlight,
-        })) {
-            inkz_editor.packer.appendProject() catch {
-                dvui.log.err("Failed to append project", .{});
-            };
+        _ = folder;
+        // if (dvui.button(@src(), "Pack Project", .{ .draw_focus = false }, .{
+        //     .expand = .horizontal,
+        //     .style = .highlight,
+        // })) {
+        //     inkz_editor.packer.appendProject() catch {
+        //         dvui.log.err("Failed to append project", .{});
+        //     };
 
-            inkz_editor.packer.packAndClear() catch {
-                dvui.log.err("Failed to pack project", .{});
-            };
-        }
+        //     inkz_editor.packer.packAndClear() catch {
+        //         dvui.log.err("Failed to pack project", .{});
+        //     };
+        // }
 
-        if (inkz_editor.editor.project) |project| {
-            if (inkz_editor.packer.atlas) |atlas| {
-                if (dvui.button(@src(), "Export Project", .{ .draw_focus = false }, .{
-                    .expand = .horizontal,
-                    .style = .highlight,
-                })) {
-                    if (project.packed_atlas_output) |output| {
-                        atlas.save(output, .data) catch {
-                            dvui.log.err("Failed to save atlas data", .{});
-                        };
-                    }
+        // if (inkz_editor.editor.project) |project| {
+        //     if (inkz_editor.packer.atlas) |atlas| {
+        //         if (dvui.button(@src(), "Export Project", .{ .draw_focus = false }, .{
+        //             .expand = .horizontal,
+        //             .style = .highlight,
+        //         })) {
+        //             if (project.packed_atlas_output) |output| {
+        //                 atlas.save(output, .data) catch {
+        //                     dvui.log.err("Failed to save atlas data", .{});
+        //                 };
+        //             }
 
-                    if (project.packed_image_output) |image_output| {
-                        atlas.save(image_output, .source) catch {
-                            dvui.log.err("Failed to save atlas image", .{});
-                        };
-                    }
-                }
-            }
+        //             if (project.packed_image_output) |image_output| {
+        //                 atlas.save(image_output, .source) catch {
+        //                     dvui.log.err("Failed to save atlas image", .{});
+        //                 };
+        //             }
+        //         }
+        //     }
 
-            const tl = dvui.textLayout(@src(), .{}, .{
-                .expand = .none,
-                .margin = dvui.Rect.all(0),
-                .background = false,
-            });
-            defer tl.deinit();
+        //     const tl = dvui.textLayout(@src(), .{}, .{
+        //         .expand = .none,
+        //         .margin = dvui.Rect.all(0),
+        //         .background = false,
+        //     });
+        //     defer tl.deinit();
 
-            const project_path = std.fs.path.join(dvui.currentWindow().lifo(), &.{ folder, ".inkz_editorproject" }) catch {
-                dvui.log.err("Failed to join project path", .{});
-                return;
-            };
-            defer dvui.currentWindow().lifo().free(project_path);
+        //     const project_path = std.fs.path.join(dvui.currentWindow().lifo(), &.{ folder, ".inkz_editorproject" }) catch {
+        //         dvui.log.err("Failed to join project path", .{});
+        //         return;
+        //     };
+        //     defer dvui.currentWindow().lifo().free(project_path);
 
-            tl.addText(project_path, .{ .color_text = dvui.themeGet().color(.control, .text) });
-        } else {
+        //     tl.addText(project_path, .{ .color_text = dvui.themeGet().color(.control, .text) });
+        // } else
+        {
             var box = dvui.box(@src(), .{ .dir = .vertical }, .{
                 .expand = .horizontal,
                 .max_size_content = .{ .w = inkz_editor.editor.explorer.scroll_info.virtual_size.w, .h = std.math.floatMax(f32) },

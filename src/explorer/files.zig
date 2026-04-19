@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const Io = std.Io;
 
 const dvui = @import("dvui");
 const icons = @import("icons");
@@ -40,12 +41,12 @@ pub const Extension = enum {
     gif,
 };
 
-pub fn draw() !void {
+pub fn draw(io: Io) !void {
     var tree = inkz_editor.dvui.TreeWidget.tree(@src(), .{ .enable_reordering = true }, .{ .background = false, .expand = .both });
     defer tree.deinit();
 
     if (inkz_editor.editor.folder) |path| {
-        try drawFiles(path, tree);
+        try drawFiles(io, path, tree);
     } else {
         dvui.labelNoFmt(
             @src(),
@@ -56,13 +57,13 @@ pub fn draw() !void {
 
         if (dvui.button(@src(), "Open Folder", .{ .draw_focus = false }, .{ .expand = .horizontal, .style = .highlight })) {
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
-                try inkz_editor.editor.setProjectFolder(folder);
+                try inkz_editor.editor.setProjectFolder(io, folder);
             }
         }
     }
 }
 
-pub fn drawFiles(path: []const u8, tree: *inkz_editor.dvui.TreeWidget) !void {
+pub fn drawFiles(io: Io, path: []const u8, tree: *inkz_editor.dvui.TreeWidget) !void {
     const unique_id = dvui.parentGet().extendId(@src(), 0);
 
     var filter_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
@@ -171,18 +172,18 @@ pub fn drawFiles(path: []const u8, tree: *inkz_editor.dvui.TreeWidget) !void {
         });
         defer box.deinit();
 
-        try recurseFiles(path, tree, unique_id, filter_text);
+        try recurseFiles(io, path, tree, unique_id, filter_text);
     }
 }
 
-fn lessThan(_: void, lhs: std.fs.Dir.Entry, rhs: std.fs.Dir.Entry) bool {
+fn lessThan(_: void, lhs: std.Io.Dir.Entry, rhs: std.Io.Dir.Entry) bool {
     if (lhs.kind == .directory and rhs.kind == .file) return true;
     if (lhs.kind == .file and rhs.kind == .directory) return false;
 
     return std.mem.order(u8, lhs.name, rhs.name) == .lt;
 }
 
-pub fn editableLabel(id_extra: usize, label: []const u8, color: dvui.Color, kind: std.fs.Dir.Entry.Kind, full_path: []const u8) !void {
+pub fn editableLabel(io: Io, id_extra: usize, label: []const u8, color: dvui.Color, kind: std.Io.File.Kind, full_path: []const u8) !void {
     const padding = dvui.Rect.all(2);
 
     const selected: bool = if (selected_id) |id| id_extra == id else false;
@@ -237,7 +238,7 @@ pub fn editableLabel(id_extra: usize, label: []const u8, color: dvui.Color, kind
             defer edit_id = null;
 
             const valid_path = blk: {
-                std.fs.accessAbsolute(full_path, .{}) catch {
+                std.Io.Dir.accessAbsolute(io, full_path, .{}) catch {
                     break :blk false;
                 };
 
@@ -253,26 +254,26 @@ pub fn editableLabel(id_extra: usize, label: []const u8, color: dvui.Color, kind
             if (!std.mem.eql(u8, label, te.getText()) and te.getText().len > 0 and valid_path) {
                 switch (kind) {
                     .directory => {
-                        std.fs.renameAbsolute(full_path, new_path) catch dvui.log.err("Failed to rename folder: {s} to {s}", .{ label, te.getText() });
+                        std.Io.Dir.renameAbsolute(full_path, new_path, io) catch dvui.log.err("Failed to rename folder: {s} to {s}", .{ label, te.getText() });
 
-                        for (inkz_editor.editor.open_files.values()) |*file| {
-                            if (std.mem.containsAtLeast(u8, file.path, 1, full_path)) {
-                                const file_name = dvui.currentWindow().arena().dupe(u8, std.fs.path.basename(file.path)) catch "Failed to duplicate path";
-                                inkz_editor.app.allocator.free(file.path);
-                                file.path = try std.fs.path.join(inkz_editor.app.allocator, &.{ new_path, file_name });
-                            }
-                        }
+                        // for (inkz_editor.editor.open_files.values()) |*file| {
+                        //     if (std.mem.containsAtLeast(u8, file.path, 1, full_path)) {
+                        //         const file_name = dvui.currentWindow().arena().dupe(u8, std.fs.path.basename(file.path)) catch "Failed to duplicate path";
+                        //         inkz_editor.app.allocator.free(file.path);
+                        //         file.path = try std.fs.path.join(inkz_editor.app.allocator, &.{ new_path, file_name });
+                        //     }
+                        // }
                     },
                     .file => {
-                        std.fs.renameAbsolute(full_path, new_path) catch dvui.log.err("Failed to rename file: {s} to {s}", .{ label, te.getText() });
+                        std.Io.Dir.renameAbsolute(full_path, new_path, io) catch dvui.log.err("Failed to rename file: {s} to {s}", .{ label, te.getText() });
 
-                        if (inkz_editor.editor.getFileFromPath(full_path)) |file| {
-                            inkz_editor.app.allocator.free(file.path);
-                            file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
-                                dvui.log.err("Failed to duplicate path: {s}", .{new_path});
-                                return error.FailedToDuplicatePath;
-                            };
-                        }
+                        // if (inkz_editor.editor.getFileFromPath(full_path)) |file| {
+                        //     inkz_editor.app.allocator.free(file.path);
+                        //     file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
+                        //         dvui.log.err("Failed to duplicate path: {s}", .{new_path});
+                        //         return error.FailedToDuplicatePath;
+                        //     };
+                        // }
                     },
                     else => {},
                 }
@@ -297,28 +298,29 @@ pub fn editableLabel(id_extra: usize, label: []const u8, color: dvui.Color, kind
     }
 }
 
-pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.TreeWidget, unique_id: dvui.Id, outer_filter_text: []const u8) !void {
+pub fn recurseFiles(io_outer: Io, root_directory: []const u8, outer_tree: *inkz_editor.dvui.TreeWidget, unique_id: dvui.Id, outer_filter_text: []const u8) !void {
     var color_i: usize = 0;
     var id_extra: usize = 0;
 
     const recursor = struct {
-        fn search(directory: []const u8, tree: *inkz_editor.dvui.TreeWidget, inner_unique_id: dvui.Id, inner_id_extra: *usize, color_id: *usize, filter_text: []const u8, parent_branch: ?*inkz_editor.dvui.TreeWidget.Branch) !void {
-            var dir = std.fs.cwd().openDir(directory, .{ .access_sub_paths = true, .iterate = true }) catch return;
-            defer dir.close();
+        fn search(io: Io, directory: []const u8, tree: *inkz_editor.dvui.TreeWidget, inner_unique_id: dvui.Id, inner_id_extra: *usize, color_id: *usize, filter_text: []const u8, parent_branch: ?*inkz_editor.dvui.TreeWidget.Branch) !void {
+            var dir = std.Io.Dir.cwd().openDir(io, directory, .{ .access_sub_paths = true, .iterate = true }) catch return;
+            defer dir.close(io);
 
             // Collect all files/folders in the directory and sort them alphabetically
-            var files = std.array_list.Managed(std.fs.Dir.Entry).init(dvui.currentWindow().arena());
+            var files = std.array_list.Managed(std.Io.Dir.Entry).init(dvui.currentWindow().arena());
 
             var iter = dir.iterate();
-            while (try iter.next()) |entry| {
+            while (try iter.next(io)) |entry| {
                 try files.append(.{
                     .name = dvui.currentWindow().arena().dupe(u8, entry.name) catch "Arena failed to allocate",
                     .kind = entry.kind,
+                    .inode = entry.inode,
                 });
             }
 
             std.mem.sort(
-                std.fs.Dir.Entry,
+                std.Io.Dir.Entry,
                 files.items,
                 {},
                 lessThan,
@@ -335,7 +337,7 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
                         continue;
                     }
                 } else if (filter_text.len > 0) {
-                    search(abs_path, tree, inner_unique_id, inner_id_extra, color_id, filter_text, null) catch continue;
+                    search(io, abs_path, tree, inner_unique_id, inner_id_extra, color_id, filter_text, null) catch continue;
                     continue;
                 }
 
@@ -443,15 +445,15 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
                         const new_path = try std.fs.path.join(dvui.currentWindow().arena(), &.{ if (entry.kind == .directory) abs_path else directory, old_sub_path });
 
                         if (!std.mem.eql(u8, removed_path, new_path)) {
-                            std.fs.renameAbsolute(removed_path, new_path) catch dvui.log.err("Failed to move {s} to {s}", .{ removed_path, new_path });
+                            std.Io.Dir.renameAbsolute(removed_path, new_path, io) catch dvui.log.err("Failed to move {s} to {s}", .{ removed_path, new_path });
 
-                            if (inkz_editor.editor.getFileFromPath(removed_path)) |file| {
-                                inkz_editor.app.allocator.free(file.path);
-                                file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
-                                    dvui.log.err("Failed to duplicate path: {s}", .{new_path});
-                                    return error.FailedToDuplicatePath;
-                                };
-                            }
+                            // if (inkz_editor.editor.getFileFromPath(removed_path)) |file| {
+                            //     inkz_editor.app.allocator.free(file.path);
+                            //     file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
+                            //         dvui.log.err("Failed to duplicate path: {s}", .{new_path});
+                            //         return error.FailedToDuplicatePath;
+                            //     };
+                            // }
                         }
 
                         dvui.dataRemove(null, inner_unique_id, "removed_path");
@@ -464,15 +466,15 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
                         const new_path = try std.fs.path.join(dvui.currentWindow().arena(), &.{ abs_path, old_sub_path });
 
                         if (!std.mem.eql(u8, removed_path, new_path)) {
-                            std.fs.renameAbsolute(removed_path, new_path) catch dvui.log.err("Failed to move {s} to {s}", .{ removed_path, new_path });
+                            std.Io.Dir.renameAbsolute(removed_path, new_path, io) catch dvui.log.err("Failed to move {s} to {s}", .{ removed_path, new_path });
 
-                            if (inkz_editor.editor.getFileFromPath(removed_path)) |file| {
-                                inkz_editor.app.allocator.free(file.path);
-                                file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
-                                    dvui.log.err("Failed to duplicate path: {s}", .{new_path});
-                                    return error.FailedToDuplicatePath;
-                                };
-                            }
+                            // if (inkz_editor.editor.getFileFromPath(removed_path)) |file| {
+                            //     inkz_editor.app.allocator.free(file.path);
+                            //     file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
+                            //         dvui.log.err("Failed to duplicate path: {s}", .{new_path});
+                            //         return error.FailedToDuplicatePath;
+                            //     };
+                            // }
                         }
 
                         dvui.dataRemove(null, inner_unique_id, "removed_path");
@@ -497,29 +499,30 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
 
                         selected_id = inner_id_extra.*;
 
-                        if (entry.kind == .file) {
-                            if ((dvui.menuItemLabel(@src(), "Open", .{}, .{
-                                .expand = .horizontal,
-                            })) != null) {
-                                _ = inkz_editor.editor.openFilePath(abs_path, inkz_editor.editor.currentGroupingID()) catch |err| {
-                                    dvui.log.err("Failed to open file: {any}", .{err});
-                                };
+                        // TODO: Wire back in
+                        // if (entry.kind == .file) {
+                        //     if ((dvui.menuItemLabel(@src(), "Open", .{}, .{
+                        //         .expand = .horizontal,
+                        //     })) != null) {
+                        //         _ = inkz_editor.editor.openFilePath(abs_path, inkz_editor.editor.currentGroupingID()) catch |err| {
+                        //             dvui.log.err("Failed to open file: {any}", .{err});
+                        //         };
 
-                                fw2.close();
-                            }
+                        //         fw2.close();
+                        //     }
 
-                            if ((dvui.menuItemLabel(@src(), "Open to the side", .{}, .{
-                                .expand = .horizontal,
-                            })) != null) {
-                                _ = inkz_editor.editor.openFilePath(abs_path, if (inkz_editor.editor.open_files.count() == 0) inkz_editor.editor.currentGroupingID() else inkz_editor.editor.newGroupingID()) catch {
-                                    dvui.log.err("Failed to open file: {s}", .{abs_path});
-                                };
+                        //     if ((dvui.menuItemLabel(@src(), "Open to the side", .{}, .{
+                        //         .expand = .horizontal,
+                        //     })) != null) {
+                        //         _ = inkz_editor.editor.openFilePath(abs_path, if (inkz_editor.editor.open_files.count() == 0) inkz_editor.editor.currentGroupingID() else inkz_editor.editor.newGroupingID()) catch {
+                        //             dvui.log.err("Failed to open file: {s}", .{abs_path});
+                        //         };
 
-                                fw2.close();
-                            }
+                        //         fw2.close();
+                        //     }
 
-                            _ = dvui.separator(@src(), .{ .expand = .horizontal });
-                        }
+                        //     _ = dvui.separator(@src(), .{ .expand = .horizontal });
+                        // }
 
                         if ((dvui.menuItemLabel(@src(), open_message, .{}, .{ .expand = .horizontal })) != null) {
                             inkz_editor.editor.openInFileBrowser(if (entry.kind == .file) std.fs.path.dirname(abs_path) orelse abs_path else abs_path) catch {
@@ -546,18 +549,18 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
                                 .id_extra = branch_id.asUsize(),
                             });
                             dvui.dataSetSlice(null, mutex.id, "_parent_path", abs_path);
-                            mutex.mutex.unlock();
+                            mutex.mutex.unlock(io);
                         }
 
                         if ((dvui.menuItemLabel(@src(), "New Folder...", .{}, .{ .expand = .horizontal })) != null) {
                             switch (entry.kind) {
                                 .directory => {
                                     const new_folder_path = try std.fs.path.join(dvui.currentWindow().arena(), &.{ abs_path, "New Folder" });
-                                    std.fs.makeDirAbsolute(new_folder_path) catch dvui.log.err("Failed to create folder: {s}", .{new_folder_path});
+                                    std.Io.Dir.createDirAbsolute(io, new_folder_path, .default_dir) catch dvui.log.err("Failed to create folder: {s}", .{new_folder_path});
                                 },
                                 .file => {
-                                    const new_folder_path = try std.fs.path.join(dvui.currentWindow().arena(), &.{ directory, "New Folder" });
-                                    std.fs.makeDirAbsolute(new_folder_path) catch dvui.log.err("Failed to create folder: {s}", .{new_folder_path});
+                                    const new_folder_path = try std.Io.Dir.path.join(dvui.currentWindow().arena(), &.{ directory, "New Folder" });
+                                    std.Io.Dir.createDirAbsolute(io, new_folder_path, .default_file) catch dvui.log.err("Failed to create folder: {s}", .{new_folder_path});
                                 },
                                 else => {},
                             }
@@ -579,9 +582,9 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
                                 defer fw2.close();
 
                                 if (entry.kind == .file) {
-                                    std.fs.deleteFileAbsolute(abs_path) catch dvui.log.err("Failed to delete file: {s}", .{abs_path});
+                                    std.Io.Dir.deleteFileAbsolute(io, abs_path) catch dvui.log.err("Failed to delete file: {s}", .{abs_path});
                                 } else if (entry.kind == .directory) {
-                                    std.fs.deleteDirAbsolute(abs_path) catch dvui.log.err("Failed to delete folder: {s}", .{abs_path});
+                                    std.Io.Dir.deleteDirAbsolute(io, abs_path) catch dvui.log.err("Failed to delete folder: {s}", .{abs_path});
                                 }
                             }
                         }
@@ -605,47 +608,40 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
 
                         const file_icon_color: dvui.Color = if (ext == .inkz_editor) .transparent else icon_color;
 
-                        if (ext == .inkz_editor) {
-                            _ = inkz_editor.dvui.sprite(
-                                @src(),
-                                .{ .source = inkz_editor.editor.atlas.source, .sprite = inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.logo_default], .scale = 2.0 },
-                                .{ .gravity_y = 0.5, .margin = padding, .padding = padding, .background = false },
-                            );
-                        } else {
-                            dvui.icon(
-                                @src(),
-                                "FileIcon",
-                                icon,
-                                .{ .stroke_color = file_icon_color, .fill_color = file_icon_color },
-                                .{
-                                    .gravity_y = 0.5,
-                                    .padding = padding,
-                                    .background = false,
-                                },
-                            );
-                        }
+                        dvui.icon(
+                            @src(),
+                            "FileIcon",
+                            icon,
+                            .{ .stroke_color = file_icon_color, .fill_color = file_icon_color },
+                            .{
+                                .gravity_y = 0.5,
+                                .padding = padding,
+                                .background = false,
+                            },
+                        );
 
-                        editableLabel(
-                            inner_id_extra.*,
-                            if (filter_text.len > 0) std.fs.path.relative(dvui.currentWindow().arena(), inkz_editor.editor.folder.?, abs_path) catch entry.name else entry.name,
-                            if (inkz_editor.editor.getFileFromPath(abs_path) != null) dvui.themeGet().color(.window, .text) else dvui.themeGet().color(.control, .text),
-                            entry.kind,
-                            abs_path,
-                        ) catch {
-                            dvui.log.err("Failed to draw editable label", .{});
-                        };
+                        // TODO: Figure out how to pass env map.
+                        // editableLabel(
+                        //     inner_id_extra.*,
+                        //     if (filter_text.len > 0) std.Io.Dir.path.relative(dvui.currentWindow().arena(), inkz_editor.editor.folder.?, abs_path) catch entry.name else entry.name,
+                        //     if (inkz_editor.editor.getFileFromPath(abs_path) != null) dvui.themeGet().color(.window, .text) else dvui.themeGet().color(.control, .text),
+                        //     entry.kind,
+                        //     abs_path,
+                        // ) catch {
+                        //     dvui.log.err("Failed to draw editable label", .{});
+                        // };
 
-                        if (inkz_editor.editor.getFileFromPath(abs_path)) |file| {
-                            if (file.dirty()) {
-                                _ = dvui.icon(
-                                    @src(),
-                                    "DirtyIcon",
-                                    icons.tvg.lucide.@"circle-small",
-                                    .{ .stroke_color = dvui.themeGet().color(.window, .text) },
-                                    .{ .gravity_y = 0.5 },
-                                );
-                            }
-                        }
+                        // if (inkz_editor.editor.getFileFromPath(abs_path)) |file| {
+                        //     if (file.dirty()) {
+                        //         _ = dvui.icon(
+                        //             @src(),
+                        //             "DirtyIcon",
+                        //             icons.tvg.lucide.@"circle-small",
+                        //             .{ .stroke_color = dvui.themeGet().color(.window, .text) },
+                        //             .{ .gravity_y = 0.5 },
+                        //         );
+                        //     }
+                        // }
 
                         if (branch.button.clicked()) {
                             selected_id = inner_id_extra.*;
@@ -694,6 +690,7 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
                         }
 
                         editableLabel(
+                            io,
                             inner_id_extra.*,
                             folder_name,
                             dvui.themeGet().color(.control, .text),
@@ -723,6 +720,7 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
                                 dvui.log.debug("Failed to track branch state!", .{});
                             };
                             try search(
+                                io,
                                 abs_path,
                                 tree,
                                 inner_unique_id,
@@ -748,7 +746,7 @@ pub fn recurseFiles(root_directory: []const u8, outer_tree: *inkz_editor.dvui.Tr
         }
     }.search;
 
-    try recursor(root_directory, outer_tree, unique_id, &id_extra, &color_i, outer_filter_text, null);
+    try recursor(io_outer, root_directory, outer_tree, unique_id, &id_extra, &color_i, outer_filter_text, null);
 
     return;
 }

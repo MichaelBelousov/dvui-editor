@@ -19,16 +19,18 @@ pub const Sidebar = @import("Sidebar.zig");
 
 const Editor = @This();
 
-// pub const Project = @import("Project.zig");
+pub const Project = @import("Project.zig");
 // pub const Recents = @import("Recents.zig");
 pub const Settings = @import("Settings.zig");
 // pub const Tools = @import("Tools.zig");
-// pub const Dialogs = @import("dialogs/Dialogs.zig");
+pub const Dialogs = @import("dialogs/Dialogs.zig");
 
 // pub const Transform = @import("Transform.zig");
 // pub const Workspace = @import("Workspace.zig");
 // pub const Panel = @import("panel/Panel.zig");
 // pub const Infobar = @import("Infobar.zig");
+io: std.Io,
+gpa: std.mem.Allocator,
 /// This arena is for small per-frame editor allocations, such as path joins, null terminations and labels.
 /// Do not free these allocations, instead, this allocator will be .reset(.retain_capacity) each frame
 arena: std.heap.ArenaAllocator,
@@ -54,11 +56,10 @@ sidebar: Sidebar,
 
 /// The root folder that will be searched for files and a .inkz_editorproject file
 folder: ?[]const u8 = null,
-// project: ?Project = null,
+project: ?Project = null,
 
 themes: std.array_list.Managed(dvui.Theme) = undefined,
-
-// open_files: std.ArrayHashMap(u64, inkz_editor.Internal.File) = undefined,
+open_files: std.AutoArrayHashMapUnmanaged(u64, inkz_editor.Internal.File) = undefined,
 
 // The actively focused workspace grouping ID
 // This will contain tabs for all open files with a matching grouping ID
@@ -70,7 +71,7 @@ colors: Colors = .{},
 grouping_id_counter: u64 = 0,
 file_id_counter: u64 = 0,
 
-sprite_clipboard: ?SpriteClipboard = null,
+// sprite_clipboard: ?SpriteClipboard = null,
 
 window_opacity: f32 = 1.0,
 
@@ -80,10 +81,10 @@ window_opacity: f32 = 1.0,
 /// When set, next `tick` runs `warmupDrawingComposites` on the active file (after open or drawing-tool select).
 composite_warmup_pending: bool = false,
 
-pub const SpriteClipboard = struct {
-    source: dvui.ImageSource,
-    offset: dvui.Point,
-};
+// pub const SpriteClipboard = struct {
+//     source: dvui.ImageSource,
+//     offset: dvui.Point,
+// };
 
 pub fn init(
     io: Io,
@@ -183,6 +184,8 @@ pub fn init(
     inkz_editor_light.focus = inkz_editor_light.highlight.fill.?;
 
     var editor: Editor = .{
+        .io = io,
+        .gpa = app.allocator,
         .config_folder = config_folder,
         .palette_folder = palette_folder,
         .explorer = try app.allocator.create(Explorer),
@@ -289,6 +292,7 @@ const handle_size = 10;
 const handle_dist = 60;
 
 pub fn tick(editor: *Editor) !dvui.App.Result {
+    const io = editor.io;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
     // if (inkz_editor.backend.pollPendingNativeMenuAction()) |action| {
@@ -493,75 +497,75 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
 
         // Explorer area
         {
-            const result = try editor.explorer.draw();
+            const result = try editor.explorer.draw(io);
             if (result != .ok) {
                 return result;
             }
         }
     }
 
-    if (editor.explorer.paned.showSecond()) {
-        const bg_box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
-        defer bg_box.deinit();
+    // if (editor.explorer.paned.showSecond()) {
+    //     const bg_box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+    //     defer bg_box.deinit();
 
-        // On macOS, the menu is handled natively, so we don't need to draw it here
-        if (builtin.os.tag != .macos) {
-            const result = try Menu.draw();
-            if (result != .ok) {
-                return result;
-            }
-        }
+    //     // On macOS, the menu is handled natively, so we don't need to draw it here
+    //     if (builtin.os.tag != .macos) {
+    //         const result = try Menu.draw();
+    //         if (result != .ok) {
+    //             return result;
+    //         }
+    //     }
 
-        const workspace_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = false, .padding = .{ .w = handle_size } });
-        defer workspace_vbox.deinit();
+    //     const workspace_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = false, .padding = .{ .w = handle_size } });
+    //     defer workspace_vbox.deinit();
 
-        editor.panel.paned = inkz_editor.dvui.paned(@src(), .{
-            .direction = .vertical,
-            .collapsed_size = inkz_editor.editor.settings.min_window_size[1] + 1,
-            .handle_size = handle_size,
-            .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
-            .uncollapse_ratio = 1.0,
-        }, .{
-            .expand = .both,
-            .background = false,
-        });
-        defer editor.panel.paned.deinit();
+    //     editor.panel.paned = inkz_editor.dvui.paned(@src(), .{
+    //         .direction = .vertical,
+    //         .collapsed_size = inkz_editor.editor.settings.min_window_size[1] + 1,
+    //         .handle_size = handle_size,
+    //         .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
+    //         .uncollapse_ratio = 1.0,
+    //     }, .{
+    //         .expand = .both,
+    //         .background = false,
+    //     });
+    //     defer editor.panel.paned.deinit();
 
-        if (!editor.panel.paned.dragging) {
-            if (editor.activeFile()) |_| {
-                if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and inkz_editor.editor.settings.panel_ratio > 0.0) {
-                    editor.panel.paned.animateSplit(1.0 - inkz_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
-                }
-            } else {
-                if (!editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0) {
-                    editor.panel.paned.animateSplit(1.0, dvui.easing.outQuint);
-                }
-            }
-        } else {
-            inkz_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
-        }
+    //     if (!editor.panel.paned.dragging) {
+    //         if (editor.activeFile()) |_| {
+    //             if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and inkz_editor.editor.settings.panel_ratio > 0.0) {
+    //                 editor.panel.paned.animateSplit(1.0 - inkz_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
+    //             }
+    //         } else {
+    //             if (!editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0) {
+    //                 editor.panel.paned.animateSplit(1.0, dvui.easing.outQuint);
+    //             }
+    //         }
+    //     } else {
+    //         inkz_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
+    //     }
 
-        if (editor.panel.paned.showSecond()) {
-            const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
-                .expand = .both,
-                .background = false,
-                .gravity_y = 0.0,
-            });
-            defer vbox.deinit();
+    //     if (editor.panel.paned.showSecond()) {
+    //         const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
+    //             .expand = .both,
+    //             .background = false,
+    //             .gravity_y = 0.0,
+    //         });
+    //         defer vbox.deinit();
 
-            const result = try editor.panel.draw();
-            if (result != .ok) {
-                return result;
-            }
-        }
+    //         const result = try editor.panel.draw();
+    //         if (result != .ok) {
+    //             return result;
+    //         }
+    //     }
 
-        if (editor.panel.paned.showFirst()) {
-            const result = try editor.drawWorkspaces(0);
-            if (result != .ok) {
-                return result;
-            }
-        }
-    }
+    // if (editor.panel.paned.showFirst()) {
+    //     const result = try editor.drawWorkspaces(0);
+    //     if (result != .ok) {
+    //         return result;
+    //     }
+    // }
+    // }
 
     //     { // Radial Menu
 
@@ -1047,17 +1051,17 @@ pub fn close(app: *App, editor: *Editor) void {
     app.should_close = should_close;
 }
 
-pub fn setProjectFolder(editor: *Editor, path: []const u8) !void {
+pub fn setProjectFolder(editor: *Editor, io: Io, path: []const u8) !void {
     if (editor.folder) |folder| {
         if (editor.project) |*project| {
-            project.save() catch {
+            project.save(io) catch {
                 dvui.log.err("Failed to save project", .{});
             };
         }
         inkz_editor.app.allocator.free(folder);
     }
     editor.folder = try inkz_editor.app.allocator.dupe(u8, path);
-    try editor.recents.appendFolder(try inkz_editor.app.allocator.dupe(u8, path));
+    // try editor.recents.appendFolder(try inkz_editor.app.allocator.dupe(u8, path));
     editor.explorer.pane = .files;
 
     // editor.project = Project.load(inkz_editor.app.allocator) catch null;
@@ -1074,61 +1078,67 @@ pub fn saving(editor: *Editor) bool {
 /// The editor doesn't care what type of file is being opened,
 /// File.fromPath will handle the file type
 pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
-    for (editor.open_files.values(), 0..) |*file, i| {
-        if (std.mem.eql(u8, file.path, path)) {
-            editor.setActiveFile(i);
-            return false;
-        }
-    }
+    _ = editor;
+    _ = path;
+    _ = grouping;
+    // for (editor.open_files.values(), 0..) |*file, i| {
+    //     if (std.mem.eql(u8, file.path, path)) {
+    //         editor.setActiveFile(i);
+    //         return false;
+    //     }
+    // }
 
-    if (inkz_editor.Internal.File.fromPath(path) catch null) |file| {
-        try editor.open_files.put(file.id, file);
-        if (editor.open_files.getPtr(file.id)) |f| {
-            f.editor.grouping = grouping;
-        }
+    // if (inkz_editor.Internal.File.fromPath(path) catch null) |file| {
+    //     try editor.open_files.put(file.id, file);
+    //     if (editor.open_files.getPtr(file.id)) |f| {
+    //         f.editor.grouping = grouping;
+    //     }
 
-        // At this point, if the workspace grouping doesn't exist, it will next frame
-        // once the workspaces are rebuilt. Since we cant wait on that, go ahead and set it now
-        //editor.open_workspace_grouping = grouping;
+    //     // At this point, if the workspace grouping doesn't exist, it will next frame
+    //     // once the workspaces are rebuilt. Since we cant wait on that, go ahead and set it now
+    //     //editor.open_workspace_grouping = grouping;
 
-        // If the workspace grouping does exist, go ahead and set the active file
-        editor.setActiveFile(editor.open_files.count() - 1);
-        editor.composite_warmup_pending = true;
-        return true;
-    }
+    //     // If the workspace grouping does exist, go ahead and set the active file
+    //     editor.setActiveFile(editor.open_files.count() - 1);
+    //     editor.composite_warmup_pending = true;
+    //     return true;
+    // }
     return error.FailedToOpenFile;
 }
 
 pub fn requestCompositeWarmup(editor: *Editor) void {
     editor.composite_warmup_pending = true;
 }
-
+// TODO: Bring it back
 pub fn newFile(editor: *Editor, path: []const u8, options: inkz_editor.Internal.File.InitOptions) !*inkz_editor.Internal.File {
-    if (editor.getFileFromPath(path)) |_| {
-        return error.FileAlreadyExists;
-    }
+    _ = path;
+    _ = options;
+    // if (editor.getFileFromPath(path)) |_| {
+    //     return error.FileAlreadyExists;
+    // }
 
-    const file = inkz_editor.Internal.File.init(path, options) catch {
-        dvui.log.err("Failed to create file: {s}", .{path});
-        return error.FailedToCreateFile;
-    };
+    // const file = inkz_editor.Internal.File.init(path, options) catch {
+    //     dvui.log.err("Failed to create file: {s}", .{path});
+    //     return error.FailedToCreateFile;
+    // };
+    const file: inkz_editor.Internal.File = .{};
 
-    try editor.open_files.put(file.id, file);
+    try editor.open_files.put(editor.gpa, file.id, file);
     editor.setActiveFile(editor.open_files.count() - 1);
-    editor.composite_warmup_pending = true;
+    // editor.composite_warmup_pending = true;
 
     return editor.open_files.getPtr(file.id) orelse return error.FailedToCreateFile;
 }
 
 pub fn setActiveFile(editor: *Editor, index: usize) void {
     if (index >= editor.open_files.values().len) return;
-    const file = editor.open_files.values()[index];
-    const grouping = file.editor.grouping;
+    // const file = editor.open_files.values()[index];
+    // const grouping = file.editor.grouping;
 
-    if (editor.workspaces.getPtr(grouping)) |workspace| {
-        editor.open_workspace_grouping = grouping;
-        workspace.open_file_index = index;
-    }
+    // if (editor.workspaces.getPtr(grouping)) |workspace| {
+    //     editor.open_workspace_grouping = grouping;
+    //     workspace.open_file_index = index;
+    // }
 }
 
 /// Returns the actively focused file, through workspace grouping.
@@ -1147,17 +1157,17 @@ pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.File {
     return &editor.open_files.values()[index];
 }
 
-pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*inkz_editor.Internal.File {
-    if (editor.open_files.values().len == 0) return null;
+// pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*inkz_editor.Internal.File {
+//     if (editor.open_files.values().len == 0) return null;
 
-    for (editor.open_files.values()) |*file| {
-        if (std.mem.eql(u8, file.path, path)) {
-            return file;
-        }
-    }
+//     for (editor.open_files.values()) |*file| {
+//         if (std.mem.eql(u8, file.path, path)) {
+//             return file;
+//         }
+//     }
 
-    return null;
-}
+//     return null;
+// }
 
 pub fn forceCloseFile(editor: *Editor, index: usize) !void {
     if (editor.getFile(index) != null) {
@@ -1541,9 +1551,9 @@ pub fn redo(editor: *Editor) !void {
     }
 }
 
-pub fn openInFileBrowser(_: *Editor, path: []const u8) !void {
+pub fn openInFileBrowser(editor: *Editor, path: []const u8) !void {
     const cmd = if (builtin.os.tag == .macos) "open" else if (builtin.os.tag == .linux) "xdg-open" else "start";
-    _ = std.process.Child.run(.{ .argv = &.{ cmd, path }, .allocator = inkz_editor.app.allocator }) catch {
+    _ = std.process.run(inkz_editor.app.allocator, editor.io, .{ .argv = &.{ cmd, path } }) catch {
         dvui.log.err("Failed to open file browser", .{});
         return;
     };

@@ -44,6 +44,15 @@
             .url = "git+https://codeberg.org/BSF/inkz.git#2ad855b9b2d7bb32114d480bd2eb40279f0a3a05",
             .hash = "inkz-0.0.1-2kQZr2nXEwCQM7_dYJ59VvzRwrVvRHACqR6LedbfLL3f",
         },
+        .icons = .{
+            .path = "../zig-lib-icons",
+            // .url = "git+https://github.com/foxnne/zig-lib-icons#035f219f39222e6ce564d11563a2ec490f922006",
+            // .hash = "icons-0.0.0-iJxA-SH4MwCWmUdHazW-wr-jgWdCtS30-tJcbemaRKEs",
+        },
+        // .assetpack = .{
+        //     .url = "git+https://github.com/foxnne/assetpack#40314c96819d53ba44c3cab1b2b71219004de829",
+        //     .hash = "assetpack-0.1.0-5DA2d2VlAACfTN5RE7XvEVSPwr-a8IT2E58MFnONRXnP",
+        // },
     },
     .paths = .{
         "build.zig",

@@ -15,6 +15,10 @@ pub const Internal = struct {
     // pub const File = @import("internal/File.zig");
     // pub const History = @import("internal/History.zig");
     pub const Palette = @import("internal/Palette.zig");
+    pub const File = struct {
+        id: u32 = 0,
+        pub const InitOptions = struct {};
+    };
 };
 
 pub const dvui = @import("dvui.zig");

@@ -1,6 +1,7 @@
-const builtin = @import("builtin");
-const inkz_editor = @import("root.zig");
 const std = @import("std");
+const builtin = @import("builtin");
+
+const inkz_editor = @import("root.zig");
 
 const Settings = @This();
 
@@ -97,7 +98,7 @@ pub fn load(allocator: std.mem.Allocator, path: []const u8) !Settings {
     }
 
     return .{
-        .theme = try allocator.dupe(u8, "pixi_dark.json"),
+        .theme = try allocator.dupe(u8, "inkz_editor_dark.json"),
     };
 }
 

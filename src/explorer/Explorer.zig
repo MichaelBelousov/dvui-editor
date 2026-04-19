@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 
 const Core = @import("mach").Core;
 const dvui = @import("dvui");
@@ -11,14 +12,12 @@ const Packer = inkz_editor.Packer;
 pub const files = @import("files.zig");
 pub const project = @import("project.zig");
 pub const settings = @import("settings.zig");
-pub const Sprites = @import("sprites.zig");
 pub const Tools = @import("tools.zig");
 
 pub const Explorer = @This();
 
 // pub const animations = @import("animations.zig");
 // pub const keyframe_animations = @import("keyframe_animations.zig");
-sprites: Sprites = .{},
 tools: Tools = .{},
 pane: Pane = .files,
 paned: *inkz_editor.dvui.PanedWidget = undefined,
@@ -82,7 +81,7 @@ pub fn open(explorer: *Explorer) void {
     explorer.closed = false;
 }
 
-pub fn draw(explorer: *Explorer) !dvui.App.Result {
+pub fn draw(explorer: *Explorer, io: std.Io) !dvui.App.Result {
     const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .both,
         .background = false,
@@ -106,11 +105,10 @@ pub fn draw(explorer: *Explorer) !dvui.App.Result {
     });
 
     switch (explorer.pane) {
-        .files => try files.draw(),
+        .files => try files.draw(io),
         .settings => try settings.draw(),
         .project => try project.draw(),
         .tools => try explorer.tools.draw(),
-        .sprites => try explorer.sprites.draw(),
         else => {},
     }
 
