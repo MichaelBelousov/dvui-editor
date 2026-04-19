@@ -21,7 +21,7 @@ const Editor = @This();
 
 // pub const Project = @import("Project.zig");
 // pub const Recents = @import("Recents.zig");
-// pub const Settings = @import("Settings.zig");
+pub const Settings = @import("Settings.zig");
 // pub const Tools = @import("Tools.zig");
 // pub const Dialogs = @import("dialogs/Dialogs.zig");
 
@@ -38,7 +38,7 @@ palette_folder: []const u8,
 
 // atlas: inkz_editor.Internal.Atlas,
 
-// settings: Settings = undefined,
+settings: Settings = undefined,
 // recents: Recents = undefined,
 
 explorer: *Explorer,
@@ -289,13 +289,13 @@ const handle_size = 10;
 const handle_dist = 60;
 
 pub fn tick(editor: *Editor) !dvui.App.Result {
-    // editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
+    editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
     // if (inkz_editor.backend.pollPendingNativeMenuAction()) |action| {
     //     editor.queueNativeMenuAction(action);
     // }
 
-    // defer editor.dim_titlebar = false;
+    defer editor.dim_titlebar = false;
     // editor.setTitlebarColor();
     // editor.setWindowStyle();
 
@@ -349,28 +349,28 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     // {
 
     //     // First, window color is set to the opaque color.
-    //     var window_color = dvui.themeGet().color(.content, .fill);
+    const window_color = dvui.themeGet().color(.content, .fill);
 
-    //     switch (builtin.os.tag) {
-    //         .macos => {
-    //             window_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
-    //         },
-    //         .windows => {
-    //             window_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
-    //         },
-    //         else => {},
-    //     }
+    // switch (builtin.os.tag) {
+    //     .macos => {
+    //         window_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
+    //     },
+    //     .windows => {
+    //         window_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
+    //     },
+    //     else => {},
+    // }
 
-    //     var overall_box = dvui.box(
-    //         @src(),
-    //         .{ .dir = .vertical },
-    //         .{
-    //             .expand = .both,
-    //             .background = true,
-    //             .color_fill = window_color,
-    //         },
-    //     );
-    //     defer overall_box.deinit();
+    var overall_box = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .expand = .both,
+            .background = true,
+            .color_fill = window_color,
+        },
+    );
+    defer overall_box.deinit();
 
     //     if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) {
     //         var animation = dvui.animate(@src(), .{ .duration = 400_000, .kind = .vertical, .easing = dvui.easing.outBack }, .{});
@@ -431,137 +431,137 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     //         }
     //     };
 
-    //     // Sidebar area
-    //     // Since sidebar is drawn before the explorer, and we want to allow expanding the explorer
-    //     // from clicking a sidebar option, we need to check if the sidebar was pressed
-    //     const sidebar_pressed = editor.sidebar.draw() catch {
-    //         dvui.log.err("Failed to draw sidebar", .{});
-    //         return false;
+    // Sidebar area
+    // Since sidebar is drawn before the explorer, and we want to allow expanding the explorer
+    // from clicking a sidebar option, we need to check if the sidebar was pressed
+    const sidebar_pressed = editor.sidebar.draw() catch {
+        dvui.log.err("Failed to draw sidebar", .{});
+        return false;
+    };
+
+    var explorer_paned_box = dvui.box(
+        @src(),
+        .{ .dir = .vertical },
+        .{
+            .expand = .both,
+            .background = false,
+        },
+    );
+    defer explorer_paned_box.deinit();
+
+    // Draw the infobar, but draw it at the bottom of the paned box (gravity_y = 1.0)
+    // {
+    //     editor.infobar.draw() catch {
+    //         dvui.log.err("Failed to draw infobar", .{});
     //     };
+    // }
 
-    //     var explorer_paned_box = dvui.box(
-    //         @src(),
-    //         .{ .dir = .vertical },
-    //         .{
-    //             .expand = .both,
-    //             .background = false,
-    //         },
-    //     );
-    //     defer explorer_paned_box.deinit();
+    // Draw the explorer paned widget, which will recursively draw the workspaces in the second pane
+    editor.explorer.paned = inkz_editor.dvui.paned(@src(), .{
+        .direction = .horizontal,
+        .collapsed_size = inkz_editor.editor.settings.min_window_size[0] + 1,
+        .handle_size = handle_size,
+        .handle_dynamic = .{
+            .handle_size_max = handle_size,
+            .distance_max = handle_dist,
+        },
+        .uncollapse_ratio = inkz_editor.editor.settings.explorer_ratio,
+    }, .{
+        .expand = .both,
+        .background = false,
+    });
+    defer editor.explorer.paned.deinit();
 
-    //     // Draw the infobar, but draw it at the bottom of the paned box (gravity_y = 1.0)
-    //     {
-    //         editor.infobar.draw() catch {
-    //             dvui.log.err("Failed to draw infobar", .{});
-    //         };
-    //     }
+    // editor.flushQueuedNativeMenuActions();
 
-    //     // Draw the explorer paned widget, which will recursively draw the workspaces in the second pane
-    //     editor.explorer.paned = inkz_editor.dvui.paned(@src(), .{
-    //         .direction = .horizontal,
-    //         .collapsed_size = inkz_editor.editor.settings.min_window_size[0] + 1,
-    //         .handle_size = handle_size,
-    //         .handle_dynamic = .{
-    //             .handle_size_max = handle_size,
-    //             .distance_max = handle_dist,
-    //         },
-    //         .uncollapse_ratio = inkz_editor.editor.settings.explorer_ratio,
-    //     }, .{
-    //         .expand = .both,
-    //         .background = false,
-    //     });
-    //     defer editor.explorer.paned.deinit();
+    if (dvui.firstFrame(editor.explorer.paned.wd.id)) {
+        editor.explorer.paned.split_ratio.* = 0.0;
+        editor.explorer.paned.animateSplit(inkz_editor.editor.settings.explorer_ratio, dvui.easing.outBack);
 
-    //     editor.flushQueuedNativeMenuActions();
+        if (inkz_editor.editor.settings.explorer_ratio < 0.01) {
+            editor.explorer.closed = true;
+        }
+    } else if (editor.explorer.paned.dragging) {
+        editor.settings.explorer_ratio = editor.explorer.paned.split_ratio.*;
+    }
 
-    //     if (dvui.firstFrame(editor.explorer.paned.wd.id)) {
-    //         editor.explorer.paned.split_ratio.* = 0.0;
-    //         editor.explorer.paned.animateSplit(inkz_editor.editor.settings.explorer_ratio, dvui.easing.outBack);
+    if (sidebar_pressed) {
+        editor.explorer.open();
+    }
 
-    //         if (inkz_editor.editor.settings.explorer_ratio < 0.01) {
-    //             editor.explorer.closed = true;
-    //         }
-    //     } else if (editor.explorer.paned.dragging) {
-    //         editor.settings.explorer_ratio = editor.explorer.paned.split_ratio.*;
-    //     }
+    if (editor.explorer.paned.showFirst()) {
 
-    //     if (sidebar_pressed) {
-    //         editor.explorer.open();
-    //     }
+        // Explorer area
+        {
+            const result = try editor.explorer.draw();
+            if (result != .ok) {
+                return result;
+            }
+        }
+    }
 
-    //     if (editor.explorer.paned.showFirst()) {
+    if (editor.explorer.paned.showSecond()) {
+        const bg_box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+        defer bg_box.deinit();
 
-    //         // Explorer area
-    //         {
-    //             const result = try editor.explorer.draw();
-    //             if (result != .ok) {
-    //                 return result;
-    //             }
-    //         }
-    //     }
+        // On macOS, the menu is handled natively, so we don't need to draw it here
+        if (builtin.os.tag != .macos) {
+            const result = try Menu.draw();
+            if (result != .ok) {
+                return result;
+            }
+        }
 
-    //     if (editor.explorer.paned.showSecond()) {
-    //         const bg_box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
-    //         defer bg_box.deinit();
+        const workspace_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = false, .padding = .{ .w = handle_size } });
+        defer workspace_vbox.deinit();
 
-    //         // On macOS, the menu is handled natively, so we don't need to draw it here
-    //         if (builtin.os.tag != .macos) {
-    //             const result = try Menu.draw();
-    //             if (result != .ok) {
-    //                 return result;
-    //             }
-    //         }
+        editor.panel.paned = inkz_editor.dvui.paned(@src(), .{
+            .direction = .vertical,
+            .collapsed_size = inkz_editor.editor.settings.min_window_size[1] + 1,
+            .handle_size = handle_size,
+            .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
+            .uncollapse_ratio = 1.0,
+        }, .{
+            .expand = .both,
+            .background = false,
+        });
+        defer editor.panel.paned.deinit();
 
-    //         const workspace_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = false, .padding = .{ .w = handle_size } });
-    //         defer workspace_vbox.deinit();
+        if (!editor.panel.paned.dragging) {
+            if (editor.activeFile()) |_| {
+                if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and inkz_editor.editor.settings.panel_ratio > 0.0) {
+                    editor.panel.paned.animateSplit(1.0 - inkz_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
+                }
+            } else {
+                if (!editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0) {
+                    editor.panel.paned.animateSplit(1.0, dvui.easing.outQuint);
+                }
+            }
+        } else {
+            inkz_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
+        }
 
-    //         editor.panel.paned = inkz_editor.dvui.paned(@src(), .{
-    //             .direction = .vertical,
-    //             .collapsed_size = inkz_editor.editor.settings.min_window_size[1] + 1,
-    //             .handle_size = handle_size,
-    //             .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
-    //             .uncollapse_ratio = 1.0,
-    //         }, .{
-    //             .expand = .both,
-    //             .background = false,
-    //         });
-    //         defer editor.panel.paned.deinit();
+        if (editor.panel.paned.showSecond()) {
+            const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
+                .expand = .both,
+                .background = false,
+                .gravity_y = 0.0,
+            });
+            defer vbox.deinit();
 
-    //         if (!editor.panel.paned.dragging) {
-    //             if (editor.activeFile()) |_| {
-    //                 if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and inkz_editor.editor.settings.panel_ratio > 0.0) {
-    //                     editor.panel.paned.animateSplit(1.0 - inkz_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
-    //                 }
-    //             } else {
-    //                 if (!editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0) {
-    //                     editor.panel.paned.animateSplit(1.0, dvui.easing.outQuint);
-    //                 }
-    //             }
-    //         } else {
-    //             inkz_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
-    //         }
+            const result = try editor.panel.draw();
+            if (result != .ok) {
+                return result;
+            }
+        }
 
-    //         if (editor.panel.paned.showSecond()) {
-    //             const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
-    //                 .expand = .both,
-    //                 .background = false,
-    //                 .gravity_y = 0.0,
-    //             });
-    //             defer vbox.deinit();
-
-    //             const result = try editor.panel.draw();
-    //             if (result != .ok) {
-    //                 return result;
-    //             }
-    //         }
-
-    //         if (editor.panel.paned.showFirst()) {
-    //             const result = try editor.drawWorkspaces(0);
-    //             if (result != .ok) {
-    //                 return result;
-    //             }
-    //         }
-    //     }
+        if (editor.panel.paned.showFirst()) {
+            const result = try editor.drawWorkspaces(0);
+            if (result != .ok) {
+                return result;
+            }
+        }
+    }
 
     //     { // Radial Menu
 
@@ -694,18 +694,18 @@ pub fn handleNativeMenuAction(editor: *Editor, action: inkz_editor.backend.Nativ
     }
 }
 
-pub fn setTitlebarColor(editor: *Editor) void {
-    const color = if (editor.dim_titlebar) dvui.themeGet().color(.control, .fill).lerp(.black, if (dvui.themeGet().dark) 60.0 / 255.0 else 80.0 / 255.0) else dvui.themeGet().color(.control, .fill);
+// pub fn setTitlebarColor(editor: *Editor) void {
+//     const color = if (editor.dim_titlebar) dvui.themeGet().color(.control, .fill).lerp(.black, if (dvui.themeGet().dark) 60.0 / 255.0 else 80.0 / 255.0) else dvui.themeGet().color(.control, .fill);
 
-    if (!std.mem.eql(u8, &editor.last_titlebar_color.toRGBA(), &color.toRGBA())) {
-        editor.last_titlebar_color = color;
-        inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), color.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
-    }
-}
+//     if (!std.mem.eql(u8, &editor.last_titlebar_color.toRGBA(), &color.toRGBA())) {
+//         editor.last_titlebar_color = color;
+//         inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), color.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
+//     }
+// }
 
-pub fn setWindowStyle(_: *Editor) void {
-    inkz_editor.backend.setWindowStyle(dvui.currentWindow());
-}
+// pub fn setWindowStyle(_: *Editor) void {
+//     inkz_editor.backend.setWindowStyle(dvui.currentWindow());
+// }
 
 pub fn drawRadialMenu(editor: *Editor) !void {
     var fw: dvui.FloatingWidget = undefined;
