@@ -81,7 +81,7 @@ pub fn open(explorer: *Explorer) void {
     explorer.closed = false;
 }
 
-pub fn draw(explorer: *Explorer, io: std.Io) !dvui.App.Result {
+pub fn draw(explorer: *Explorer, io: std.Io, environ: *const std.process.Environ.Map) !dvui.App.Result {
     const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .both,
         .background = false,
@@ -105,7 +105,7 @@ pub fn draw(explorer: *Explorer, io: std.Io) !dvui.App.Result {
     });
 
     switch (explorer.pane) {
-        .files => try files.draw(io),
+        .files => try files.draw(io, environ),
         .settings => try settings.draw(),
         .project => try project.draw(),
         .tools => try explorer.tools.draw(),

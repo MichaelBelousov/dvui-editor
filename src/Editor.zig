@@ -31,6 +31,7 @@ pub const Panel = @import("Panel.zig");
 // pub const Infobar = @import("Infobar.zig");
 io: std.Io,
 gpa: std.mem.Allocator,
+environ: *std.process.Environ.Map,
 /// This arena is for small per-frame editor allocations, such as path joins, null terminations and labels.
 /// Do not free these allocations, instead, this allocator will be .reset(.retain_capacity) each frame
 arena: std.heap.ArenaAllocator,
@@ -186,6 +187,7 @@ pub fn init(
     var editor: Editor = .{
         .io = io,
         .gpa = app.allocator,
+        .environ = app.environ,
         .config_folder = config_folder,
         .palette_folder = palette_folder,
         .explorer = try app.allocator.create(Explorer),
@@ -295,6 +297,7 @@ const handle_dist = 60;
 
 pub fn tick(editor: *Editor) !dvui.App.Result {
     const io = editor.io;
+    const environ = editor.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
     // if (inkz_editor.backend.pollPendingNativeMenuAction()) |action| {
@@ -499,7 +502,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
 
         // Explorer area
         {
-            const result = try editor.explorer.draw(io);
+            const result = try editor.explorer.draw(io, environ);
             if (result != .ok) {
                 return result;
             }
@@ -1160,17 +1163,19 @@ pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.File {
     return &editor.open_files.values()[index];
 }
 
-// pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*inkz_editor.Internal.File {
-//     if (editor.open_files.values().len == 0) return null;
+pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*inkz_editor.Internal.File {
+    if (editor.open_files.values().len == 0) return null;
 
-//     for (editor.open_files.values()) |*file| {
-//         if (std.mem.eql(u8, file.path, path)) {
-//             return file;
-//         }
-//     }
+    _ = path;
+    // TODO: The following is segfaulting for empty path
+    // for (editor.open_files.values()) |*file| {
+    //     if (std.mem.eql(u8, file.path, path)) {
+    //         return file;
+    //     }
+    // }
 
-//     return null;
-// }
+    return null;
+}
 
 pub fn forceCloseFile(editor: *Editor, index: usize) !void {
     if (editor.getFile(index) != null) {

@@ -18,6 +18,7 @@ const Editor = inkz_editor.Editor;
 
 // App fields
 allocator: std.mem.Allocator = undefined,
+environ: *std.process.Environ.Map,
 
 //delta_time: f32 = 0.0,
 
@@ -47,6 +48,7 @@ pub const std_options: std.Options = .{
 pub fn AppInit(win: *dvui.Window) !void {
     const io = dvui.io;
     const gpa = win.gpa;
+    const environ = dvui.App.main_init.?.environ_map;
 
     // Run from the directory where the executable is located so relative assets can be found.
     // var buffer: [1024]u8 = undefined;
@@ -58,6 +60,7 @@ pub fn AppInit(win: *dvui.Window) !void {
     inkz_editor.app = try gpa.create(App);
     inkz_editor.app.* = .{
         .allocator = gpa,
+        .environ = environ,
         .window = win,
         .root_path = gpa.dupeZ(u8, path) catch ".",
     };

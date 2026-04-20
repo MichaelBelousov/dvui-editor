@@ -41,12 +41,12 @@ pub const Extension = enum {
     gif,
 };
 
-pub fn draw(io: Io) !void {
+pub fn draw(io: Io, environ: *const std.process.Environ.Map) !void {
     var tree = inkz_editor.dvui.TreeWidget.tree(@src(), .{ .enable_reordering = true }, .{ .background = false, .expand = .both });
     defer tree.deinit();
 
     if (inkz_editor.editor.folder) |path| {
-        try drawFiles(io, path, tree);
+        try drawFiles(io, environ, path, tree);
     } else {
         dvui.labelNoFmt(
             @src(),
@@ -63,7 +63,7 @@ pub fn draw(io: Io) !void {
     }
 }
 
-pub fn drawFiles(io: Io, path: []const u8, tree: *inkz_editor.dvui.TreeWidget) !void {
+pub fn drawFiles(io: Io, environ: *const std.process.Environ.Map, path: []const u8, tree: *inkz_editor.dvui.TreeWidget) !void {
     const unique_id = dvui.parentGet().extendId(@src(), 0);
 
     var filter_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
@@ -172,7 +172,7 @@ pub fn drawFiles(io: Io, path: []const u8, tree: *inkz_editor.dvui.TreeWidget) !
         });
         defer box.deinit();
 
-        try recurseFiles(io, path, tree, unique_id, filter_text);
+        try recurseFiles(io, environ, path, tree, unique_id, filter_text);
     }
 }
 
@@ -298,12 +298,12 @@ pub fn editableLabel(io: Io, id_extra: usize, label: []const u8, color: dvui.Col
     }
 }
 
-pub fn recurseFiles(io_outer: Io, root_directory: []const u8, outer_tree: *inkz_editor.dvui.TreeWidget, unique_id: dvui.Id, outer_filter_text: []const u8) !void {
+pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map, root_directory: []const u8, outer_tree: *inkz_editor.dvui.TreeWidget, unique_id: dvui.Id, outer_filter_text: []const u8) !void {
     var color_i: usize = 0;
     var id_extra: usize = 0;
 
     const recursor = struct {
-        fn search(io: Io, directory: []const u8, tree: *inkz_editor.dvui.TreeWidget, inner_unique_id: dvui.Id, inner_id_extra: *usize, color_id: *usize, filter_text: []const u8, parent_branch: ?*inkz_editor.dvui.TreeWidget.Branch) !void {
+        fn search(io: Io, environ: *const std.process.Environ.Map, directory: []const u8, tree: *inkz_editor.dvui.TreeWidget, inner_unique_id: dvui.Id, inner_id_extra: *usize, color_id: *usize, filter_text: []const u8, parent_branch: ?*inkz_editor.dvui.TreeWidget.Branch) !void {
             var dir = std.Io.Dir.cwd().openDir(io, directory, .{ .access_sub_paths = true, .iterate = true }) catch return;
             defer dir.close(io);
 
@@ -337,7 +337,7 @@ pub fn recurseFiles(io_outer: Io, root_directory: []const u8, outer_tree: *inkz_
                         continue;
                     }
                 } else if (filter_text.len > 0) {
-                    search(io, abs_path, tree, inner_unique_id, inner_id_extra, color_id, filter_text, null) catch continue;
+                    search(io, environ, abs_path, tree, inner_unique_id, inner_id_extra, color_id, filter_text, null) catch continue;
                     continue;
                 }
 
@@ -620,17 +620,19 @@ pub fn recurseFiles(io_outer: Io, root_directory: []const u8, outer_tree: *inkz_
                             },
                         );
 
-                        // TODO: Figure out how to pass env map.
-                        // editableLabel(
-                        //     inner_id_extra.*,
-                        //     if (filter_text.len > 0) std.Io.Dir.path.relative(dvui.currentWindow().arena(), inkz_editor.editor.folder.?, abs_path) catch entry.name else entry.name,
-                        //     if (inkz_editor.editor.getFileFromPath(abs_path) != null) dvui.themeGet().color(.window, .text) else dvui.themeGet().color(.control, .text),
-                        //     entry.kind,
-                        //     abs_path,
-                        // ) catch {
-                        //     dvui.log.err("Failed to draw editable label", .{});
-                        // };
+                        const cwd: []const u8 = "."; // TODO: How to do cwd correctly?
+                        editableLabel(
+                            io,
+                            inner_id_extra.*,
+                            if (filter_text.len > 0) std.Io.Dir.path.relative(dvui.currentWindow().arena(), cwd, environ, inkz_editor.editor.folder.?, abs_path) catch entry.name else entry.name,
+                            if (inkz_editor.editor.getFileFromPath(abs_path) != null) dvui.themeGet().color(.window, .text) else dvui.themeGet().color(.control, .text),
+                            entry.kind,
+                            abs_path,
+                        ) catch {
+                            dvui.log.err("Failed to draw editable label", .{});
+                        };
 
+                        // TODO: Get back dirty when file abstraction is further.
                         // if (inkz_editor.editor.getFileFromPath(abs_path)) |file| {
                         //     if (file.dirty()) {
                         //         _ = dvui.icon(
@@ -721,6 +723,7 @@ pub fn recurseFiles(io_outer: Io, root_directory: []const u8, outer_tree: *inkz_
                             };
                             try search(
                                 io,
+                                environ,
                                 abs_path,
                                 tree,
                                 inner_unique_id,
@@ -746,7 +749,7 @@ pub fn recurseFiles(io_outer: Io, root_directory: []const u8, outer_tree: *inkz_
         }
     }.search;
 
-    try recursor(io_outer, root_directory, outer_tree, unique_id, &id_extra, &color_i, outer_filter_text, null);
+    try recursor(io_outer, environ_outer, root_directory, outer_tree, unique_id, &id_extra, &color_i, outer_filter_text, null);
 
     return;
 }

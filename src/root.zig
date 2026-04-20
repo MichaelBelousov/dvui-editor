@@ -17,6 +17,7 @@ pub const Internal = struct {
     pub const Palette = @import("internal/Palette.zig");
     pub const File = struct {
         id: u32 = 0,
+        path: []const u8 = "",
         pub const InitOptions = struct {};
     };
 };
