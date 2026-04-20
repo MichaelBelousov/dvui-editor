@@ -257,8 +257,10 @@ pub fn init(
     // inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), inkz_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
 
     editor.explorer.* = .init();
-    // editor.panel.* = .init();
-    // editor.open_files = .init(inkz_editor.app.allocator);
+    editor.panel.* = .init();
+
+    // TODO: Find out why open_files .init breaks pane opening.
+    // editor.open_files = try .init(inkz_editor.app.allocator, &.{}, &.{});
     // editor.workspaces = .init(inkz_editor.app.allocator);
     // editor.workspaces.put(0, .init(0)) catch |err| {
     //     std.log.err("Failed to create workspace: {s}", .{@errorName(err)});

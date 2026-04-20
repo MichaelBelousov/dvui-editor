@@ -34,9 +34,9 @@ closed: bool = false,
 pub const Pane = enum(u32) {
     files,
     tools,
-    sprites,
-    animations,
-    keyframe_animations,
+    // sprites,
+    // animations,
+    // keyframe_animations,
     project,
     settings,
 };
@@ -56,9 +56,9 @@ pub fn title(pane: Pane, all_caps: bool) []const u8 {
     return switch (pane) {
         .files => if (all_caps) "FILES" else "Files",
         .tools => if (all_caps) "TOOLS" else "Tools",
-        .sprites => if (all_caps) "SPRITES" else "Sprites",
-        .animations => if (all_caps) "ANIMATIONS" else "Animations",
-        .keyframe_animations => if (all_caps) "KEYFRAME ANIMATIONS" else "Keyframe Animations",
+        // .sprites => if (all_caps) "SPRITES" else "Sprites",
+        // .animations => if (all_caps) "ANIMATIONS" else "Animations",
+        // .keyframe_animations => if (all_caps) "KEYFRAME ANIMATIONS" else "Keyframe Animations",
         .project => if (all_caps) "PROJECT" else "Project",
         .settings => if (all_caps) "SETTINGS" else "Settings",
     };
@@ -109,7 +109,7 @@ pub fn draw(explorer: *Explorer, io: std.Io) !dvui.App.Result {
         .settings => try settings.draw(),
         .project => try project.draw(),
         .tools => try explorer.tools.draw(),
-        else => {},
+        // else => {},
     }
 
     const vertical_scroll = scroll.si.offset(.vertical);
