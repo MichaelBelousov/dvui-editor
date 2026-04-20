@@ -64,6 +64,12 @@ pub fn build(b: *std.Build) void {
     app_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
     app_mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
 
+    const known_folders = b.dependency("known_folders", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("known-folders");
+    exe.root_module.addImport("known-folders", known_folders);
+
     if (b.lazyDependency("icons", .{ .target = target, .optimize = optimize })) |dep| {
         exe.root_module.addImport("icons", dep.module("icons"));
     }

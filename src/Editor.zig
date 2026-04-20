@@ -5,7 +5,7 @@ const Io = std.Io;
 // const assets = @import("assets");
 const dvui = @import("dvui");
 // const icons = @import("icons");
-// const known_folders = @import("known-folders");
+const known_folders = @import("known-folders");
 // const objc = @import("objc");
 // const sdl3 = @import("backend").c;
 
@@ -90,13 +90,13 @@ pub fn init(
     io: Io,
     app: *App,
 ) !Editor {
-    // TODO: Enable again
-    // const config_folder = std.fs.path.join(inkz_editor.app.allocator, &.{
-    //     try known_folders.getPath(dvui.currentWindow().arena(), .local_configuration) orelse app.root_path,
-    //     "Pixi",
+    // TODO: Enable again, how do we pass env?
+    // const config_folder = std.Io.Dir.path.join(inkz_editor.app.allocator, &.{
+    //     try known_folders.getPath(io, dvui.currentWindow().arena(), .local_configuration) orelse app.root_path,
+    //     "inkz-editor",
     // }) catch app.root_path;
     const config_folder = app.root_path;
-    const palette_folder = std.fs.path.join(inkz_editor.app.allocator, &.{ config_folder, "Palettes" }) catch config_folder;
+    const palette_folder = std.Io.Dir.path.join(inkz_editor.app.allocator, &.{ config_folder, "Palettes" }) catch config_folder;
 
     var inkz_editor_dark = dvui.themeGet();
 
