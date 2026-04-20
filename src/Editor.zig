@@ -27,7 +27,7 @@ pub const Dialogs = @import("dialogs/Dialogs.zig");
 
 // pub const Transform = @import("Transform.zig");
 // pub const Workspace = @import("Workspace.zig");
-// pub const Panel = @import("panel/Panel.zig");
+pub const Panel = @import("Panel.zig");
 // pub const Infobar = @import("Infobar.zig");
 io: std.Io,
 gpa: std.mem.Allocator,
@@ -44,7 +44,7 @@ settings: Settings = undefined,
 // recents: Recents = undefined,
 
 explorer: *Explorer,
-// panel: *Panel,
+panel: *Panel,
 
 last_titlebar_color: dvui.Color,
 dim_titlebar: bool = false,
@@ -189,7 +189,7 @@ pub fn init(
         .config_folder = config_folder,
         .palette_folder = palette_folder,
         .explorer = try app.allocator.create(Explorer),
-        // .panel = try app.allocator.create(Panel),
+        .panel = try app.allocator.create(Panel),
         .sidebar = try .init(),
         // .infobar = try .init(),
         .arena = .init(std.heap.page_allocator),
@@ -394,14 +394,14 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     //         _ = dvui.spacer(@src(), .{ .expand = .horizontal });
     //     }
 
-    //     var base_box = dvui.box(
-    //         @src(),
-    //         .{ .dir = .horizontal },
-    //         .{
-    //             .expand = .both,
-    //         },
-    //     );
-    //     defer base_box.deinit();
+    var base_box = dvui.box(
+        @src(),
+        .{ .dir = .horizontal },
+        .{
+            .expand = .both,
+        },
+    );
+    defer base_box.deinit();
 
     //     // Advance the animation frame if we are in play mode
     //     if (editor.activeFile()) |file| {
@@ -504,68 +504,68 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         }
     }
 
-    // if (editor.explorer.paned.showSecond()) {
-    //     const bg_box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
-    //     defer bg_box.deinit();
+    if (editor.explorer.paned.showSecond()) {
+        const bg_box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
+        defer bg_box.deinit();
 
-    //     // On macOS, the menu is handled natively, so we don't need to draw it here
-    //     if (builtin.os.tag != .macos) {
-    //         const result = try Menu.draw();
-    //         if (result != .ok) {
-    //             return result;
-    //         }
-    //     }
+        // On macOS, the menu is handled natively, so we don't need to draw it here
+        if (builtin.os.tag != .macos) {
+            const result = try Menu.draw();
+            if (result != .ok) {
+                return result;
+            }
+        }
 
-    //     const workspace_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = false, .padding = .{ .w = handle_size } });
-    //     defer workspace_vbox.deinit();
+        const workspace_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = false, .padding = .{ .w = handle_size } });
+        defer workspace_vbox.deinit();
 
-    //     editor.panel.paned = inkz_editor.dvui.paned(@src(), .{
-    //         .direction = .vertical,
-    //         .collapsed_size = inkz_editor.editor.settings.min_window_size[1] + 1,
-    //         .handle_size = handle_size,
-    //         .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
-    //         .uncollapse_ratio = 1.0,
-    //     }, .{
-    //         .expand = .both,
-    //         .background = false,
-    //     });
-    //     defer editor.panel.paned.deinit();
+        editor.panel.paned = inkz_editor.dvui.paned(@src(), .{
+            .direction = .vertical,
+            .collapsed_size = inkz_editor.editor.settings.min_window_size[1] + 1,
+            .handle_size = handle_size,
+            .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
+            .uncollapse_ratio = 1.0,
+        }, .{
+            .expand = .both,
+            .background = false,
+        });
+        defer editor.panel.paned.deinit();
 
-    //     if (!editor.panel.paned.dragging) {
-    //         if (editor.activeFile()) |_| {
-    //             if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and inkz_editor.editor.settings.panel_ratio > 0.0) {
-    //                 editor.panel.paned.animateSplit(1.0 - inkz_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
-    //             }
-    //         } else {
-    //             if (!editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0) {
-    //                 editor.panel.paned.animateSplit(1.0, dvui.easing.outQuint);
-    //             }
-    //         }
-    //     } else {
-    //         inkz_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
-    //     }
+        // if (!editor.panel.paned.dragging) {
+        //     if (editor.activeFile()) |_| {
+        //         if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and inkz_editor.editor.settings.panel_ratio > 0.0) {
+        //             editor.panel.paned.animateSplit(1.0 - inkz_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
+        //         }
+        //     } else {
+        //         if (!editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0) {
+        //             editor.panel.paned.animateSplit(1.0, dvui.easing.outQuint);
+        //         }
+        //     }
+        // } else {
+        //     inkz_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
+        // }
 
-    //     if (editor.panel.paned.showSecond()) {
-    //         const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
-    //             .expand = .both,
-    //             .background = false,
-    //             .gravity_y = 0.0,
-    //         });
-    //         defer vbox.deinit();
+        if (editor.panel.paned.showSecond()) {
+            const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
+                .expand = .both,
+                .background = false,
+                .gravity_y = 0.0,
+            });
+            defer vbox.deinit();
 
-    //         const result = try editor.panel.draw();
-    //         if (result != .ok) {
-    //             return result;
-    //         }
-    //     }
+            const result = try editor.panel.draw();
+            if (result != .ok) {
+                return result;
+            }
+        }
 
-    // if (editor.panel.paned.showFirst()) {
-    //     const result = try editor.drawWorkspaces(0);
-    //     if (result != .ok) {
-    //         return result;
-    //     }
-    // }
-    // }
+        // if (editor.panel.paned.showFirst()) {
+        //     const result = try editor.drawWorkspaces(0);
+        //     if (result != .ok) {
+        //         return result;
+        //     }
+        // }
+    }
 
     //     { // Radial Menu
 
@@ -976,64 +976,64 @@ pub fn rebuildWorkspaces(editor: *Editor) !void {
     }
 }
 
-pub fn drawWorkspaces(editor: *Editor, index: usize) !dvui.App.Result {
-    if (index >= editor.workspaces.count()) return .ok;
+// pub fn drawWorkspaces(editor: *Editor, index: usize) !dvui.App.Result {
+//     if (index >= editor.workspaces.count()) return .ok;
 
-    var s = inkz_editor.dvui.paned(@src(), .{
-        .direction = .horizontal,
-        .collapsed_size = if (index == editor.workspaces.count() - 1) std.math.floatMax(f32) else 0,
-        .handle_size = handle_size,
-        .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
-    }, .{
-        .expand = .both,
-        .background = false,
-    });
-    defer s.deinit();
+//     var s = inkz_editor.dvui.paned(@src(), .{
+//         .direction = .horizontal,
+//         .collapsed_size = if (index == editor.workspaces.count() - 1) std.math.floatMax(f32) else 0,
+//         .handle_size = handle_size,
+//         .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
+//     }, .{
+//         .expand = .both,
+//         .background = false,
+//     });
+//     defer s.deinit();
 
-    const dragging = editor.panel.paned.dragging or s.dragging;
+//     const dragging = editor.panel.paned.dragging or s.dragging;
 
-    if (!dragging) {
-        if (index + 1 < editor.workspaces.count()) {
-            editor.workspaces.values()[index + 1].center = (s.animating and s.split_ratio.* < 1.0) or (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
-        } else if (editor.workspaces.count() == 1) {
-            editor.workspaces.values()[index].center = (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
-        }
-    }
+//     if (!dragging) {
+//         if (index + 1 < editor.workspaces.count()) {
+//             editor.workspaces.values()[index + 1].center = (s.animating and s.split_ratio.* < 1.0) or (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
+//         } else if (editor.workspaces.count() == 1) {
+//             editor.workspaces.values()[index].center = (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
+//         }
+//     }
 
-    // Ens
-    if (s.collapsing and s.split_ratio.* < 0.5) {
-        s.animateSplit(1.0, dvui.easing.outBack);
-    }
+//     // Ens
+//     if (s.collapsing and s.split_ratio.* < 0.5) {
+//         s.animateSplit(1.0, dvui.easing.outBack);
+//     }
 
-    if (!s.dragging and !s.animating and !s.collapsing and !s.collapsed_state) {
-        if (index == editor.workspaces.count() - 1) {
-            if (s.split_ratio.* != 1.0) {
-                s.animateSplit(1.0, dvui.easing.outBack);
-            }
-        } else {
-            if (dvui.firstFrame(s.wd.id)) {
-                s.split_ratio.* = 1.0;
-                s.animateSplit(0.5, dvui.easing.outBack);
-            }
-        }
-    }
+//     if (!s.dragging and !s.animating and !s.collapsing and !s.collapsed_state) {
+//         if (index == editor.workspaces.count() - 1) {
+//             if (s.split_ratio.* != 1.0) {
+//                 s.animateSplit(1.0, dvui.easing.outBack);
+//             }
+//         } else {
+//             if (dvui.firstFrame(s.wd.id)) {
+//                 s.split_ratio.* = 1.0;
+//                 s.animateSplit(0.5, dvui.easing.outBack);
+//             }
+//         }
+//     }
 
-    if (s.showFirst()) {
-        const result = try editor.workspaces.values()[index].draw();
-        if (result != .ok) {
-            return result;
-        }
-    }
+//     if (s.showFirst()) {
+//         const result = try editor.workspaces.values()[index].draw();
+//         if (result != .ok) {
+//             return result;
+//         }
+//     }
 
-    if (s.showSecond()) {
-        const result = try drawWorkspaces(editor, index + 1);
-        if (result != .ok) {
-            return result;
-        }
-    }
+//     if (s.showSecond()) {
+//         const result = try drawWorkspaces(editor, index + 1);
+//         if (result != .ok) {
+//             return result;
+//         }
+//     }
 
-    return .ok;
-}
+//     return .ok;
+// }
 
 pub fn close(app: *App, editor: *Editor) void {
     var should_close = true;
@@ -1141,14 +1141,15 @@ pub fn setActiveFile(editor: *Editor, index: usize) void {
     // }
 }
 
+// TODO: Add workspaces back.
 /// Returns the actively focused file, through workspace grouping.
-pub fn activeFile(editor: *Editor) ?*inkz_editor.Internal.File {
-    if (editor.workspaces.get(editor.open_workspace_grouping)) |workspace| {
-        return editor.getFile(workspace.open_file_index);
-    }
+// pub fn activeFile(editor: *Editor) ?*inkz_editor.Internal.File {
+//     if (editor.workspaces.get(editor.open_workspace_grouping)) |workspace| {
+//         return editor.getFile(workspace.open_file_index);
+//     }
 
-    return null;
-}
+//     return null;
+// }
 
 pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.File {
     if (editor.open_files.values().len == 0) return null;

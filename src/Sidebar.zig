@@ -27,8 +27,8 @@ pub fn draw(_: Sidebar) !bool {
 
     const options = [_]struct { pane: Pane, icon: []const u8 }{
         .{ .pane = .files, .icon = dvui.entypo.folder },
-        .{ .pane = .tools, .icon = dvui.entypo.pencil },
-        .{ .pane = .sprites, .icon = dvui.entypo.grid },
+        // .{ .pane = .tools, .icon = dvui.entypo.pencil },
+        // .{ .pane = .sprites, .icon = dvui.entypo.grid },
         //.{ .pane = .animations, .icon = dvui.entypo.controller_play },
         //.{ .pane = .keyframe_animations, .icon = dvui.entypo.key },
         .{ .pane = .project, .icon = dvui.entypo.box },
