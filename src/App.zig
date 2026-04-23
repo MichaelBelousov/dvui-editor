@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const builtin = @import("builtin");
 const zmath = @import("zmath");
 const dvui = @import("dvui");
@@ -17,7 +18,8 @@ const App = @This();
 const Editor = inkz_editor.Editor;
 
 // App fields
-allocator: std.mem.Allocator = undefined,
+io: Io,
+gpa: std.mem.Allocator = undefined,
 environ: *std.process.Environ.Map,
 
 //delta_time: f32 = 0.0,
@@ -59,7 +61,8 @@ pub fn AppInit(win: *dvui.Window) !void {
 
     inkz_editor.app = try gpa.create(App);
     inkz_editor.app.* = .{
-        .allocator = gpa,
+        .io = io,
+        .gpa = gpa,
         .environ = environ,
         .window = win,
         .root_path = gpa.dupeZ(u8, path) catch ".",

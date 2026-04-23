@@ -20,8 +20,8 @@ pub fn loadFromFile(allocator: std.mem.Allocator, file: []const u8) !Palette {
     const ext = std.fs.path.extension(file);
 
     if (std.mem.eql(u8, ext, ".hex")) {
-        if (inkz_editor.fs.read(inkz_editor.app.allocator, file) catch null) |read| {
-            defer inkz_editor.app.allocator.free(read);
+        if (inkz_editor.fs.read(inkz_editor.app.gpa, file) catch null) |read| {
+            defer inkz_editor.app.gpa.free(read);
 
             return loadFromBytes(allocator, std.fs.path.basename(file), read);
         }
@@ -49,6 +49,6 @@ pub fn loadFromBytes(allocator: std.mem.Allocator, name: []const u8, bytes: []co
 }
 
 pub fn deinit(self: *Palette) void {
-    inkz_editor.app.allocator.free(self.name);
-    inkz_editor.app.allocator.free(self.colors);
+    inkz_editor.app.gpa.free(self.name);
+    inkz_editor.app.gpa.free(self.colors);
 }

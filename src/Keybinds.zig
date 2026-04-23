@@ -77,7 +77,7 @@ pub fn tick() !void {
                     if (ke.matchBind("open_files") and ke.action == .down) {
                         if (try dvui.dialogNativeFileOpenMultiple(
                             dvui.currentWindow().arena(),
-                            .{ .title = "Open Files...", .filter_description = ".inkz_editor, .png", .filters = &.{ "*.inkz_editor", "*.png" } },
+                            .{ .title = "Open Files...", .filter_description = ".txt, .md", .filters = &.{ "*.txt", "*.md" } },
                         )) |files| {
                             for (files) |file| {
                                 _ = inkz_editor.editor.openFilePath(file, inkz_editor.editor.open_workspace_grouping) catch {

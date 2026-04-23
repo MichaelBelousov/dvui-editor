@@ -121,13 +121,13 @@ pub fn draw() !void {
     //             break :blk true;
     //         };
 
-    //         if (dvui.dialogNativeFileSave(inkz_editor.app.allocator, .{
+    //         if (dvui.dialogNativeFileSave(inkz_editor.app.gpa, .{
     //             .title = "Select Atlas Data Output",
     //             .filters = &.{".atlas"},
     //             .filter_description = "Atlas file",
     //             .path = if (valid_path) project.packed_atlas_output else null,
     //         }) catch null) |path| {
-    //             project.packed_atlas_output = inkz_editor.app.allocator.dupe(u8, path[0..]) catch null;
+    //             project.packed_atlas_output = inkz_editor.app.gpa.dupe(u8, path[0..]) catch null;
     //             set_text = true;
     //         } else {
     //             dvui.log.err("Project failed to copy new path", .{});
@@ -154,7 +154,7 @@ pub fn draw() !void {
     //     if (te.text_changed) {
     //         const t = te.getText();
     //         if (t.len > 0) {
-    //             project.packed_atlas_output = inkz_editor.app.allocator.dupe(u8, t) catch null;
+    //             project.packed_atlas_output = inkz_editor.app.gpa.dupe(u8, t) catch null;
     //         } else {
     //             project.packed_atlas_output = null;
     //         }
@@ -202,13 +202,13 @@ pub fn draw() !void {
     //             break :blk true;
     //         };
 
-    //         if (dvui.dialogNativeFileSave(inkz_editor.app.allocator, .{
+    //         if (dvui.dialogNativeFileSave(inkz_editor.app.gpa, .{
     //             .title = "Select Atlas Image Output",
     //             .filters = &.{".png"},
     //             .filter_description = "Image file",
     //             .path = if (valid_path) project.packed_image_output else null,
     //         }) catch null) |path| {
-    //             project.packed_image_output = inkz_editor.app.allocator.dupe(u8, path[0..]) catch null;
+    //             project.packed_image_output = inkz_editor.app.gpa.dupe(u8, path[0..]) catch null;
     //             set_text = true;
     //         } else {
     //             dvui.log.err("Project failed to copy new path", .{});
@@ -235,7 +235,7 @@ pub fn draw() !void {
     //     if (te.text_changed) {
     //         const t = te.getText();
     //         if (t.len > 0) {
-    //             project.packed_image_output = inkz_editor.app.allocator.dupe(u8, t) catch null;
+    //             project.packed_image_output = inkz_editor.app.gpa.dupe(u8, t) catch null;
     //         } else {
     //             project.packed_image_output = null;
     //         }
@@ -334,7 +334,7 @@ fn pathTextEntry(path_type: PathType) !void {
         if (te.text_changed) {
             const t = te.getText();
             if (t.len > 0) {
-                output_path.* = inkz_editor.app.allocator.dupe(u8, t) catch null;
+                output_path.* = inkz_editor.app.gpa.dupe(u8, t) catch null;
             } else {
                 output_path.* = null;
             }
@@ -348,7 +348,7 @@ pub fn packedAtlasOutputCallback(paths: ?[][:0]const u8) void {
 
         if (paths) |paths_| {
             for (paths_) |path| {
-                output_path.* = inkz_editor.app.allocator.dupe(u8, path) catch null;
+                output_path.* = inkz_editor.app.gpa.dupe(u8, path) catch null;
             }
         }
     }
@@ -360,7 +360,7 @@ pub fn packedImageOutputCallback(paths: ?[][:0]const u8) void {
 
         if (paths) |paths_| {
             for (paths_) |path| {
-                output_path.* = inkz_editor.app.allocator.dupe(u8, path) catch null;
+                output_path.* = inkz_editor.app.gpa.dupe(u8, path) catch null;
             }
         }
     }

@@ -60,7 +60,7 @@ folder: ?[]const u8 = null,
 project: ?Project = null,
 
 themes: std.array_list.Managed(dvui.Theme) = undefined,
-open_files: std.AutoArrayHashMapUnmanaged(u64, inkz_editor.Internal.File) = undefined,
+open_files: std.AutoArrayHashMapUnmanaged(u64, inkz_editor.Internal.TextFile) = undefined,
 
 // The actively focused workspace grouping ID
 // This will contain tabs for all open files with a matching grouping ID
@@ -97,7 +97,7 @@ pub fn init(
     //     "inkz-editor",
     // }) catch app.root_path;
     const config_folder = app.root_path;
-    const palette_folder = std.Io.Dir.path.join(inkz_editor.app.allocator, &.{ config_folder, "Palettes" }) catch config_folder;
+    const palette_folder = std.Io.Dir.path.join(inkz_editor.app.gpa, &.{ config_folder, "Palettes" }) catch config_folder;
 
     var inkz_editor_dark = dvui.themeGet();
 
@@ -186,12 +186,12 @@ pub fn init(
 
     var editor: Editor = .{
         .io = io,
-        .gpa = app.allocator,
+        .gpa = app.gpa,
         .environ = app.environ,
         .config_folder = config_folder,
         .palette_folder = palette_folder,
-        .explorer = try app.allocator.create(Explorer),
-        .panel = try app.allocator.create(Panel),
+        .explorer = try app.gpa.create(Explorer),
+        .panel = try app.gpa.create(Panel),
         .sidebar = try .init(),
         // .infobar = try .init(),
         .arena = .init(std.heap.page_allocator),
@@ -201,7 +201,7 @@ pub fn init(
         //     .source = try inkz_editor.image.fromImageFileBytes("inkz_editor.png", assets.files.@"inkz_editor.png", .ptr),
         // },
         // .tools = try .init(app.allocator),
-        .themes = .init(app.allocator),
+        .themes = .init(app.gpa),
     };
 
     editor.themes.append(inkz_editor_dark) catch {
@@ -635,8 +635,8 @@ pub fn handleNativeMenuAction(editor: *Editor, action: inkz_editor.backend.Nativ
         .open_files => {
             if (try dvui.dialogNativeFileOpenMultiple(dvui.currentWindow().arena(), .{
                 .title = "Open Files...",
-                .filter_description = ".inkz_editor, .png",
-                .filters = &.{ "*.inkz_editor", "*.png" },
+                .filter_description = ".txt, .md",
+                .filters = &.{ "*.txt", "*.md" },
             })) |files| {
                 for (files) |file| {
                     _ = editor.openFilePath(file, editor.open_workspace_grouping) catch {
@@ -1063,9 +1063,9 @@ pub fn setProjectFolder(editor: *Editor, io: Io, path: []const u8) !void {
                 dvui.log.err("Failed to save project", .{});
             };
         }
-        inkz_editor.app.allocator.free(folder);
+        inkz_editor.app.gpa.free(folder);
     }
-    editor.folder = try inkz_editor.app.allocator.dupe(u8, path);
+    editor.folder = try inkz_editor.app.gpa.dupe(u8, path);
     // try editor.recents.appendFolder(try inkz_editor.app.allocator.dupe(u8, path));
     editor.explorer.pane = .files;
 
@@ -1083,31 +1083,29 @@ pub fn saving(editor: *Editor) bool {
 /// The editor doesn't care what type of file is being opened,
 /// File.fromPath will handle the file type
 pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
-    _ = editor;
-    _ = path;
-    _ = grouping;
-    // for (editor.open_files.values(), 0..) |*file, i| {
-    //     if (std.mem.eql(u8, file.path, path)) {
-    //         editor.setActiveFile(i);
-    //         return false;
-    //     }
-    // }
+    for (editor.open_files.values(), 0..) |*file, i| {
+        if (std.mem.eql(u8, file.path, path)) {
+            editor.setActiveFile(i);
+            return false;
+        }
+    }
 
-    // if (inkz_editor.Internal.File.fromPath(path) catch null) |file| {
-    //     try editor.open_files.put(file.id, file);
-    //     if (editor.open_files.getPtr(file.id)) |f| {
-    //         f.editor.grouping = grouping;
-    //     }
+    if (inkz_editor.Internal.TextFile.fromPath(path) catch null) |file| {
+        try editor.open_files.put(editor.gpa, file.id, file);
+        _ = grouping;
+        // if (editor.open_files.getPtr(file.id)) |f| {
+        //     f.editor.grouping = grouping;
+        // }
 
-    //     // At this point, if the workspace grouping doesn't exist, it will next frame
-    //     // once the workspaces are rebuilt. Since we cant wait on that, go ahead and set it now
-    //     //editor.open_workspace_grouping = grouping;
+        // At this point, if the workspace grouping doesn't exist, it will next frame
+        // once the workspaces are rebuilt. Since we cant wait on that, go ahead and set it now
+        //editor.open_workspace_grouping = grouping;
 
-    //     // If the workspace grouping does exist, go ahead and set the active file
-    //     editor.setActiveFile(editor.open_files.count() - 1);
-    //     editor.composite_warmup_pending = true;
-    //     return true;
-    // }
+        // If the workspace grouping does exist, go ahead and set the active file
+        editor.setActiveFile(editor.open_files.count() - 1);
+        editor.composite_warmup_pending = true;
+        return true;
+    }
     return error.FailedToOpenFile;
 }
 
@@ -1115,7 +1113,7 @@ pub fn requestCompositeWarmup(editor: *Editor) void {
     editor.composite_warmup_pending = true;
 }
 // TODO: Bring it back
-pub fn newFile(editor: *Editor, path: []const u8, options: inkz_editor.Internal.File.InitOptions) !*inkz_editor.Internal.File {
+pub fn newFile(editor: *Editor, path: []const u8, options: inkz_editor.Internal.TextFile.InitOptions) !*inkz_editor.Internal.TextFile {
     _ = path;
     _ = options;
     // if (editor.getFileFromPath(path)) |_| {
@@ -1126,7 +1124,7 @@ pub fn newFile(editor: *Editor, path: []const u8, options: inkz_editor.Internal.
     //     dvui.log.err("Failed to create file: {s}", .{path});
     //     return error.FailedToCreateFile;
     // };
-    const file: inkz_editor.Internal.File = .{};
+    const file: inkz_editor.Internal.TextFile = .{};
 
     try editor.open_files.put(editor.gpa, file.id, file);
     editor.setActiveFile(editor.open_files.count() - 1);
@@ -1163,7 +1161,7 @@ pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.File {
     return &editor.open_files.values()[index];
 }
 
-pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*inkz_editor.Internal.File {
+pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*inkz_editor.Internal.TextFile {
     if (editor.open_files.values().len == 0) return null;
 
     _ = path;
@@ -1561,7 +1559,7 @@ pub fn redo(editor: *Editor) !void {
 
 pub fn openInFileBrowser(editor: *Editor, path: []const u8) !void {
     const cmd = if (builtin.os.tag == .macos) "open" else if (builtin.os.tag == .linux) "xdg-open" else "start";
-    _ = std.process.run(inkz_editor.app.allocator, editor.io, .{ .argv = &.{ cmd, path } }) catch {
+    _ = std.process.run(inkz_editor.app.gpa, editor.io, .{ .argv = &.{ cmd, path } }) catch {
         dvui.log.err("Failed to open file browser", .{});
         return;
     };
@@ -1658,6 +1656,6 @@ pub fn deinit(editor: *Editor) !void {
 
     editor.explorer.deinit();
 
-    if (editor.folder) |folder| inkz_editor.app.allocator.free(folder);
+    if (editor.folder) |folder| inkz_editor.app.gpa.free(folder);
     editor.arena.deinit();
 }

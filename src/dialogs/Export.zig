@@ -276,7 +276,7 @@ pub fn callAfter(_: dvui.Id, response: dvui.enums.DialogResponse) anyerror!void 
                             break :blk "animation.gif";
                         };
 
-                        const default_filename: [:0]const u8 = std.fmt.allocPrintSentinel(inkz_editor.app.allocator, "{s}.gif", .{
+                        const default_filename: [:0]const u8 = std.fmt.allocPrintSentinel(inkz_editor.app.gpa, "{s}.gif", .{
                             if (file.selected_animation_index) |animation_index| file.animations.items(.name)[animation_index] else "animation",
                         }, 0) catch {
                             dvui.log.err("Failed to allocate filename", .{});
@@ -356,8 +356,8 @@ pub fn createAnimationGif(path: []const u8) anyerror!void {
             const sprite_rect = file.spriteRect(sprite_index);
 
             var layer_index = file.layers.len - 1;
-            const pixels = file.layers.get(layer_index).pixelsFromRect(inkz_editor.app.allocator, sprite_rect) orelse continue;
-            defer inkz_editor.app.allocator.free(pixels);
+            const pixels = file.layers.get(layer_index).pixelsFromRect(inkz_editor.app.gpa, sprite_rect) orelse continue;
+            defer inkz_editor.app.gpa.free(pixels);
 
             while (layer_index > 0) {
                 layer_index -= 1;
@@ -366,9 +366,9 @@ pub fn createAnimationGif(path: []const u8) anyerror!void {
                     break;
                 }
 
-                if (layer.pixelsFromRect(inkz_editor.app.allocator, sprite_rect)) |layer_pixels| {
+                if (layer.pixelsFromRect(inkz_editor.app.gpa, sprite_rect)) |layer_pixels| {
                     inkz_editor.image.blitData(pixels, @intFromFloat(sprite_rect.w), @intFromFloat(sprite_rect.h), layer_pixels, sprite_rect.justSize(), true);
-                    inkz_editor.app.allocator.free(layer_pixels);
+                    inkz_editor.app.gpa.free(layer_pixels);
                 }
             }
 
@@ -390,11 +390,11 @@ pub fn createAnimationGif(path: []const u8) anyerror!void {
             }
 
             if (scale != 1.0) {
-                const resized_pixels = inkz_editor.app.allocator.alloc([4]u8, export_width * export_height) catch {
+                const resized_pixels = inkz_editor.app.gpa.alloc([4]u8, export_width * export_height) catch {
                     dvui.log.err("Failed to allocate resized pixels", .{});
                     continue;
                 };
-                defer inkz_editor.app.allocator.free(resized_pixels);
+                defer inkz_editor.app.gpa.free(resized_pixels);
 
                 _ = zstbi.resize(
                     pixels,

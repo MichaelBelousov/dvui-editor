@@ -43,7 +43,7 @@ pub const Pane = enum(u32) {
 
 pub fn init() Explorer {
     return .{
-        .open_branches = .init(inkz_editor.app.allocator),
+        .open_branches = .init(inkz_editor.app.gpa),
     };
 }
 

@@ -1,7 +1,9 @@
 const std = @import("std");
 const Io = std.Io;
-const inkz_editor = @import("root.zig");
+
 const dvui = @import("dvui");
+
+const inkz_editor = @import("root.zig");
 
 const Project = @This();
 
@@ -67,7 +69,7 @@ pub fn save(project: *Project, io: Io) !void {
         _ = project;
         // const options = std.json.Stringify.Options{};
 
-        // const str = try std.json.Stringify.valueAlloc(inkz_editor.app.allocator, Project{
+        // const str = try std.json.Stringify.valueAlloc(inkz_editor.app.gpa, Project{
         //     .packed_atlas_output = project.packed_atlas_output,
         //     .packed_image_output = project.packed_image_output,
         //     //.packed_heightmap_output = project.packed_heightmap_output,

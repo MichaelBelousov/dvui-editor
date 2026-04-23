@@ -207,7 +207,7 @@ pub fn callAfter(id: dvui.Id, response: dvui.enums.DialogResponse) anyerror!void
             //     return error.FailedToSaveFile;
             // };
 
-            inkz_editor.Editor.Explorer.files.new_file_path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
+            inkz_editor.Editor.Explorer.files.new_file_path = inkz_editor.app.gpa.dupe(u8, new_path) catch {
                 dvui.log.err("Failed to duplicate path: {s}", .{new_path});
                 return error.FailedToDuplicatePath;
             };

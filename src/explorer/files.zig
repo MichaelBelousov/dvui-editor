@@ -1,6 +1,6 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const Io = std.Io;
+const builtin = @import("builtin");
 
 const dvui = @import("dvui");
 const icons = @import("icons");
@@ -119,7 +119,7 @@ pub fn drawFiles(io: Io, environ: *const std.process.Environ.Map, path: []const 
                 .expand = .horizontal,
             })) != null) {
                 if (inkz_editor.editor.folder) |f| {
-                    inkz_editor.app.allocator.free(f);
+                    inkz_editor.app.gpa.free(f);
                     inkz_editor.editor.folder = null;
                 }
 
@@ -259,8 +259,8 @@ pub fn editableLabel(io: Io, id_extra: usize, label: []const u8, color: dvui.Col
                         // for (inkz_editor.editor.open_files.values()) |*file| {
                         //     if (std.mem.containsAtLeast(u8, file.path, 1, full_path)) {
                         //         const file_name = dvui.currentWindow().arena().dupe(u8, std.fs.path.basename(file.path)) catch "Failed to duplicate path";
-                        //         inkz_editor.app.allocator.free(file.path);
-                        //         file.path = try std.fs.path.join(inkz_editor.app.allocator, &.{ new_path, file_name });
+                        //         inkz_editor.app.gpa.free(file.path);
+                        //         file.path = try std.fs.path.join(inkz_editor.app.gpa, &.{ new_path, file_name });
                         //     }
                         // }
                     },
@@ -268,8 +268,8 @@ pub fn editableLabel(io: Io, id_extra: usize, label: []const u8, color: dvui.Col
                         std.Io.Dir.renameAbsolute(full_path, new_path, io) catch dvui.log.err("Failed to rename file: {s} to {s}", .{ label, te.getText() });
 
                         // if (inkz_editor.editor.getFileFromPath(full_path)) |file| {
-                        //     inkz_editor.app.allocator.free(file.path);
-                        //     file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
+                        //     inkz_editor.app.gpa.free(file.path);
+                        //     file.path = inkz_editor.app.gpa.dupe(u8, new_path) catch {
                         //         dvui.log.err("Failed to duplicate path: {s}", .{new_path});
                         //         return error.FailedToDuplicatePath;
                         //     };
@@ -448,8 +448,8 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
                             std.Io.Dir.renameAbsolute(removed_path, new_path, io) catch dvui.log.err("Failed to move {s} to {s}", .{ removed_path, new_path });
 
                             // if (inkz_editor.editor.getFileFromPath(removed_path)) |file| {
-                            //     inkz_editor.app.allocator.free(file.path);
-                            //     file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
+                            //     inkz_editor.app.gpa.free(file.path);
+                            //     file.path = inkz_editor.app.gpa.dupe(u8, new_path) catch {
                             //         dvui.log.err("Failed to duplicate path: {s}", .{new_path});
                             //         return error.FailedToDuplicatePath;
                             //     };
@@ -469,8 +469,8 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
                             std.Io.Dir.renameAbsolute(removed_path, new_path, io) catch dvui.log.err("Failed to move {s} to {s}", .{ removed_path, new_path });
 
                             // if (inkz_editor.editor.getFileFromPath(removed_path)) |file| {
-                            //     inkz_editor.app.allocator.free(file.path);
-                            //     file.path = inkz_editor.app.allocator.dupe(u8, new_path) catch {
+                            //     inkz_editor.app.gpa.free(file.path);
+                            //     file.path = inkz_editor.app.gpa.dupe(u8, new_path) catch {
                             //         dvui.log.err("Failed to duplicate path: {s}", .{new_path});
                             //         return error.FailedToDuplicatePath;
                             //     };
