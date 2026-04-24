@@ -29,9 +29,7 @@ pub const Dialogs = @import("dialogs/Dialogs.zig");
 // pub const Workspace = @import("Workspace.zig");
 pub const Panel = @import("Panel.zig");
 // pub const Infobar = @import("Infobar.zig");
-io: std.Io,
-gpa: std.mem.Allocator,
-environ: *std.process.Environ.Map,
+
 /// This arena is for small per-frame editor allocations, such as path joins, null terminations and labels.
 /// Do not free these allocations, instead, this allocator will be .reset(.retain_capacity) each frame
 arena: std.heap.ArenaAllocator,
@@ -55,12 +53,13 @@ dim_titlebar: bool = false,
 sidebar: Sidebar,
 // infobar: Infobar,
 
-/// The root folder that will be searched for files and a .inkz_editorproject file
+/// The root folder that will be searched for files and a .inkz project file
 folder: ?[]const u8 = null,
 project: ?Project = null,
 
 themes: std.array_list.Managed(dvui.Theme) = undefined,
-open_files: std.AutoArrayHashMapUnmanaged(u64, inkz_editor.Internal.TextFile) = undefined,
+
+open_files: std.array_hash_map.Auto(u64, inkz_editor.Internal.TextFile) = .empty,
 
 // The actively focused workspace grouping ID
 // This will contain tabs for all open files with a matching grouping ID
@@ -91,12 +90,11 @@ pub fn init(
     io: Io,
     app: *App,
 ) !Editor {
-    // TODO: Enable again, how do we pass env?
-    // const config_folder = std.Io.Dir.path.join(inkz_editor.app.allocator, &.{
-    //     try known_folders.getPath(io, dvui.currentWindow().arena(), .local_configuration) orelse app.root_path,
-    //     "inkz-editor",
-    // }) catch app.root_path;
-    const config_folder = app.root_path;
+    const config_folder = std.Io.Dir.path.join(inkz_editor.app.gpa, &.{
+        try known_folders.getPath(io, dvui.currentWindow().arena(), app.environ.*, .local_configuration) orelse app.root_path,
+        "inkz-editor",
+    }) catch app.root_path;
+    std.debug.print("config_folder: {s}", .{config_folder});
     const palette_folder = std.Io.Dir.path.join(inkz_editor.app.gpa, &.{ config_folder, "Palettes" }) catch config_folder;
 
     var inkz_editor_dark = dvui.themeGet();
@@ -185,9 +183,6 @@ pub fn init(
     inkz_editor_light.focus = inkz_editor_light.highlight.fill.?;
 
     var editor: Editor = .{
-        .io = io,
-        .gpa = app.gpa,
-        .environ = app.environ,
         .config_folder = config_folder,
         .palette_folder = palette_folder,
         .explorer = try app.gpa.create(Explorer),
@@ -248,9 +243,10 @@ pub fn init(
         }
     }
 
-    // editor.settings = settings.load(app.allocator, try std.fs.path.join(app.allocator, &.{ editor.config_folder, "settings.json" })) catch .{
-    //     .theme = try app.allocator.dupe(u8, "inkz_editor_dark.json"),
-    // };
+    // editor.settings = .{};
+    editor.settings = Settings.load(app.io, app.gpa, try std.fs.path.join(app.gpa, &.{ editor.config_folder, "settings.json" })) catch .{
+        .theme = try app.gpa.dupe(u8, "inkz_editor_dark.json"),
+    };
     // inkz_editor.perf.console_logging_enabled = editor.settings.perf_logging;
     // editor.recents = Recents.load(app.allocator, try std.fs.path.join(app.allocator, &.{ editor.config_folder, "recents.json" })) catch .{
     //     .folders = .init(app.allocator),
@@ -261,8 +257,6 @@ pub fn init(
     editor.explorer.* = .init();
     editor.panel.* = .init();
 
-    // TODO: Find out why open_files .init breaks pane opening.
-    // editor.open_files = try .init(inkz_editor.app.allocator, &.{}, &.{});
     // editor.workspaces = .init(inkz_editor.app.allocator);
     // editor.workspaces.put(0, .init(0)) catch |err| {
     //     std.log.err("Failed to create workspace: {s}", .{@errorName(err)});
@@ -296,8 +290,8 @@ const handle_size = 10;
 const handle_dist = 60;
 
 pub fn tick(editor: *Editor) !dvui.App.Result {
-    const io = editor.io;
-    const environ = editor.environ;
+    const io = inkz_editor.app.io;
+    const environ = inkz_editor.app.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
     // if (inkz_editor.backend.pollPendingNativeMenuAction()) |action| {
@@ -495,6 +489,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     }
 
     if (sidebar_pressed) {
+        std.debug.print("Sidebar pressed!\n", .{});
         editor.explorer.open();
     }
 
@@ -1091,7 +1086,7 @@ pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
     }
 
     if (inkz_editor.Internal.TextFile.fromPath(path) catch null) |file| {
-        try editor.open_files.put(editor.gpa, file.id, file);
+        try editor.open_files.put(inkz_editor.app.gpa, file.id, file);
         _ = grouping;
         // if (editor.open_files.getPtr(file.id)) |f| {
         //     f.editor.grouping = grouping;
@@ -1126,7 +1121,7 @@ pub fn newFile(editor: *Editor, path: []const u8, options: inkz_editor.Internal.
     // };
     const file: inkz_editor.Internal.TextFile = .{};
 
-    try editor.open_files.put(editor.gpa, file.id, file);
+    try editor.open_files.put(inkz_editor.app.gpa, file.id, file);
     editor.setActiveFile(editor.open_files.count() - 1);
     // editor.composite_warmup_pending = true;
 
@@ -1557,9 +1552,9 @@ pub fn redo(editor: *Editor) !void {
     }
 }
 
-pub fn openInFileBrowser(editor: *Editor, path: []const u8) !void {
+pub fn openInFileBrowser(_: *Editor, path: []const u8) !void {
     const cmd = if (builtin.os.tag == .macos) "open" else if (builtin.os.tag == .linux) "xdg-open" else "start";
-    _ = std.process.run(inkz_editor.app.gpa, editor.io, .{ .argv = &.{ cmd, path } }) catch {
+    _ = std.process.run(inkz_editor.app.gpa, inkz_editor.app.io, .{ .argv = &.{ cmd, path } }) catch {
         dvui.log.err("Failed to open file browser", .{});
         return;
     };

@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const builtin = @import("builtin");
 
 const inkz_editor = @import("root.zig");
@@ -83,22 +84,22 @@ transparency_effect: TransparencyEffect = .none,
 titlebar_height: f32 = 30.0, // This is the height of the titlebar in pixels
 
 /// Loads settings or if fails, returns default settings
-pub fn load(allocator: std.mem.Allocator, path: []const u8) !Settings {
-    if (inkz_editor.fs.read(allocator, path) catch null) |data| {
-        defer allocator.free(data);
+pub fn load(io: Io, gpa: std.mem.Allocator, path: []const u8) !Settings {
+    if (Io.Dir.cwd().readFileAlloc(io, path, gpa, .unlimited) catch null) |data| {
+        defer gpa.free(data);
 
         const options = std.json.ParseOptions{
             .duplicate_field_behavior = .use_first,
             .ignore_unknown_fields = true,
         };
-        if (std.json.parseFromSlice(Settings, allocator, data, options) catch null) |p| {
+        if (std.json.parseFromSlice(Settings, gpa, data, options) catch null) |p| {
             parsed = p;
             return p.value;
         }
     }
 
     return .{
-        .theme = try allocator.dupe(u8, "inkz_editor_dark.json"),
+        .theme = try gpa.dupe(u8, "inkz_editor_dark.json"),
     };
 }
 

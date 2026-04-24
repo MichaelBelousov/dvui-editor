@@ -24,21 +24,9 @@ const open_message = if (builtin.os.tag == .macos) "Reveal in Finder" else "Reve
 pub const Extension = enum {
     unsupported,
     hidden,
-    inkz_editor,
-    atlas,
-    png,
-    jpg,
-    pdf,
-    psd,
-    aseprite,
-    pyxel,
-    json,
-    zig,
+    ink,
     txt,
-    zip,
-    _7z,
-    tar,
-    gif,
+    md,
 };
 
 pub fn draw(io: Io, environ: *const std.process.Environ.Map) !void {
@@ -596,17 +584,14 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
                         const ext = extension(entry.name);
                         //if (ext == .hidden) continue;
                         const icon = switch (ext) {
-                            .inkz_editor, .psd => icons.tvg.lucide.@"file-pen-line",
-                            .jpg, .png, .aseprite, .pyxel, .gif => icons.tvg.entypo.picture,
-                            .pdf => icons.tvg.entypo.@"doc-text",
-                            .json, .zig, .txt, .atlas => icons.tvg.entypo.code,
-                            .tar, ._7z, .zip => icons.tvg.entypo.archive,
+                            // TODO: Add back icons for file types
                             else => icons.tvg.entypo.archive,
                         };
 
                         const icon_color = color;
 
-                        const file_icon_color: dvui.Color = if (ext == .inkz_editor) .transparent else icon_color;
+                        // const file_icon_color: dvui.Color = if (ext == .inkz_editor) .transparent else icon_color;
+                        const file_icon_color = icon_color;
 
                         dvui.icon(
                             @src(),
@@ -648,7 +633,7 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
                         if (branch.button.clicked()) {
                             selected_id = inner_id_extra.*;
                             switch (ext) {
-                                .inkz_editor, .png => {
+                                .txt, .md, .ink => {
                                     _ = inkz_editor.editor.openFilePath(abs_path, inkz_editor.editor.currentGroupingID()) catch |err| {
                                         dvui.log.err("{any}: {s}", .{ err, abs_path });
                                     };
@@ -757,20 +742,8 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
 pub fn extension(file: []const u8) Extension {
     const ext = std.fs.path.extension(file);
     if (std.mem.eql(u8, ext, "")) return .hidden;
-    if (std.mem.eql(u8, ext, ".inkz_editor")) return .inkz_editor;
-    if (std.mem.eql(u8, ext, ".atlas")) return .atlas;
-    if (std.mem.eql(u8, ext, ".png")) return .png;
-    if (std.mem.eql(u8, ext, ".gif")) return .gif;
-    if (std.mem.eql(u8, ext, ".jpg")) return .jpg;
-    if (std.mem.eql(u8, ext, ".pdf")) return .pdf;
-    if (std.mem.eql(u8, ext, ".psd")) return .psd;
-    if (std.mem.eql(u8, ext, ".aseprite")) return .aseprite;
-    if (std.mem.eql(u8, ext, ".pyxel")) return .pyxel;
-    if (std.mem.eql(u8, ext, ".json")) return .json;
-    if (std.mem.eql(u8, ext, ".zig")) return .zig;
-    if (std.mem.eql(u8, ext, ".zip")) return .zip;
-    if (std.mem.eql(u8, ext, ".7z")) return ._7z;
-    if (std.mem.eql(u8, ext, ".tar")) return .tar;
+    if (std.mem.eql(u8, ext, ".ink")) return .ink;
+    if (std.mem.eql(u8, ext, ".md")) return .md;
     if (std.mem.eql(u8, ext, ".txt")) return .txt;
     return .unsupported;
 }

@@ -7,7 +7,7 @@ const TextFile = @This();
 
 id: u64 = 0,
 path: []const u8 = "",
-// TODO: Use less naive datastructure
+// TODO: Use less naive datastructure, this will always read full file content into memory!
 content: []const u8 = "",
 
 pub const InitOptions = struct {};
