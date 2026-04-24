@@ -18,6 +18,10 @@ pub const Internal = struct {
     pub const TextFile = @import("internal/TextFile.zig");
 };
 
+pub const math = struct {
+    pub const Color = @import("color.zig").Color;
+};
+
 pub const dvui = @import("dvui.zig");
 
 /// This is a documentation comment to explain the `printAnotherMessage` function below.

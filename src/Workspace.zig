@@ -106,7 +106,7 @@ pub fn draw(self: *Workspace) !dvui.App.Result {
         self.drawProject();
     } else {
         self.drawTabs();
-        // try self.drawCanvas();
+        try self.drawEditor();
     }
 
     return .ok;
@@ -498,18 +498,18 @@ pub fn processTabDrag(self: *Workspace, data: *dvui.WidgetData) void {
     }
 }
 
-pub fn drawCanvas(self: *Workspace) !void {
-    var content_color = dvui.themeGet().color(.window, .fill);
+pub fn drawEditor(self: *Workspace) !void {
+    const content_color = dvui.themeGet().color(.window, .fill);
 
-    switch (builtin.os.tag) {
-        .macos => {
-            content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
-        },
-        .windows => {
-            content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
-        },
-        else => {},
-    }
+    // switch (builtin.os.tag) {
+    //     .macos => {
+    //         content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
+    //     },
+    //     .windows => {
+    //         content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
+    //     },
+    //     else => {},
+    // }
 
     const has_files = inkz_editor.editor.open_files.values().len > 0;
 
@@ -530,12 +530,12 @@ pub fn drawCanvas(self: *Workspace) !void {
         }
 
         const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
-        file.editor.canvas.id = canvas_vbox.data().id;
+        file.editor.text_edit_widget.id = canvas_vbox.data().id;
         file.editor.workspace = self;
 
         if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(canvas_vbox.data().id)) {
             defer inkz_editor.dvui.drawEdgeShadow(canvas_vbox.data().rectScale(), .top, .{});
-            self.drawRuler(.horizontal);
+            // self.drawRuler(.horizontal);
         }
 
         var canvas_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
@@ -543,19 +543,14 @@ pub fn drawCanvas(self: *Workspace) !void {
 
         if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(canvas_vbox.data().id)) {
             defer inkz_editor.dvui.drawEdgeShadow(canvas_vbox.data().rectScale(), .left, .{});
-            self.drawRuler(.vertical);
+            // self.drawRuler(.vertical);
         }
-
-        self.drawTransformDialog(canvas_vbox);
 
         if (self.grouping != file.editor.grouping) return;
 
-        inkz_editor.perf.canvasPaneDrawn();
+        // inkz_editor.perf.canvasPaneDrawn();
 
-        var file_widget = inkz_editor.dvui.FileWidget.init(@src(), .{
-            .file = file,
-            .center = self.center,
-        }, .{
+        var file_widget = inkz_editor.dvui.TextEditWidget.init(@src(), file, .{
             .expand = .both,
             .background = false,
             .color_fill = .transparent,
@@ -587,371 +582,371 @@ pub const RulerOrientation = enum {
     vertical,
 };
 
-pub fn drawRuler(self: *Workspace, orientation: RulerOrientation) void {
-    const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
-    const font = dvui.Font.theme(.body).larger(-1);
+// pub fn drawRuler(self: *Workspace, orientation: RulerOrientation) void {
+//     const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
+//     const font = dvui.Font.theme(.body).larger(-1);
 
-    const largest_label = std.fmt.allocPrint(dvui.currentWindow().arena(), "{d}", .{file.rows - 1}) catch {
-        dvui.log.err("Failed to allocate largest label", .{});
-        return;
-    };
-    const largest_label_size = font.textSize(largest_label);
-    const natural_scale = dvui.currentWindow().natural_scale;
-    const largest_label_phys = largest_label_size.scale(natural_scale, dvui.Size.Physical);
-    const base_ruler_size = largest_label_size.w + inkz_editor.editor.settings.ruler_padding;
+//     const largest_label = std.fmt.allocPrint(dvui.currentWindow().arena(), "{d}", .{file.lines - 1}) catch {
+//         dvui.log.err("Failed to allocate largest label", .{});
+//         return;
+//     };
+//     const largest_label_size = font.textSize(largest_label);
+//     const natural_scale = dvui.currentWindow().natural_scale;
+//     const largest_label_phys = largest_label_size.scale(natural_scale, dvui.Size.Physical);
+//     const base_ruler_size = largest_label_size.w + inkz_editor.editor.settings.ruler_padding;
 
-    const ruler_thickness: f32 = switch (orientation) {
-        .horizontal => blk: {
-            self.horizontal_ruler_height = font.textSize("M").h + inkz_editor.editor.settings.ruler_padding;
-            break :blk self.horizontal_ruler_height;
-        },
-        .vertical => blk: {
-            self.vertical_ruler_width = @max(base_ruler_size, font.textSize("M").h + inkz_editor.editor.settings.ruler_padding);
-            break :blk self.vertical_ruler_width;
-        },
-    };
+//     const ruler_thickness: f32 = switch (orientation) {
+//         .horizontal => blk: {
+//             self.horizontal_ruler_height = font.textSize("M").h + inkz_editor.editor.settings.ruler_padding;
+//             break :blk self.horizontal_ruler_height;
+//         },
+//         .vertical => blk: {
+//             self.vertical_ruler_width = @max(base_ruler_size, font.textSize("M").h + inkz_editor.editor.settings.ruler_padding);
+//             break :blk self.vertical_ruler_width;
+//         },
+//     };
 
-    switch (orientation) {
-        .horizontal => {
-            var canvas_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{
-                .expand = .horizontal,
-            });
-            defer canvas_hbox.deinit();
+//     switch (orientation) {
+//         .horizontal => {
+//             var canvas_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{
+//                 .expand = .horizontal,
+//             });
+//             defer canvas_hbox.deinit();
 
-            var corner_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-                .expand = .none,
-                .min_size_content = .{ .h = self.vertical_ruler_width, .w = self.vertical_ruler_width },
-                .background = true,
-                .color_fill = dvui.themeGet().color(.window, .fill),
-            });
-            corner_box.deinit();
+//             var corner_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
+//                 .expand = .none,
+//                 .min_size_content = .{ .h = self.vertical_ruler_width, .w = self.vertical_ruler_width },
+//                 .background = true,
+//                 .color_fill = dvui.themeGet().color(.window, .fill),
+//             });
+//             corner_box.deinit();
 
-            var top_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-                .expand = .horizontal,
-                .min_size_content = .{ .h = ruler_thickness, .w = ruler_thickness },
-                .background = true,
-                .color_fill = dvui.themeGet().color(.window, .fill),
-            });
-            defer top_box.deinit();
+//             var top_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
+//                 .expand = .horizontal,
+//                 .min_size_content = .{ .h = ruler_thickness, .w = ruler_thickness },
+//                 .background = true,
+//                 .color_fill = dvui.themeGet().color(.window, .fill),
+//             });
+//             defer top_box.deinit();
 
-            self.drawRulerContent(file, font, orientation, ruler_thickness, largest_label, null);
-        },
-        .vertical => {
-            var ruler_box = dvui.box(@src(), .{ .dir = .vertical }, .{
-                .expand = .vertical,
-                .min_size_content = .{ .w = ruler_thickness, .h = 1.0 },
-                .background = true,
-                .color_fill = dvui.themeGet().color(.window, .fill),
-            });
-            defer ruler_box.deinit();
+//             self.drawRulerContent(file, font, orientation, ruler_thickness, largest_label, null);
+//         },
+//         .vertical => {
+//             var ruler_box = dvui.box(@src(), .{ .dir = .vertical }, .{
+//                 .expand = .vertical,
+//                 .min_size_content = .{ .w = ruler_thickness, .h = 1.0 },
+//                 .background = true,
+//                 .color_fill = dvui.themeGet().color(.window, .fill),
+//             });
+//             defer ruler_box.deinit();
 
-            self.drawRulerContent(file, font, orientation, ruler_thickness, largest_label, largest_label_phys);
-        },
-    }
-}
+//             self.drawRulerContent(file, font, orientation, ruler_thickness, largest_label, largest_label_phys);
+//         },
+//     }
+// }
 
-/// `largest_row_index_*` come from `drawRuler` (widest row index string and its measured size in physical pixels).
-fn drawRulerContent(
-    self: *Workspace,
-    file: *inkz_editor.Internal.File,
-    font: dvui.Font,
-    orientation: RulerOrientation,
-    ruler_size: f32,
-    largest_row_index_label: []const u8,
-    largest_row_index_size_phys: ?dvui.Size.Physical,
-) void {
-    const scale = file.editor.canvas.scale;
-    const canvas = file.editor.canvas;
+// /// `largest_row_index_*` come from `drawRuler` (widest row index string and its measured size in physical pixels).
+// fn drawRulerContent(
+//     self: *Workspace,
+//     file: *inkz_editor.Internal.TextFile,
+//     font: dvui.Font,
+//     orientation: RulerOrientation,
+//     ruler_size: f32,
+//     largest_row_index_label: []const u8,
+//     largest_row_index_size_phys: ?dvui.Size.Physical,
+// ) void {
+//     const scale = file.editor.canvas.scale;
+//     const canvas = file.editor.canvas;
 
-    switch (orientation) {
-        .horizontal => {
-            self.horizontal_scroll_info.virtual_size.w = canvas.scroll_info.virtual_size.w;
-            self.horizontal_scroll_info.virtual_size.h = ruler_size;
-            self.horizontal_scroll_info.viewport.w = canvas.scroll_info.viewport.w;
-            self.horizontal_scroll_info.viewport.x = canvas.scroll_info.viewport.x;
-        },
-        .vertical => {
-            self.vertical_scroll_info.virtual_size.h = canvas.scroll_info.virtual_size.h;
-            self.vertical_scroll_info.virtual_size.w = ruler_size;
-            self.vertical_scroll_info.viewport.h = canvas.scroll_info.viewport.h;
-            self.vertical_scroll_info.viewport.y = canvas.scroll_info.viewport.y;
-        },
-    }
+//     switch (orientation) {
+//         .horizontal => {
+//             self.horizontal_scroll_info.virtual_size.w = canvas.scroll_info.virtual_size.w;
+//             self.horizontal_scroll_info.virtual_size.h = ruler_size;
+//             self.horizontal_scroll_info.viewport.w = canvas.scroll_info.viewport.w;
+//             self.horizontal_scroll_info.viewport.x = canvas.scroll_info.viewport.x;
+//         },
+//         .vertical => {
+//             self.vertical_scroll_info.virtual_size.h = canvas.scroll_info.virtual_size.h;
+//             self.vertical_scroll_info.virtual_size.w = ruler_size;
+//             self.vertical_scroll_info.viewport.h = canvas.scroll_info.viewport.h;
+//             self.vertical_scroll_info.viewport.y = canvas.scroll_info.viewport.y;
+//         },
+//     }
 
-    const scroll_info = switch (orientation) {
-        .horizontal => &self.horizontal_scroll_info,
-        .vertical => &self.vertical_scroll_info,
-    };
+//     const scroll_info = switch (orientation) {
+//         .horizontal => &self.horizontal_scroll_info,
+//         .vertical => &self.vertical_scroll_info,
+//     };
 
-    var scroll_area = dvui.scrollArea(@src(), .{
-        .scroll_info = scroll_info,
-        .container = true,
-        .process_events_after = true,
-        .horizontal_bar = .hide,
-        .vertical_bar = .hide,
-    }, .{ .expand = .both });
-    defer scroll_area.deinit();
+//     var scroll_area = dvui.scrollArea(@src(), .{
+//         .scroll_info = scroll_info,
+//         .container = true,
+//         .process_events_after = true,
+//         .horizontal_bar = .hide,
+//         .vertical_bar = .hide,
+//     }, .{ .expand = .both });
+//     defer scroll_area.deinit();
 
-    const scale_rect = switch (orientation) {
-        .horizontal => dvui.Rect{ .x = -canvas.origin.x, .y = 0, .w = 0, .h = 0 },
-        .vertical => dvui.Rect{ .x = 0, .y = -canvas.origin.y, .w = 0, .h = 0 },
-    };
-    var scaler = dvui.scale(@src(), .{ .scale = &file.editor.canvas.scale }, .{ .rect = scale_rect });
-    defer scaler.deinit();
+//     const scale_rect = switch (orientation) {
+//         .horizontal => dvui.Rect{ .x = -canvas.origin.x, .y = 0, .w = 0, .h = 0 },
+//         .vertical => dvui.Rect{ .x = 0, .y = -canvas.origin.y, .w = 0, .h = 0 },
+//     };
+//     var scaler = dvui.scale(@src(), .{ .scale = &file.editor.canvas.scale }, .{ .rect = scale_rect });
+//     defer scaler.deinit();
 
-    const outer_rect: dvui.Rect = switch (orientation) {
-        .horizontal => .{
-            .x = 0,
-            .y = 0,
-            .w = @as(f32, @floatFromInt(file.width())),
-            .h = ruler_size / scale,
-        },
-        .vertical => .{
-            .x = 0,
-            .y = 0,
-            .w = ruler_size / scale,
-            .h = @as(f32, @floatFromInt(file.height())),
-        },
-    };
-    var outer_box = dvui.box(@src(), .{ .dir = switch (orientation) {
-        .horizontal => .horizontal,
-        .vertical => .horizontal,
-    } }, .{
-        .expand = .none,
-        .rect = outer_rect,
-    });
-    defer outer_box.deinit();
+//     const outer_rect: dvui.Rect = switch (orientation) {
+//         .horizontal => .{
+//             .x = 0,
+//             .y = 0,
+//             .w = @as(f32, @floatFromInt(file.width())),
+//             .h = ruler_size / scale,
+//         },
+//         .vertical => .{
+//             .x = 0,
+//             .y = 0,
+//             .w = ruler_size / scale,
+//             .h = @as(f32, @floatFromInt(file.height())),
+//         },
+//     };
+//     var outer_box = dvui.box(@src(), .{ .dir = switch (orientation) {
+//         .horizontal => .horizontal,
+//         .vertical => .horizontal,
+//     } }, .{
+//         .expand = .none,
+//         .rect = outer_rect,
+//     });
+//     defer outer_box.deinit();
 
-    const drag_name = switch (orientation) {
-        .horizontal => self.columns_drag_name,
-        .vertical => self.rows_drag_name,
-    };
+//     const drag_name = switch (orientation) {
+//         .horizontal => self.columns_drag_name,
+//         .vertical => self.rows_drag_name,
+//     };
 
-    var reorder = inkz_editor.dvui.reorder(@src(), .{ .drag_name = drag_name }, .{
-        .expand = .both,
-        .margin = dvui.Rect.all(0),
-        .padding = dvui.Rect.all(0),
-        .background = false,
-        .corner_radius = dvui.Rect.all(0),
-    });
-    defer reorder.deinit();
+//     var reorder = inkz_editor.dvui.reorder(@src(), .{ .drag_name = drag_name }, .{
+//         .expand = .both,
+//         .margin = dvui.Rect.all(0),
+//         .padding = dvui.Rect.all(0),
+//         .background = false,
+//         .corner_radius = dvui.Rect.all(0),
+//     });
+//     defer reorder.deinit();
 
-    const reorder_box_dir: dvui.enums.Direction = switch (orientation) {
-        .horizontal => .horizontal,
-        .vertical => .vertical,
-    };
-    var reorder_box = dvui.box(@src(), .{ .dir = reorder_box_dir }, .{
-        .expand = .both,
-        .background = false,
-        .corner_radius = dvui.Rect.all(0),
-        .margin = dvui.Rect.all(0),
-        .padding = dvui.Rect.all(0),
-    });
-    defer reorder_box.deinit();
+//     const reorder_box_dir: dvui.enums.Direction = switch (orientation) {
+//         .horizontal => .horizontal,
+//         .vertical => .vertical,
+//     };
+//     var reorder_box = dvui.box(@src(), .{ .dir = reorder_box_dir }, .{
+//         .expand = .both,
+//         .background = false,
+//         .corner_radius = dvui.Rect.all(0),
+//         .margin = dvui.Rect.all(0),
+//         .padding = dvui.Rect.all(0),
+//     });
+//     defer reorder_box.deinit();
 
-    const ruler_stroke_color = dvui.themeGet().color(.control, .fill_hover).lighten(switch (orientation) {
-        .horizontal => 2.0,
-        .vertical => 0.0,
-    });
+//     const ruler_stroke_color = dvui.themeGet().color(.control, .fill_hover).lighten(switch (orientation) {
+//         .horizontal => 2.0,
+//         .vertical => 0.0,
+//     });
 
-    const edge_stroke_points = switch (orientation) {
-        .horizontal => .{
-            reorder_box.data().rectScale().r.topRight(),
-            reorder_box.data().rectScale().r.bottomRight(),
-        },
-        .vertical => .{
-            reorder_box.data().rectScale().r.bottomRight(),
-            reorder_box.data().rectScale().r.bottomLeft(),
-        },
-    };
-    defer dvui.Path.stroke(.{ .points = &edge_stroke_points }, .{
-        .color = ruler_stroke_color,
-        .thickness = 1.0,
-    });
+//     const edge_stroke_points = switch (orientation) {
+//         .horizontal => .{
+//             reorder_box.data().rectScale().r.topRight(),
+//             reorder_box.data().rectScale().r.bottomRight(),
+//         },
+//         .vertical => .{
+//             reorder_box.data().rectScale().r.bottomRight(),
+//             reorder_box.data().rectScale().r.bottomLeft(),
+//         },
+//     };
+//     defer dvui.Path.stroke(.{ .points = &edge_stroke_points }, .{
+//         .color = ruler_stroke_color,
+//         .thickness = 1.0,
+//     });
 
-    const count = switch (orientation) {
-        .horizontal => file.columns,
-        .vertical => file.rows,
-    };
-    const cell_min_size: dvui.Size = switch (orientation) {
-        .horizontal => .{ .w = @as(f32, @floatFromInt(file.column_width)), .h = 1.0 },
-        .vertical => .{ .w = 1.0, .h = @as(f32, @floatFromInt(file.row_height)) },
-    };
-    const reorder_mode: inkz_editor.dvui.ReorderWidget.Reorderable.Mode = switch (orientation) {
-        .horizontal => .any_y,
-        .vertical => .any_x,
-    };
-    const reorder_expand: dvui.Options.Expand = switch (orientation) {
-        .horizontal => .vertical,
-        .vertical => .horizontal,
-    };
+//     const count = switch (orientation) {
+//         .horizontal => file.columns,
+//         .vertical => file.rows,
+//     };
+//     const cell_min_size: dvui.Size = switch (orientation) {
+//         .horizontal => .{ .w = @as(f32, @floatFromInt(file.column_width)), .h = 1.0 },
+//         .vertical => .{ .w = 1.0, .h = @as(f32, @floatFromInt(file.row_height)) },
+//     };
+//     const reorder_mode: inkz_editor.dvui.ReorderWidget.Reorderable.Mode = switch (orientation) {
+//         .horizontal => .any_y,
+//         .vertical => .any_x,
+//     };
+//     const reorder_expand: dvui.Options.Expand = switch (orientation) {
+//         .horizontal => .vertical,
+//         .vertical => .horizontal,
+//     };
 
-    // Shared layout width for every row tick (widest index string); actual glyph size may differ per cell.
-    const vertical_row_layout_size_phys: ?dvui.Size.Physical = switch (orientation) {
-        .vertical => largest_row_index_size_phys,
-        .horizontal => null,
-    };
+//     // Shared layout width for every row tick (widest index string); actual glyph size may differ per cell.
+//     const vertical_row_layout_size_phys: ?dvui.Size.Physical = switch (orientation) {
+//         .vertical => largest_row_index_size_phys,
+//         .horizontal => null,
+//     };
 
-    var index: usize = 0;
-    while (index < count) : (index += 1) {
-        var reorderable = reorder.reorderable(@src(), .{
-            .mode = reorder_mode,
-            .clamp_to_edges = true,
-        }, .{
-            .expand = reorder_expand,
-            .id_extra = index,
-            .padding = dvui.Rect.all(0),
-            .margin = dvui.Rect.all(0),
-            .min_size_content = cell_min_size,
-        });
-        defer reorderable.deinit();
+//     var index: usize = 0;
+//     while (index < count) : (index += 1) {
+//         var reorderable = reorder.reorderable(@src(), .{
+//             .mode = reorder_mode,
+//             .clamp_to_edges = true,
+//         }, .{
+//             .expand = reorder_expand,
+//             .id_extra = index,
+//             .padding = dvui.Rect.all(0),
+//             .margin = dvui.Rect.all(0),
+//             .min_size_content = cell_min_size,
+//         });
+//         defer reorderable.deinit();
 
-        var button_color = if (reorder.drag_point != null) dvui.themeGet().color(.control, .fill).opacity(0.85) else dvui.themeGet().color(.window, .fill);
+//         var button_color = if (reorder.drag_point != null) dvui.themeGet().color(.control, .fill).opacity(0.85) else dvui.themeGet().color(.window, .fill);
 
-        if (inkz_editor.dvui.hovered(reorderable.data())) {
-            button_color = dvui.themeGet().color(.control, .fill);
-            dvui.cursorSet(.hand);
-        }
+//         if (inkz_editor.dvui.hovered(reorderable.data())) {
+//             button_color = dvui.themeGet().color(.control, .fill);
+//             dvui.cursorSet(.hand);
+//         }
 
-        var cell_box: dvui.BoxWidget = undefined;
-        cell_box.init(@src(), .{ .dir = .horizontal }, .{
-            .expand = .both,
-            .background = true,
-            .color_fill = button_color,
-            .id_extra = index,
-        });
+//         var cell_box: dvui.BoxWidget = undefined;
+//         cell_box.init(@src(), .{ .dir = .horizontal }, .{
+//             .expand = .both,
+//             .background = true,
+//             .color_fill = button_color,
+//             .id_extra = index,
+//         });
 
-        switch (orientation) {
-            .horizontal => {
-                if (reorderable.floating()) {
-                    self.columns_drag_index = index;
-                    reorder.reorderable_size.h = 0.0;
-                    dvui.cursorSet(.hand);
-                }
-                if (reorderable.removed()) self.columns_removed_index = index;
-                if (reorderable.insertBefore()) self.columns_insert_before_index = index;
-                if (reorderable.targetID()) |target_id| self.columns_target_id = target_id;
-                if (self.columns_drag_index) |_| {
-                    var mouse_pt = @constCast(&file.editor.canvas).dataFromScreenPoint(dvui.currentWindow().mouse_pt);
-                    mouse_pt.y = 0.0;
-                    mouse_pt.x = std.math.clamp(mouse_pt.x, 0.0, @as(f32, @floatFromInt(file.width() - 1)));
-                    self.columns_target_index = file.columnIndex(mouse_pt);
-                }
-            },
-            .vertical => {
-                if (reorderable.floating()) {
-                    self.rows_drag_index = index;
-                    reorder.reorderable_size.w = 0.0;
-                    dvui.cursorSet(.hand);
-                }
-                if (reorderable.removed()) self.rows_removed_index = index;
-                if (reorderable.insertBefore()) self.rows_insert_before_index = index;
-                if (reorderable.targetID()) |target_id| self.rows_target_id = target_id;
-                if (self.rows_drag_index) |_| {
-                    var mouse_pt = @constCast(&file.editor.canvas).dataFromScreenPoint(dvui.currentWindow().mouse_pt);
-                    mouse_pt.x = 0.0;
-                    mouse_pt.y = std.math.clamp(mouse_pt.y, 0.0, @as(f32, @floatFromInt(file.height() - 1)));
-                    self.rows_target_index = file.rowIndex(mouse_pt);
-                }
-            },
-        }
+//         switch (orientation) {
+//             .horizontal => {
+//                 if (reorderable.floating()) {
+//                     self.columns_drag_index = index;
+//                     reorder.reorderable_size.h = 0.0;
+//                     dvui.cursorSet(.hand);
+//                 }
+//                 if (reorderable.removed()) self.columns_removed_index = index;
+//                 if (reorderable.insertBefore()) self.columns_insert_before_index = index;
+//                 if (reorderable.targetID()) |target_id| self.columns_target_id = target_id;
+//                 if (self.columns_drag_index) |_| {
+//                     var mouse_pt = @constCast(&file.editor.canvas).dataFromScreenPoint(dvui.currentWindow().mouse_pt);
+//                     mouse_pt.y = 0.0;
+//                     mouse_pt.x = std.math.clamp(mouse_pt.x, 0.0, @as(f32, @floatFromInt(file.width() - 1)));
+//                     self.columns_target_index = file.columnIndex(mouse_pt);
+//                 }
+//             },
+//             .vertical => {
+//                 if (reorderable.floating()) {
+//                     self.rows_drag_index = index;
+//                     reorder.reorderable_size.w = 0.0;
+//                     dvui.cursorSet(.hand);
+//                 }
+//                 if (reorderable.removed()) self.rows_removed_index = index;
+//                 if (reorderable.insertBefore()) self.rows_insert_before_index = index;
+//                 if (reorderable.targetID()) |target_id| self.rows_target_id = target_id;
+//                 if (self.rows_drag_index) |_| {
+//                     var mouse_pt = @constCast(&file.editor.canvas).dataFromScreenPoint(dvui.currentWindow().mouse_pt);
+//                     mouse_pt.x = 0.0;
+//                     mouse_pt.y = std.math.clamp(mouse_pt.y, 0.0, @as(f32, @floatFromInt(file.height() - 1)));
+//                     self.rows_target_index = file.rowIndex(mouse_pt);
+//                 }
+//             },
+//         }
 
-        {
-            defer cell_box.deinit();
-            cell_box.drawBackground();
+//         {
+//             defer cell_box.deinit();
+//             cell_box.drawBackground();
 
-            const label = switch (orientation) {
-                .horizontal => file.fmtColumn(dvui.currentWindow().arena(), @intCast(index)) catch {
-                    dvui.log.err("Failed to allocate label", .{});
-                    return;
-                },
-                .vertical => std.fmt.allocPrint(dvui.currentWindow().arena(), "{d}", .{index}) catch {
-                    dvui.log.err("Failed to allocate label", .{});
-                    return;
-                },
-            };
+//             const label = switch (orientation) {
+//                 .horizontal => file.fmtColumn(dvui.currentWindow().arena(), @intCast(index)) catch {
+//                     dvui.log.err("Failed to allocate label", .{});
+//                     return;
+//                 },
+//                 .vertical => std.fmt.allocPrint(dvui.currentWindow().arena(), "{d}", .{index}) catch {
+//                     dvui.log.err("Failed to allocate label", .{});
+//                     return;
+//                 },
+//             };
 
-            self.drawRulerLabel(.{
-                .font = font,
-                .label = label,
-                .rect = cell_box.data().rectScale().r,
-                .color = dvui.themeGet().color(.control, .text).opacity(0.5),
-                .mode = switch (orientation) {
-                    .horizontal => .horizontal,
-                    .vertical => .vertical,
-                },
-                .largest_label = if (orientation == .vertical) largest_row_index_label else null,
-                .ref_size_physical = vertical_row_layout_size_phys,
-            });
+//             self.drawRulerLabel(.{
+//                 .font = font,
+//                 .label = label,
+//                 .rect = cell_box.data().rectScale().r,
+//                 .color = dvui.themeGet().color(.control, .text).opacity(0.5),
+//                 .mode = switch (orientation) {
+//                     .horizontal => .horizontal,
+//                     .vertical => .vertical,
+//                 },
+//                 .largest_label = if (orientation == .vertical) largest_row_index_label else null,
+//                 .ref_size_physical = vertical_row_layout_size_phys,
+//             });
 
-            const cell_rect = cell_box.data().rectScale().r;
-            const cell_stroke_points = switch (orientation) {
-                .horizontal => .{ cell_rect.topLeft(), cell_rect.bottomLeft() },
-                .vertical => .{ cell_rect.topLeft(), cell_rect.topRight() },
-            };
-            dvui.Path.stroke(.{ .points = &cell_stroke_points }, .{ .color = ruler_stroke_color, .thickness = 2.0 });
+//             const cell_rect = cell_box.data().rectScale().r;
+//             const cell_stroke_points = switch (orientation) {
+//                 .horizontal => .{ cell_rect.topLeft(), cell_rect.bottomLeft() },
+//                 .vertical => .{ cell_rect.topLeft(), cell_rect.topRight() },
+//             };
+//             dvui.Path.stroke(.{ .points = &cell_stroke_points }, .{ .color = ruler_stroke_color, .thickness = 2.0 });
 
-            loop: for (dvui.events()) |*e| {
-                if (!cell_box.matchEvent(e)) continue;
+//             loop: for (dvui.events()) |*e| {
+//                 if (!cell_box.matchEvent(e)) continue;
 
-                switch (e.evt) {
-                    .mouse => |me| {
-                        if (me.action == .press and me.button.pointer()) {
-                            e.handle(@src(), cell_box.data());
-                            dvui.captureMouse(cell_box.data(), e.num);
-                            dvui.dragPreStart(me.p, .{
-                                .size = reorderable.data().rectScale().r.size(),
-                                .offset = reorderable.data().rectScale().r.topLeft().diff(me.p),
-                            });
-                        } else if (me.action == .release and me.button.pointer()) {
-                            dvui.captureMouse(null, e.num);
-                            dvui.dragEnd();
-                            switch (orientation) {
-                                .horizontal => self.columns_drag_index = null,
-                                .vertical => self.rows_drag_index = null,
-                            }
-                        } else if (me.action == .motion) {
-                            if (dvui.captured(cell_box.data().id)) {
-                                e.handle(@src(), cell_box.data());
-                                if (dvui.dragging(me.p, null)) |_| {
-                                    reorderable.reorder.dragStart(reorderable.data().id.asUsize(), me.p, 0);
-                                    break :loop;
-                                }
-                            }
-                        }
-                    },
-                    else => {},
-                }
-            }
-        }
-    }
+//                 switch (e.evt) {
+//                     .mouse => |me| {
+//                         if (me.action == .press and me.button.pointer()) {
+//                             e.handle(@src(), cell_box.data());
+//                             dvui.captureMouse(cell_box.data(), e.num);
+//                             dvui.dragPreStart(me.p, .{
+//                                 .size = reorderable.data().rectScale().r.size(),
+//                                 .offset = reorderable.data().rectScale().r.topLeft().diff(me.p),
+//                             });
+//                         } else if (me.action == .release and me.button.pointer()) {
+//                             dvui.captureMouse(null, e.num);
+//                             dvui.dragEnd();
+//                             switch (orientation) {
+//                                 .horizontal => self.columns_drag_index = null,
+//                                 .vertical => self.rows_drag_index = null,
+//                             }
+//                         } else if (me.action == .motion) {
+//                             if (dvui.captured(cell_box.data().id)) {
+//                                 e.handle(@src(), cell_box.data());
+//                                 if (dvui.dragging(me.p, null)) |_| {
+//                                     reorderable.reorder.dragStart(reorderable.data().id.asUsize(), me.p, 0);
+//                                     break :loop;
+//                                 }
+//                             }
+//                         }
+//                     },
+//                     else => {},
+//                 }
+//             }
+//         }
+//     }
 
-    const final_slot_id = switch (orientation) {
-        .horizontal => file.columns,
-        .vertical => file.rows,
-    };
-    if (reorder.needFinalSlot()) {
-        var reorderable = reorder.reorderable(@src(), .{
-            .mode = reorder_mode,
-            .last_slot = true,
-            .clamp_to_edges = true,
-        }, .{
-            .expand = reorder_expand,
-            .id_extra = final_slot_id,
-            .padding = dvui.Rect.all(0),
-            .margin = dvui.Rect.all(0),
-            .min_size_content = cell_min_size,
-        });
-        defer reorderable.deinit();
+//     const final_slot_id = switch (orientation) {
+//         .horizontal => file.columns,
+//         .vertical => file.rows,
+//     };
+//     if (reorder.needFinalSlot()) {
+//         var reorderable = reorder.reorderable(@src(), .{
+//             .mode = reorder_mode,
+//             .last_slot = true,
+//             .clamp_to_edges = true,
+//         }, .{
+//             .expand = reorder_expand,
+//             .id_extra = final_slot_id,
+//             .padding = dvui.Rect.all(0),
+//             .margin = dvui.Rect.all(0),
+//             .min_size_content = cell_min_size,
+//         });
+//         defer reorderable.deinit();
 
-        if (reorderable.insertBefore()) {
-            switch (orientation) {
-                .horizontal => self.columns_insert_before_index = final_slot_id,
-                .vertical => self.rows_insert_before_index = final_slot_id,
-            }
-        }
-    }
-}
+//         if (reorderable.insertBefore()) {
+//             switch (orientation) {
+//                 .horizontal => self.columns_insert_before_index = final_slot_id,
+//                 .vertical => self.rows_insert_before_index = final_slot_id,
+//             }
+//         }
+//     }
+// }
 
 pub const TextLabelOptions = struct {
     pub const Mode = enum {
@@ -1110,94 +1105,6 @@ pub fn drawRulerLabel(_: *Workspace, options: TextLabelOptions) void {
 //     }
 // }
 
-pub fn drawTransformDialog(self: *Workspace, canvas_vbox: *dvui.BoxWidget) void {
-    const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
-    if (file.editor.transform) |*transform| {
-        var rect = canvas_vbox.data().rect;
-        rect.w = 0;
-        rect.h = 0;
-
-        var fw: dvui.FloatingWidget = undefined;
-        fw.init(@src(), .{}, .{
-            .rect = .{ .x = canvas_vbox.data().rectScale().r.toNatural().x + 10, .y = canvas_vbox.data().rectScale().r.toNatural().y + 10, .w = 0, .h = 0 },
-            .expand = .none,
-            .background = true,
-            .color_fill = dvui.themeGet().color(.control, .fill),
-            .corner_radius = dvui.Rect.all(8),
-            .box_shadow = .{
-                .color = .black,
-                .alpha = 0.2,
-                .fade = 8,
-                .corner_radius = dvui.Rect.all(8),
-            },
-        });
-        defer fw.deinit();
-
-        var anim = dvui.animate(@src(), .{ .kind = .vertical, .duration = 450_000, .easing = dvui.easing.outBack }, .{});
-        defer anim.deinit();
-
-        var anim_box = dvui.box(@src(), .{ .dir = .vertical }, .{
-            .expand = .both,
-            .background = false,
-        });
-        defer anim_box.deinit();
-
-        dvui.labelNoFmt(@src(), "TRANSFORM", .{ .align_x = 0.5 }, .{
-            .padding = dvui.Rect.all(4),
-            .expand = .horizontal,
-            .font = dvui.Font.theme(.title).larger(-4.0).withWeight(.bold),
-        });
-        _ = dvui.separator(@src(), .{ .expand = .horizontal });
-
-        _ = dvui.spacer(@src(), .{ .expand = .horizontal });
-
-        var degrees: f32 = std.math.radiansToDegrees(transform.rotation);
-
-        var slider_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-            .expand = .horizontal,
-            .background = false,
-        });
-
-        if (dvui.sliderEntry(@src(), "{d:0.0}°", .{
-            .value = &degrees,
-            .min = 0,
-            .max = 360,
-            .interval = 1,
-        }, .{ .expand = .horizontal, .color_fill = dvui.themeGet().color(.window, .fill) })) {
-            transform.rotation = std.math.degreesToRadians(degrees);
-        }
-        slider_box.deinit();
-
-        if (transform.ortho) {
-            var box = dvui.box(@src(), .{ .dir = .horizontal, .equal_space = true }, .{
-                .expand = .horizontal,
-                .background = false,
-            });
-            defer box.deinit();
-            dvui.label(@src(), "Width: {d:0.0}", .{transform.point(.bottom_left).diff(transform.point(.bottom_right).*).length()}, .{ .expand = .horizontal, .font = dvui.Font.theme(.heading) });
-            dvui.label(@src(), "Height: {d:0.0}", .{transform.point(.top_left).diff(transform.point(.bottom_left).*).length()}, .{ .expand = .horizontal, .font = dvui.Font.theme(.heading) });
-        }
-
-        {
-            var box = dvui.box(@src(), .{ .dir = .horizontal, .equal_space = true }, .{
-                .expand = .horizontal,
-                .background = false,
-            });
-            defer box.deinit();
-            if (dvui.buttonIcon(@src(), "transform_cancel", icons.tvg.lucide.@"trash-2", .{}, .{ .stroke_color = dvui.themeGet().color(.window, .fill) }, .{ .style = .err, .expand = .horizontal })) {
-                inkz_editor.editor.cancel() catch {
-                    dvui.log.err("Failed to cancel transform", .{});
-                };
-            }
-            if (dvui.buttonIcon(@src(), "transform_accept", icons.tvg.lucide.check, .{}, .{ .stroke_color = dvui.themeGet().color(.window, .fill) }, .{ .style = .highlight, .expand = .horizontal })) {
-                inkz_editor.editor.accept() catch {
-                    dvui.log.err("Failed to accept transform", .{});
-                };
-            }
-        }
-    }
-}
-
 pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
     const logo_pixel_size = 32;
     const logo_width = 3;
@@ -1293,7 +1200,11 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
         );
 
         if (button.clicked()) {
-            inkz_editor.backend.showOpenFolderDialog(setProjectFolderCallback, null);
+            // inkz_editor.backend.showOpenFolderDialog(setProjectFolderCallback, null);
+
+            if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
+                try inkz_editor.editor.setProjectFolder(inkz_editor.app.io, folder);
+            }
         }
     }
 
@@ -1321,73 +1232,74 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
         );
 
         if (button.clicked()) {
-            // if (try dvui.dialogNativeFileOpenMultiple(dvui.currentWindow().arena(), .{
-            //     .title = "Open Files...",
-            //     .filter_description = ".pixi, .png",
-            //     .filters = &.{ "*.pixi", "*.png" },
-            // })) |files| {
-            //     for (files) |file| {
-            //         _ = pixi.editor.openFilePath(file, pixi.editor.open_workspace_grouping) catch {
-            //             std.log.err("Failed to open file: {s}", .{file});
-            //         };
-            //     }
-            // }
+            if (try dvui.dialogNativeFileOpenMultiple(dvui.currentWindow().arena(), .{
+                .title = "Open Files...",
+                .filter_description = ".pixi, .png",
+                .filters = &.{ "*.pixi", "*.png" },
+            })) |files| {
+                for (files) |file| {
+                    _ = inkz_editor.editor.openFilePath(file, inkz_editor.editor.open_workspace_grouping) catch {
+                        std.log.err("Failed to open file: {s}", .{file});
+                    };
+                }
+            }
 
-            inkz_editor.backend.showOpenFileDialog(openFilesCallback, &.{
-                .{ .name = "Image Files", .pattern = "pixi;png;jpg" },
-            }, "", null);
+            // inkz_editor.backend.showOpenFileDialog(openFilesCallback, &.{
+            //     .{ .name = "Image Files", .pattern = "pixi;png;jpg" },
+            // }, "", null);
         }
     }
     vbox.deinit();
 
-    const spacer = dvui.spacer(@src(), .{ .expand = .horizontal, .min_size_content = .{ .h = 30 } });
+    // const spacer = dvui.spacer(@src(), .{ .expand = .horizontal, .min_size_content = .{ .h = 30 } });
 
-    {
-        var recents_box = dvui.box(@src(), .{ .dir = .vertical }, .{
-            .expand = .none,
-            .gravity_x = 0.5,
-            .max_size_content = .{ .h = (canvas_vbox.data().rect.h - spacer.rect.y) / 3.0, .w = canvas_vbox.data().rect.w / 2.0 },
-        });
-        defer recents_box.deinit();
+    _ = canvas_vbox;
+    // {
+    //     var recents_box = dvui.box(@src(), .{ .dir = .vertical }, .{
+    //         .expand = .none,
+    //         .gravity_x = 0.5,
+    //         .max_size_content = .{ .h = (canvas_vbox.data().rect.h - spacer.rect.y) / 3.0, .w = canvas_vbox.data().rect.w / 2.0 },
+    //     });
+    //     defer recents_box.deinit();
 
-        var scroll_area = dvui.scrollArea(@src(), .{}, .{
-            .expand = .both,
-            .color_border = dvui.themeGet().color(.control, .fill),
-            .corner_radius = dvui.Rect.all(8),
-            .color_fill = .transparent,
-        });
-        defer scroll_area.deinit();
+    //     var scroll_area = dvui.scrollArea(@src(), .{}, .{
+    //         .expand = .both,
+    //         .color_border = dvui.themeGet().color(.control, .fill),
+    //         .corner_radius = dvui.Rect.all(8),
+    //         .color_fill = .transparent,
+    //     });
+    //     defer scroll_area.deinit();
 
-        var i: usize = inkz_editor.editor.recents.folders.items.len;
-        while (i > 0) : (i -= 1) {
-            var anim = dvui.animate(@src(), .{
-                .kind = .horizontal,
-                .duration = 150_000 + 150_000 * @as(i32, @intCast(i)),
-                .easing = dvui.easing.outBack,
-            }, .{
-                .id_extra = i,
-                .expand = .horizontal,
-            });
-            defer anim.deinit();
+    //     var i: usize = inkz_editor.editor.recents.folders.items.len;
+    //     while (i > 0) : (i -= 1) {
+    //         var anim = dvui.animate(@src(), .{
+    //             .kind = .horizontal,
+    //             .duration = 150_000 + 150_000 * @as(i32, @intCast(i)),
+    //             .easing = dvui.easing.outBack,
+    //         }, .{
+    //             .id_extra = i,
+    //             .expand = .horizontal,
+    //         });
+    //         defer anim.deinit();
 
-            const folder = inkz_editor.editor.recents.folders.items[i - 1];
-            if (dvui.button(@src(), folder, .{
-                .draw_focus = false,
-            }, .{
-                .expand = .horizontal,
-                .font = dvui.Font.theme(.mono).larger(-2.0),
-                .id_extra = i,
-                .margin = dvui.Rect.all(1),
-                .padding = dvui.Rect.all(2),
-                .color_fill = .transparent,
-                .color_fill_hover = dvui.themeGet().color(.window, .fill_hover),
-                .color_fill_press = dvui.themeGet().color(.window, .fill_press),
-                .color_text = dvui.themeGet().color(.control, .text).opacity(0.5),
-            })) {
-                try inkz_editor.editor.setProjectFolder(folder);
-            }
-        }
-    }
+    //         const folder = inkz_editor.editor.recents.folders.items[i - 1];
+    //         if (dvui.button(@src(), folder, .{
+    //             .draw_focus = false,
+    //         }, .{
+    //             .expand = .horizontal,
+    //             .font = dvui.Font.theme(.mono).larger(-2.0),
+    //             .id_extra = i,
+    //             .margin = dvui.Rect.all(1),
+    //             .padding = dvui.Rect.all(2),
+    //             .color_fill = .transparent,
+    //             .color_fill_hover = dvui.themeGet().color(.window, .fill_hover),
+    //             .color_fill_press = dvui.themeGet().color(.window, .fill_press),
+    //             .color_text = dvui.themeGet().color(.control, .text).opacity(0.5),
+    //         })) {
+    //             try inkz_editor.editor.setProjectFolder(folder);
+    //         }
+    //     }
+    // }
 }
 
 pub fn drawBubble(rect: dvui.Rect, rs: dvui.RectScale, color: [4]u8, id_extra: usize) !void {

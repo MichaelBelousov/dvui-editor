@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const known_folders = @import("known-folders");
 
-pub const Colors = @import("Colors.zig");
+// pub const Colors = @import("Colors.zig");
 pub const Dialogs = @import("dialogs/Dialogs.zig");
 pub const Explorer = @import("explorer/Explorer.zig");
 const inkz_editor = @import("root.zig");
@@ -66,7 +66,7 @@ open_files: std.array_hash_map.Auto(u64, inkz_editor.Internal.TextFile) = .empty
 open_workspace_grouping: u64 = 0,
 
 // tools: Tools,
-colors: Colors = .{},
+// colors: Colors = .{},
 
 grouping_id_counter: u64 = 0,
 file_id_counter: u64 = 0,
@@ -1629,8 +1629,8 @@ pub fn closeReference(editor: *Editor, index: usize) !void {
 }
 
 pub fn deinit(editor: *Editor) !void {
-    if (editor.colors.palette) |*palette| palette.deinit();
-    if (editor.colors.file_tree_palette) |*palette| palette.deinit();
+    // if (editor.colors.palette) |*palette| palette.deinit();
+    // if (editor.colors.file_tree_palette) |*palette| palette.deinit();
 
     // editor.recents.save(inkz_editor.app.gpa, try std.fs.path.join(inkz_editor.app.gpa, &.{ editor.config_folder, "recents.json" })) catch {
     //     dvui.log.err("Failed to save recents", .{});

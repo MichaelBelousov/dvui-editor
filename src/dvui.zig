@@ -6,10 +6,9 @@ const icons = @import("icons");
 
 const inkz_editor = @import("root.zig");
 const Widgets = @import("widgets/Widgets.zig");
-pub const FileWidget = Widgets.FileWidget;
+pub const TextEditWidget = Widgets.TextEditWidget;
 pub const TabsWidget = Widgets.TabsWidget;
 pub const ImageWidget = Widgets.ImageWidget;
-pub const CanvasWidget = Widgets.CanvasWidget;
 pub const ReorderWidget = Widgets.ReorderWidget;
 pub const PanedWidget = Widgets.PanedWidget;
 pub const FloatingWindowWidget = Widgets.FloatingWindowWidget;

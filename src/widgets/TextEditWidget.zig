@@ -5,14 +5,27 @@ const dvui = @import("dvui");
 const inkz_editor = @import("../root.zig");
 const App = inkz_editor.App;
 const Editor = inkz_editor.Editor;
+const Options = dvui.Options;
 
 pub const TextEditWidget = @This();
 
-pub fn init() !TextEditWidget {
-    return .{};
+id: dvui.Id = undefined,
+wd: dvui.WidgetData = undefined,
+file: *inkz_editor.Internal.TextFile = undefined,
+
+pub fn init(src: std.builtin.SourceLocation, file: *inkz_editor.Internal.TextFile, opts: Options) TextEditWidget {
+    const defaults: Options = .{
+        .name = "TextEditWidget",
+    };
+    const wd = dvui.WidgetData.init(src, .{}, defaults.override(opts));
+
+    return .{
+        .wd = wd,
+        .file = file,
+    };
 }
 
-pub fn deinit() void {
+pub fn deinit(_: TextEditWidget) void {
     // TODO: Free memory
 }
 
@@ -32,3 +45,5 @@ pub fn draw(_: TextEditWidget) !bool {
 
     return true;
 }
+
+pub fn processEvents(_: TextEditWidget) void {}

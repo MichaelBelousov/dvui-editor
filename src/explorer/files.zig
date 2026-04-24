@@ -332,9 +332,9 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
                 inner_id_extra.* = dvui.Id.update(tree.data().id, abs_path).asUsize();
 
                 var color = dvui.themeGet().color(.control, .fill);
-                if (inkz_editor.editor.colors.palette) |*palette| {
-                    color = palette.getDVUIColor(color_id.*);
-                }
+                // if (inkz_editor.editor.colors.palette) |*palette| {
+                //     color = palette.getDVUIColor(color_id.*);
+                // }
 
                 const padding = dvui.Rect.all(2);
 
