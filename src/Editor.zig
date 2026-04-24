@@ -1637,8 +1637,8 @@ pub fn deinit(editor: *Editor) !void {
     // };
     // editor.recents.deinit();
 
-    // try editor.settings.save(inkz_editor.app.gpa, try std.fs.path.join(inkz_editor.app.gpa, &.{ editor.config_folder, "settings.json" }));
-    // editor.settings.deinit(inkz_editor.app.gpa);
+    try editor.settings.save(inkz_editor.app.io, inkz_editor.app.gpa, try std.fs.path.join(inkz_editor.app.gpa, &.{ editor.config_folder, "settings.json" }));
+    editor.settings.deinit(inkz_editor.app.gpa);
 
     // if (editor.project) |*project| {
     //     project.save() catch {

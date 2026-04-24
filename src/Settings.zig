@@ -103,14 +103,14 @@ pub fn load(io: Io, gpa: std.mem.Allocator, path: []const u8) !Settings {
     };
 }
 
-pub fn save(settings: *Settings, allocator: std.mem.Allocator, path: []const u8) !void {
+pub fn save(settings: *Settings, io: Io, allocator: std.mem.Allocator, path: []const u8) !void {
     const str = try std.json.Stringify.valueAlloc(allocator, settings, .{});
     defer allocator.free(str);
 
-    var file = try std.fs.createFileAbsolute(path, .{});
-    defer file.close();
+    var file = try std.Io.Dir.createFileAbsolute(io, path, .{});
+    defer file.close(io);
 
-    try file.writeAll(str);
+    try file.writeStreamingAll(io, str);
 }
 
 pub fn deinit(settings: *Settings, allocator: std.mem.Allocator) void {
