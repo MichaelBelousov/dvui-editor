@@ -23,7 +23,7 @@ pub const TransparencyEffect = enum {
 };
 
 /// The ratio of the explorer to the artboard.
-explorer_ratio: f32 = 0.35,
+explorer_ratio: f32 = 0.20,
 
 /// Height of the flipbook window.
 panel_ratio: f32 = 0.25,

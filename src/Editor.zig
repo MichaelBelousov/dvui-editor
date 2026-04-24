@@ -1,33 +1,33 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const Io = std.Io;
+const builtin = @import("builtin");
 
-// const assets = @import("assets");
 const dvui = @import("dvui");
-// const icons = @import("icons");
 const known_folders = @import("known-folders");
-// const objc = @import("objc");
-// const sdl3 = @import("backend").c;
 
 pub const Colors = @import("Colors.zig");
+pub const Dialogs = @import("dialogs/Dialogs.zig");
 pub const Explorer = @import("explorer/Explorer.zig");
 const inkz_editor = @import("root.zig");
 const App = inkz_editor.App;
 pub const Keybinds = @import("Keybinds.zig");
 pub const Menu = @import("Menu.zig");
+pub const Panel = @import("Panel.zig");
+pub const Project = @import("Project.zig");
+pub const Settings = @import("Settings.zig");
 pub const Sidebar = @import("Sidebar.zig");
+pub const Workspace = @import("Workspace.zig");
+
+// const assets = @import("assets");
+// const icons = @import("icons");
+// const objc = @import("objc");
+// const sdl3 = @import("backend").c;
 
 const Editor = @This();
 
-pub const Project = @import("Project.zig");
 // pub const Recents = @import("Recents.zig");
-pub const Settings = @import("Settings.zig");
 // pub const Tools = @import("Tools.zig");
-pub const Dialogs = @import("dialogs/Dialogs.zig");
-
 // pub const Transform = @import("Transform.zig");
-// pub const Workspace = @import("Workspace.zig");
-pub const Panel = @import("Panel.zig");
 // pub const Infobar = @import("Infobar.zig");
 
 /// This arena is for small per-frame editor allocations, such as path joins, null terminations and labels.
@@ -49,7 +49,7 @@ last_titlebar_color: dvui.Color,
 dim_titlebar: bool = false,
 
 /// Workspaces stored by their grouping ID
-// workspaces: std.AutoArrayHashMap(u64, Workspace) = undefined,
+workspaces: std.array_hash_map.Auto(u64, Workspace) = .empty,
 sidebar: Sidebar,
 // infobar: Infobar,
 
@@ -192,10 +192,10 @@ pub fn init(
         .arena = .init(std.heap.page_allocator),
         .last_titlebar_color = dvui.themeGet().color(.control, .fill),
         // .atlas = .{
-        //     .data = try .loadFromBytes(app.allocator, assets.files.@"inkz_editor.atlas"),
+        //     .data = try .loadFromBytes(app.gpa, assets.files.@"inkz_editor.atlas"),
         //     .source = try inkz_editor.image.fromImageFileBytes("inkz_editor.png", assets.files.@"inkz_editor.png", .ptr),
         // },
-        // .tools = try .init(app.allocator),
+        // .tools = try .init(app.gpa),
         .themes = .init(app.gpa),
     };
 
@@ -248,8 +248,8 @@ pub fn init(
         .theme = try app.gpa.dupe(u8, "inkz_editor_dark.json"),
     };
     // inkz_editor.perf.console_logging_enabled = editor.settings.perf_logging;
-    // editor.recents = Recents.load(app.allocator, try std.fs.path.join(app.allocator, &.{ editor.config_folder, "recents.json" })) catch .{
-    //     .folders = .init(app.allocator),
+    // editor.recents = Recents.load(app.gpa, try std.fs.path.join(app.gpa, &.{ editor.config_folder, "recents.json" })) catch .{
+    //     .folders = .init(app.gpa),
     // };
 
     // inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), inkz_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
@@ -257,15 +257,14 @@ pub fn init(
     editor.explorer.* = .init();
     editor.panel.* = .init();
 
-    // editor.workspaces = .init(inkz_editor.app.allocator);
-    // editor.workspaces.put(0, .init(0)) catch |err| {
-    //     std.log.err("Failed to create workspace: {s}", .{@errorName(err)});
-    //     return err;
-    // };
+    editor.workspaces.put(app.gpa, 0, .init(0)) catch |err| {
+        std.log.err("Failed to create workspace: {s}", .{@errorName(err)});
+        return err;
+    };
 
     // TODO: Enable again once assest system is working
-    // editor.colors.file_tree_palette = inkz_editor.Internal.Palette.loadFromBytes(app.allocator, "inkz_editor.hex", assets.files.palettes.@"inkz_editor.hex") catch null;
-    // editor.colors.palette = inkz_editor.Internal.Palette.loadFromBytes(app.allocator, "inkz_editor.hex", assets.files.palettes.@"inkz_editor.hex") catch null;
+    // editor.colors.file_tree_palette = inkz_editor.Internal.Palette.loadFromBytes(app.gpa, "inkz_editor.hex", assets.files.palettes.@"inkz_editor.hex") catch null;
+    // editor.colors.palette = inkz_editor.Internal.Palette.loadFromBytes(app.gpa, "inkz_editor.hex", assets.files.palettes.@"inkz_editor.hex") catch null;
 
     try Keybinds.register();
 
@@ -302,9 +301,9 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     // editor.setTitlebarColor();
     // editor.setWindowStyle();
 
-    // editor.rebuildWorkspaces() catch {
-    //     dvui.log.err("Failed to rebuild workspaces", .{});
-    // };
+    editor.rebuildWorkspaces() catch {
+        dvui.log.err("Failed to rebuild workspaces", .{});
+    };
 
     // inkz_editor.render.frame_index +%= 1;
     // if (inkz_editor.perf.record) inkz_editor.perf.beginFrame();
@@ -489,7 +488,6 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     }
 
     if (sidebar_pressed) {
-        std.debug.print("Sidebar pressed!\n", .{});
         editor.explorer.open();
     }
 
@@ -559,12 +557,12 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
             }
         }
 
-        // if (editor.panel.paned.showFirst()) {
-        //     const result = try editor.drawWorkspaces(0);
-        //     if (result != .ok) {
-        //         return result;
-        //     }
-        // }
+        if (editor.panel.paned.showFirst()) {
+            const result = try editor.drawWorkspaces(0);
+            if (result != .ok) {
+                return result;
+            }
+        }
     }
 
     //     { // Radial Menu
@@ -907,7 +905,7 @@ pub fn drawRadialMenu(editor: *Editor) !void {
 }
 
 pub fn rebuildWorkspaces(editor: *Editor) !void {
-
+    const gpa = inkz_editor.app.gpa;
     // Create workspaces for each grouping ID
     for (editor.open_files.values()) |*file| {
         if (!editor.workspaces.contains(file.editor.grouping)) {
@@ -918,7 +916,7 @@ pub fn rebuildWorkspaces(editor: *Editor) !void {
                 }
             }
 
-            editor.workspaces.put(file.editor.grouping, workspace) catch |err| {
+            editor.workspaces.put(gpa, file.editor.grouping, workspace) catch |err| {
                 std.log.err("Failed to create workspace: {s}", .{@errorName(err)});
                 return err;
             };
@@ -976,64 +974,64 @@ pub fn rebuildWorkspaces(editor: *Editor) !void {
     }
 }
 
-// pub fn drawWorkspaces(editor: *Editor, index: usize) !dvui.App.Result {
-//     if (index >= editor.workspaces.count()) return .ok;
+pub fn drawWorkspaces(editor: *Editor, index: usize) !dvui.App.Result {
+    if (index >= editor.workspaces.count()) return .ok;
 
-//     var s = inkz_editor.dvui.paned(@src(), .{
-//         .direction = .horizontal,
-//         .collapsed_size = if (index == editor.workspaces.count() - 1) std.math.floatMax(f32) else 0,
-//         .handle_size = handle_size,
-//         .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
-//     }, .{
-//         .expand = .both,
-//         .background = false,
-//     });
-//     defer s.deinit();
+    var s = inkz_editor.dvui.paned(@src(), .{
+        .direction = .horizontal,
+        .collapsed_size = if (index == editor.workspaces.count() - 1) std.math.floatMax(f32) else 0,
+        .handle_size = handle_size,
+        .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
+    }, .{
+        .expand = .both,
+        .background = false,
+    });
+    defer s.deinit();
 
-//     const dragging = editor.panel.paned.dragging or s.dragging;
+    const dragging = editor.panel.paned.dragging or s.dragging;
 
-//     if (!dragging) {
-//         if (index + 1 < editor.workspaces.count()) {
-//             editor.workspaces.values()[index + 1].center = (s.animating and s.split_ratio.* < 1.0) or (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
-//         } else if (editor.workspaces.count() == 1) {
-//             editor.workspaces.values()[index].center = (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
-//         }
-//     }
+    if (!dragging) {
+        if (index + 1 < editor.workspaces.count()) {
+            editor.workspaces.values()[index + 1].center = (s.animating and s.split_ratio.* < 1.0) or (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
+        } else if (editor.workspaces.count() == 1) {
+            editor.workspaces.values()[index].center = (editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0);
+        }
+    }
 
-//     // Ens
-//     if (s.collapsing and s.split_ratio.* < 0.5) {
-//         s.animateSplit(1.0, dvui.easing.outBack);
-//     }
+    // Ens
+    if (s.collapsing and s.split_ratio.* < 0.5) {
+        s.animateSplit(1.0, dvui.easing.outBack);
+    }
 
-//     if (!s.dragging and !s.animating and !s.collapsing and !s.collapsed_state) {
-//         if (index == editor.workspaces.count() - 1) {
-//             if (s.split_ratio.* != 1.0) {
-//                 s.animateSplit(1.0, dvui.easing.outBack);
-//             }
-//         } else {
-//             if (dvui.firstFrame(s.wd.id)) {
-//                 s.split_ratio.* = 1.0;
-//                 s.animateSplit(0.5, dvui.easing.outBack);
-//             }
-//         }
-//     }
+    if (!s.dragging and !s.animating and !s.collapsing and !s.collapsed_state) {
+        if (index == editor.workspaces.count() - 1) {
+            if (s.split_ratio.* != 1.0) {
+                s.animateSplit(1.0, dvui.easing.outBack);
+            }
+        } else {
+            if (dvui.firstFrame(s.wd.id)) {
+                s.split_ratio.* = 1.0;
+                s.animateSplit(0.5, dvui.easing.outBack);
+            }
+        }
+    }
 
-//     if (s.showFirst()) {
-//         const result = try editor.workspaces.values()[index].draw();
-//         if (result != .ok) {
-//             return result;
-//         }
-//     }
+    if (s.showFirst()) {
+        const result = try editor.workspaces.values()[index].draw();
+        if (result != .ok) {
+            return result;
+        }
+    }
 
-//     if (s.showSecond()) {
-//         const result = try drawWorkspaces(editor, index + 1);
-//         if (result != .ok) {
-//             return result;
-//         }
-//     }
+    if (s.showSecond()) {
+        const result = try drawWorkspaces(editor, index + 1);
+        if (result != .ok) {
+            return result;
+        }
+    }
 
-//     return .ok;
-// }
+    return .ok;
+}
 
 pub fn close(app: *App, editor: *Editor) void {
     var should_close = true;
@@ -1061,10 +1059,10 @@ pub fn setProjectFolder(editor: *Editor, io: Io, path: []const u8) !void {
         inkz_editor.app.gpa.free(folder);
     }
     editor.folder = try inkz_editor.app.gpa.dupe(u8, path);
-    // try editor.recents.appendFolder(try inkz_editor.app.allocator.dupe(u8, path));
+    // try editor.recents.appendFolder(try inkz_editor.app.gpa.dupe(u8, path));
     editor.explorer.pane = .files;
 
-    // editor.project = Project.load(inkz_editor.app.allocator) catch null;
+    // editor.project = Project.load(inkz_editor.app.gpa) catch null;
 }
 
 pub fn saving(editor: *Editor) bool {
@@ -1149,7 +1147,7 @@ pub fn setActiveFile(editor: *Editor, index: usize) void {
 //     return null;
 // }
 
-pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.File {
+pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.TextFile {
     if (editor.open_files.values().len == 0) return null;
     if (index >= editor.open_files.values().len) return null;
 
@@ -1205,7 +1203,7 @@ pub fn copy(editor: *Editor) !void {
         if (file.editor.transform != null) return;
 
         if (editor.sprite_clipboard) |*clipboard| {
-            inkz_editor.app.allocator.free(inkz_editor.image.bytes(clipboard.source));
+            inkz_editor.app.gpa.free(inkz_editor.image.bytes(clipboard.source));
             editor.sprite_clipboard = null;
         }
 
@@ -1279,7 +1277,7 @@ pub fn copy(editor: *Editor) !void {
 
             editor.sprite_clipboard = .{
                 .source = inkz_editor.image.fromPixelsPMA(
-                    @ptrCast(file.editor.transform_layer.pixelsFromRect(inkz_editor.app.allocator, reduced_data_rect)),
+                    @ptrCast(file.editor.transform_layer.pixelsFromRect(inkz_editor.app.gpa, reduced_data_rect)),
                     @intFromFloat(reduced_data_rect.w),
                     @intFromFloat(reduced_data_rect.h),
                     .ptr,
@@ -1516,7 +1514,7 @@ pub fn transform(editor: *Editor) !void {
                     reduced_data_rect.center(), // This point constantly moves
                 },
                 .source = inkz_editor.image.fromPixelsPMA(
-                    @ptrCast(file.editor.transform_layer.pixelsFromRect(inkz_editor.app.allocator, reduced_data_rect)),
+                    @ptrCast(file.editor.transform_layer.pixelsFromRect(inkz_editor.app.gpa, reduced_data_rect)),
                     @intFromFloat(reduced_data_rect.w),
                     @intFromFloat(reduced_data_rect.h),
                     .ptr,
@@ -1561,13 +1559,13 @@ pub fn openInFileBrowser(_: *Editor, path: []const u8) !void {
 }
 
 pub fn closeFileID(editor: *Editor, id: u64) !void {
-    if (editor.open_files.get(id)) |file| {
-        if (file.dirty()) {
-            std.log.debug("closeFile: {d} is dirty", .{id});
-            return error.FileIsDirty;
-        }
-        try editor.rawCloseFileID(id);
-    }
+    // if (editor.open_files.get(id)) |file| {
+    // if (file.dirty()) {
+    //     std.log.debug("closeFile: {d} is dirty", .{id});
+    //     return error.FileIsDirty;
+    // }
+    try editor.rawCloseFileID(id);
+    // }
 }
 
 pub fn closeFile(editor: *Editor, index: usize) !void {
@@ -1634,19 +1632,19 @@ pub fn deinit(editor: *Editor) !void {
     if (editor.colors.palette) |*palette| palette.deinit();
     if (editor.colors.file_tree_palette) |*palette| palette.deinit();
 
-    // editor.recents.save(inkz_editor.app.allocator, try std.fs.path.join(inkz_editor.app.allocator, &.{ editor.config_folder, "recents.json" })) catch {
+    // editor.recents.save(inkz_editor.app.gpa, try std.fs.path.join(inkz_editor.app.gpa, &.{ editor.config_folder, "recents.json" })) catch {
     //     dvui.log.err("Failed to save recents", .{});
     // };
     // editor.recents.deinit();
 
-    // try editor.settings.save(inkz_editor.app.allocator, try std.fs.path.join(inkz_editor.app.allocator, &.{ editor.config_folder, "settings.json" }));
-    // editor.settings.deinit(inkz_editor.app.allocator);
+    // try editor.settings.save(inkz_editor.app.gpa, try std.fs.path.join(inkz_editor.app.gpa, &.{ editor.config_folder, "settings.json" }));
+    // editor.settings.deinit(inkz_editor.app.gpa);
 
     // if (editor.project) |*project| {
     //     project.save() catch {
     //         dvui.log.err("Failed to save project file", .{});
     //     };
-    //     project.deinit(inkz_editor.app.allocator);
+    //     project.deinit(inkz_editor.app.gpa);
     // }
 
     editor.explorer.deinit();

@@ -9,6 +9,11 @@ id: u64 = 0,
 path: []const u8 = "",
 // TODO: Use less naive datastructure, this will always read full file content into memory!
 content: []const u8 = "",
+editor: EditorData = .{},
+
+pub const EditorData = struct {
+    grouping: u64 = 0,
+};
 
 pub const InitOptions = struct {};
 

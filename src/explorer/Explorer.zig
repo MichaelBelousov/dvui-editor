@@ -73,7 +73,6 @@ pub fn open(explorer: *Explorer) void {
     if (explorer.paned.collapsed()) return;
 
     if (inkz_editor.editor.settings.explorer_ratio > 0.0) {
-        std.debug.print("Ratio: {any}\n", .{inkz_editor.editor.settings.explorer_ratio});
         explorer.paned.animateSplit(inkz_editor.editor.settings.explorer_ratio, dvui.easing.outBack);
     } else {
         explorer.paned.animateSplit(0.2, dvui.easing.outBack);
