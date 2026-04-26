@@ -29,7 +29,7 @@ pub fn deinit(_: TextEditWidget) void {
     // TODO: Free memory
 }
 
-pub fn draw(_: TextEditWidget) !bool {
+pub fn draw(_: TextEditWidget) bool {
     const box = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .both,
         .background = false,
@@ -46,4 +46,6 @@ pub fn draw(_: TextEditWidget) !bool {
     return true;
 }
 
-pub fn processEvents(_: TextEditWidget) void {}
+pub fn processEvents(self: TextEditWidget) void {
+    _ = self.draw();
+}

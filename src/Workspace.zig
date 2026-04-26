@@ -513,16 +513,16 @@ pub fn drawEditor(self: *Workspace) !void {
 
     const has_files = inkz_editor.editor.open_files.values().len > 0;
 
-    var canvas_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
+    var text_editor_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .both,
         .background = has_files,
         .color_fill = content_color,
     });
     defer {
-        dvui.toastsShow(canvas_vbox.data().id, canvas_vbox.data().contentRectScale().r.toNatural());
-        canvas_vbox.deinit();
+        dvui.toastsShow(text_editor_vbox.data().id, text_editor_vbox.data().contentRectScale().r.toNatural());
+        text_editor_vbox.deinit();
     }
-    defer self.processTabDrag(canvas_vbox.data());
+    defer self.processTabDrag(text_editor_vbox.data());
 
     if (has_files) {
         if (self.open_file_index >= inkz_editor.editor.open_files.values().len) {
@@ -530,21 +530,22 @@ pub fn drawEditor(self: *Workspace) !void {
         }
 
         const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
-        file.editor.text_edit_widget.id = canvas_vbox.data().id;
+        // file.editor.text_edit_widget.id = text_editor_vbox.data().id;
         file.editor.workspace = self;
 
-        if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(canvas_vbox.data().id)) {
-            defer inkz_editor.dvui.drawEdgeShadow(canvas_vbox.data().rectScale(), .top, .{});
+        if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(text_editor_vbox.data().id)) {
+            defer inkz_editor.dvui.drawEdgeShadow(text_editor_vbox.data().rectScale(), .top, .{});
             // self.drawRuler(.horizontal);
         }
 
-        var canvas_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
-        defer canvas_hbox.deinit();
+        var text_editor_hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
+        defer text_editor_hbox.deinit();
+        // file.editor.text_edit_widget.id = text_editor_hbox.data().id;
 
-        if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(canvas_vbox.data().id)) {
-            defer inkz_editor.dvui.drawEdgeShadow(canvas_vbox.data().rectScale(), .left, .{});
-            // self.drawRuler(.vertical);
-        }
+        // if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(text_editor_vbox.data().id)) {
+        //     defer inkz_editor.dvui.drawEdgeShadow(text_editor_vbox.data().rectScale(), .left, .{});
+        //     // self.drawRuler(.vertical);
+        // }
 
         if (self.grouping != file.editor.grouping) return;
 
@@ -573,7 +574,7 @@ pub fn drawEditor(self: *Workspace) !void {
         dvui.alphaSet(1.0);
         defer dvui.alphaSet(alpha);
 
-        try self.drawHomePage(canvas_vbox);
+        try self.drawHomePage(text_editor_vbox);
     }
 }
 
