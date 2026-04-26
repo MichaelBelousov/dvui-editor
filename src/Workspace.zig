@@ -551,11 +551,7 @@ pub fn drawEditor(self: *Workspace) !void {
 
         // inkz_editor.perf.canvasPaneDrawn();
 
-        var file_widget = inkz_editor.dvui.TextEditWidget.init(@src(), file, .{
-            .expand = .both,
-            .background = false,
-            .color_fill = .transparent,
-        });
+        var file_widget = inkz_editor.dvui.TextEditWidget.init(@src(), file);
 
         defer file_widget.deinit();
         file_widget.processEvents();

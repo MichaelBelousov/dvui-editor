@@ -10,17 +10,13 @@ const Options = dvui.Options;
 pub const TextEditWidget = @This();
 
 id: dvui.Id = undefined,
-wd: dvui.WidgetData = undefined,
 file: *inkz_editor.Internal.TextFile = undefined,
+first_run: bool = true,
 
-pub fn init(src: std.builtin.SourceLocation, file: *inkz_editor.Internal.TextFile, opts: Options) TextEditWidget {
-    const defaults: Options = .{
-        .name = "TextEditWidget",
-    };
-    const wd = dvui.WidgetData.init(src, .{}, defaults.override(opts));
-
+pub fn init(src: std.builtin.SourceLocation, file: *inkz_editor.Internal.TextFile) TextEditWidget {
+    // TODO: Do we need src? How do we track multiple files?
+    _ = src;
     return .{
-        .wd = wd,
         .file = file,
     };
 }
@@ -29,7 +25,7 @@ pub fn deinit(_: TextEditWidget) void {
     // TODO: Free memory
 }
 
-pub fn draw(_: TextEditWidget) bool {
+pub fn processEvents(self: *TextEditWidget) void {
     const box = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .both,
         .background = false,
@@ -37,15 +33,16 @@ pub fn draw(_: TextEditWidget) bool {
     });
     defer box.deinit();
 
-    const text_edit = dvui.textEntry(@src(), .{ .placeholder = "My Awesome TextEdit Widget" }, .{
+    const text_edit = dvui.textEntry(@src(), .{
+        .placeholder = "My Awesome TextEdit Widget",
+        .multiline = true,
+    }, .{
         .expand = .both,
     });
-
     defer text_edit.deinit();
 
-    return true;
-}
-
-pub fn processEvents(self: TextEditWidget) void {
-    _ = self.draw();
+    if (self.first_run) {
+        self.first_run = false;
+        text_edit.textSet(self.file.content, false);
+    }
 }
