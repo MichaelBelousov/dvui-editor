@@ -88,45 +88,6 @@ pub fn tick() !void {
                     }
                 }
 
-                if (ke.matchBind("quick_tools")) {
-                    inkz_editor.editor.tools.radial_menu.visible = switch (ke.action) {
-                        .down, .repeat => true,
-                        .up => false,
-                    };
-                    // If we include a refresh here, the underlying gui has a chance to reset the cursor
-                    dvui.refresh(null, @src(), dvui.currentWindow().data().id);
-                }
-
-                if (ke.matchBind("increase_stroke_size") and (ke.action == .down or ke.action == .repeat)) {
-                    if (inkz_editor.editor.tools.stroke_size < inkz_editor.Editor.Tools.max_brush_size - 1)
-                        inkz_editor.editor.tools.stroke_size += 1;
-
-                    inkz_editor.editor.tools.setStrokeSize(inkz_editor.editor.tools.stroke_size);
-                }
-
-                if (ke.matchBind("export") and ke.action == .down) {
-                    // Create a generic dialog that contains typical okay and cancel buttons and header
-                    // The displayFn will be called during the drawing of the dialog, prior to ok and cancel buttons
-                    var mutex = inkz_editor.dvui.dialog(@src(), .{
-                        .displayFn = inkz_editor.Editor.Dialogs.Export.dialog,
-                        .callafterFn = inkz_editor.Editor.Dialogs.Export.callAfter,
-                        .title = "Export...",
-                        .ok_label = "Export",
-                        .cancel_label = "Cancel",
-                        .resizeable = false,
-                        .modal = false,
-                        .default = .ok,
-                    });
-                    mutex.mutex.unlock();
-                }
-
-                if (ke.matchBind("decrease_stroke_size") and (ke.action == .down or ke.action == .repeat)) {
-                    if (inkz_editor.editor.tools.stroke_size > 1)
-                        inkz_editor.editor.tools.stroke_size -= 1;
-
-                    inkz_editor.editor.tools.setStrokeSize(inkz_editor.editor.tools.stroke_size);
-                }
-
                 if (builtin.os.tag != .macos) {
                     if (ke.matchBind("explorer") and ke.action == .down) {
                         if (inkz_editor.editor.explorer.closed) {
@@ -137,17 +98,17 @@ pub fn tick() !void {
                     }
                 }
 
-                if (ke.matchBind("activate") and ke.action == .down) {
-                    inkz_editor.editor.accept() catch {
-                        std.log.err("Failed to accept", .{});
-                    };
-                }
+                // if (ke.matchBind("activate") and ke.action == .down) {
+                //     inkz_editor.editor.accept() catch {
+                //         std.log.err("Failed to accept", .{});
+                //     };
+                // }
 
-                if (ke.matchBind("cancel") and ke.action == .down) {
-                    inkz_editor.editor.cancel() catch {
-                        std.log.err("Failed to cancel", .{});
-                    };
-                }
+                // if (ke.matchBind("cancel") and ke.action == .down) {
+                //     inkz_editor.editor.cancel() catch {
+                //         std.log.err("Failed to cancel", .{});
+                //     };
+                // }
 
                 if (builtin.os.tag != .macos) {
                     if (ke.matchBind("undo") and (ke.action == .down or ke.action == .repeat)) {
@@ -180,28 +141,28 @@ pub fn tick() !void {
                         };
                     }
 
-                    if (ke.matchBind("transform") and ke.action == .down) {
-                        inkz_editor.editor.transform() catch {
-                            std.log.err("Failed to transform", .{});
-                        };
-                    }
+                    // if (ke.matchBind("transform") and ke.action == .down) {
+                    //     inkz_editor.editor.transform() catch {
+                    //         std.log.err("Failed to transform", .{});
+                    //     };
+                    // }
                 }
 
-                if (ke.matchBind("pencil") and ke.action == .down) {
-                    inkz_editor.editor.tools.set(.pencil);
-                }
-                if (ke.matchBind("eraser") and ke.action == .down) {
-                    inkz_editor.editor.tools.set(.eraser);
-                }
-                if (ke.matchBind("bucket") and ke.action == .down) {
-                    inkz_editor.editor.tools.set(.bucket);
-                }
-                if (ke.matchBind("pointer") and ke.action == .down) {
-                    inkz_editor.editor.tools.set(.pointer);
-                }
-                if (ke.matchBind("selection") and ke.action == .down) {
-                    inkz_editor.editor.tools.set(.selection);
-                }
+                // if (ke.matchBind("pencil") and ke.action == .down) {
+                //     inkz_editor.editor.tools.set(.pencil);
+                // }
+                // if (ke.matchBind("eraser") and ke.action == .down) {
+                //     inkz_editor.editor.tools.set(.eraser);
+                // }
+                // if (ke.matchBind("bucket") and ke.action == .down) {
+                //     inkz_editor.editor.tools.set(.bucket);
+                // }
+                // if (ke.matchBind("pointer") and ke.action == .down) {
+                //     inkz_editor.editor.tools.set(.pointer);
+                // }
+                // if (ke.matchBind("selection") and ke.action == .down) {
+                //     inkz_editor.editor.tools.set(.selection);
+                // }
             },
             else => {},
         }

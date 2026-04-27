@@ -16,6 +16,18 @@ pub const Internal = struct {
     // pub const History = @import("internal/History.zig");
     pub const Palette = @import("internal/Palette.zig");
     pub const TextFile = @import("internal/TextFile.zig");
+    pub const NativeMenuAction = enum(c_int) {
+        open_folder = 0,
+        open_files = 1,
+        save = 2,
+        copy = 3,
+        paste = 4,
+        undo = 5,
+        redo = 6,
+        transform = 7,
+        toggle_explorer = 8,
+        show_dvui_demo = 9,
+    };
 };
 
 pub const math = struct {

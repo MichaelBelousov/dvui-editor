@@ -565,12 +565,11 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         }
     }
 
+    Keybinds.tick() catch {
+        dvui.log.err("Failed to tick hotkeys", .{});
+    };
+
     //     { // Radial Menu
-
-    //         Keybinds.tick() catch {
-    //             dvui.log.err("Failed to tick hotkeys", .{});
-    //         };
-
     //         for (dvui.events()) |*e| {
     //             switch (e.evt) {
     //                 .mouse => |me| {
@@ -1137,15 +1136,14 @@ pub fn setActiveFile(editor: *Editor, index: usize) void {
     // }
 }
 
-// TODO: Add workspaces back.
 /// Returns the actively focused file, through workspace grouping.
-// pub fn activeFile(editor: *Editor) ?*inkz_editor.Internal.File {
-//     if (editor.workspaces.get(editor.open_workspace_grouping)) |workspace| {
-//         return editor.getFile(workspace.open_file_index);
-//     }
+pub fn activeFile(editor: *Editor) ?*inkz_editor.Internal.TextFile {
+    if (editor.workspaces.get(editor.open_workspace_grouping)) |workspace| {
+        return editor.getFile(workspace.open_file_index);
+    }
 
-//     return null;
-// }
+    return null;
+}
 
 pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.TextFile {
     if (editor.open_files.values().len == 0) return null;
@@ -1174,29 +1172,29 @@ pub fn forceCloseFile(editor: *Editor, index: usize) !void {
     }
 }
 
-pub fn accept(editor: *Editor) !void {
-    if (editor.activeFile()) |file| {
-        if (file.editor.transform) |*t| {
-            t.accept();
-        }
-    }
-}
+// pub fn accept(editor: *Editor) !void {
+//     if (editor.activeFile()) |file| {
+//         if (file.editor.transform) |*t| {
+//             t.accept();
+//         }
+//     }
+// }
 
-pub fn cancel(editor: *Editor) !void {
-    if (editor.activeFile()) |file| {
-        if (file.editor.transform) |*t| {
-            t.cancel();
-        }
+// pub fn cancel(editor: *Editor) !void {
+//     if (editor.activeFile()) |file| {
+//         if (file.editor.transform) |*t| {
+//             t.cancel();
+//         }
 
-        if (file.editor.selected_sprites.count() > 0) {
-            file.clearSelectedSprites();
-        }
+//         if (file.editor.selected_sprites.count() > 0) {
+//             file.clearSelectedSprites();
+//         }
 
-        if (file.selected_animation_index != null) {
-            file.selected_animation_index = null;
-        }
-    }
-}
+//         if (file.selected_animation_index != null) {
+//             file.selected_animation_index = null;
+//         }
+//     }
+// }
 
 pub fn copy(editor: *Editor) !void {
     if (editor.activeFile()) |file| {
@@ -1411,129 +1409,11 @@ pub fn paste(editor: *Editor) !void {
     }
 }
 
-/// Begins a transform operation on the currently active file.
-pub fn transform(editor: *Editor) !void {
-    if (editor.activeFile()) |file| {
-        if (file.editor.transform) |*t| {
-            t.cancel();
-        }
-
-        var selected_layer = file.layers.get(file.selected_layer_index);
-
-        switch (editor.tools.current) {
-            .selection => {
-                file.editor.transform_layer.clear();
-                // We are in the selection tool, so we should assume that the user has painted a selection
-                // into the selection layer mask, we need to copy the pixels into the transform layer itself for reducing
-                var pixel_iterator = file.editor.selection_layer.mask.iterator(.{ .kind = .set, .direction = .forward });
-                while (pixel_iterator.next()) |pixel_index| {
-                    @memcpy(&file.editor.transform_layer.pixels()[pixel_index], &selected_layer.pixels()[pixel_index]);
-                    selected_layer.pixels()[pixel_index] = .{ 0, 0, 0, 0 };
-                    file.editor.transform_layer.mask.set(pixel_index);
-                }
-                selected_layer.invalidate();
-            },
-            else => {
-                // Current tool is the pointer, so we potentially have a sprite selection in
-                // selected sprites that we need to copy to the selection layer.
-                file.editor.transform_layer.clear();
-
-                if (file.editor.selected_sprites.count() > 0) {
-                    var sprite_iterator = file.editor.selected_sprites.iterator(.{ .kind = .set, .direction = .forward });
-
-                    while (sprite_iterator.next()) |index| {
-                        const source_rect = file.spriteRect(index);
-                        if (selected_layer.pixelsFromRect(
-                            dvui.currentWindow().arena(),
-                            source_rect,
-                        )) |source_pixels| {
-                            file.editor.transform_layer.blit(
-                                source_pixels,
-                                source_rect,
-                                .{ .transparent = true, .mask = true },
-                            );
-                            selected_layer.clearRect(source_rect);
-                        }
-                    }
-                } else {
-                    if (file.editor.canvas.hovered) {
-                        if (file.spriteIndex(file.editor.canvas.dataFromScreenPoint(dvui.currentWindow().mouse_pt))) |sprite_index| {
-                            const rect = file.spriteRect(sprite_index);
-                            if (selected_layer.pixelsFromRect(
-                                dvui.currentWindow().arena(),
-                                rect,
-                            )) |source_pixels| {
-                                file.editor.transform_layer.blit(
-                                    source_pixels,
-                                    rect,
-                                    .{ .transparent = true, .mask = true },
-                                );
-                                selected_layer.clearRect(rect);
-                            }
-                        }
-                    } else if (file.selected_animation_index) |animation_index| {
-                        const animation = file.animations.get(animation_index);
-                        if (file.selected_animation_frame_index < animation.frames.len) {
-                            const source_rect = file.spriteRect(animation.frames[file.selected_animation_frame_index].sprite_index);
-                            if (selected_layer.pixelsFromRect(
-                                dvui.currentWindow().arena(),
-                                source_rect,
-                            )) |source_pixels| {
-                                file.editor.transform_layer.blit(
-                                    source_pixels,
-                                    source_rect,
-                                    .{ .transparent = true, .mask = true },
-                                );
-                                selected_layer.clearRect(source_rect);
-                            }
-                        }
-                    }
-                }
-            },
-        }
-
-        // We now have a transform layer that contains:
-        // 1. the unaltered colored pixels of the active transform
-        // 2. a mask containing bits for the pixels of the selection being transformed
-        const source_rect = dvui.Rect.fromSize(file.editor.transform_layer.size());
-        if (file.editor.transform_layer.reduce(source_rect)) |reduced_data_rect| {
-            defer file.editor.selection_layer.clearMask();
-            file.editor.transform = .{
-                .target_texture = dvui.textureCreateTarget(file.width(), file.height(), .nearest, .rgba_8_8_8_8) catch {
-                    dvui.log.err("Failed to create target texture", .{});
-                    return;
-                },
-                .file_id = file.id,
-                .layer_id = selected_layer.id,
-                .data_points = .{
-                    reduced_data_rect.topLeft(),
-                    reduced_data_rect.topRight(),
-                    reduced_data_rect.bottomRight(),
-                    reduced_data_rect.bottomLeft(),
-                    reduced_data_rect.center(),
-                    reduced_data_rect.center(), // This point constantly moves
-                },
-                .source = inkz_editor.image.fromPixelsPMA(
-                    @ptrCast(file.editor.transform_layer.pixelsFromRect(inkz_editor.app.gpa, reduced_data_rect)),
-                    @intFromFloat(reduced_data_rect.w),
-                    @intFromFloat(reduced_data_rect.h),
-                    .ptr,
-                ) catch return error.MemoryAllocationFailed,
-            };
-
-            for (file.editor.transform.?.data_points[0..4]) |*point| {
-                const d = point.diff(file.editor.transform.?.point(.pivot).*);
-                if (d.length() > file.editor.transform.?.radius) {
-                    file.editor.transform.?.radius = d.length() + 4;
-                }
-            }
-        }
-    }
-}
-
 /// Performs a save operation on the currently open file.
 pub fn save(editor: *Editor) !void {
+    std.print.debug("Save triggered");
     if (editor.activeFile()) |file| {
+        std.print.debug("Saving file: {s}", .{file.path});
         try file.saveAsync();
     }
 }
