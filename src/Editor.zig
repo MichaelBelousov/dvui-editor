@@ -65,26 +65,13 @@ open_files: std.array_hash_map.Auto(u64, inkz_editor.Internal.TextFile) = .empty
 // This will contain tabs for all open files with a matching grouping ID
 open_workspace_grouping: u64 = 0,
 
-// tools: Tools,
-// colors: Colors = .{},
-
 grouping_id_counter: u64 = 0,
 file_id_counter: u64 = 0,
-
-// sprite_clipboard: ?SpriteClipboard = null,
 
 window_opacity: f32 = 1.0,
 
 // pending_native_menu_actions: [16]inkz_editor.backend.NativeMenuAction = undefined,
 // pending_native_menu_actions_len: u8 = 0,
-
-/// When set, next `tick` runs `warmupDrawingComposites` on the active file (after open or drawing-tool select).
-composite_warmup_pending: bool = false,
-
-// pub const SpriteClipboard = struct {
-//     source: dvui.ImageSource,
-//     offset: dvui.Point,
-// };
 
 pub fn init(
     io: Io,
@@ -1095,7 +1082,6 @@ pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
 
         // If the workspace grouping does exist, go ahead and set the active file
         editor.setActiveFile(editor.open_files.count() - 1);
-        editor.composite_warmup_pending = true;
         return true;
     }
     return error.FailedToOpenFile;
