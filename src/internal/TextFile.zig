@@ -9,7 +9,7 @@ const TextFile = @This();
 id: u64 = undefined,
 path: []const u8 = undefined,
 // TODO: Use less naive datastructure, this will always read full file content into memory!
-content: []const u8 = undefined,
+content: []u8 = undefined,
 lines: u64 = undefined,
 editor: EditorData = .{},
 
