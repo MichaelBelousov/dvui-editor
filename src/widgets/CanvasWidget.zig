@@ -2,7 +2,7 @@ const std = @import("std");
 
 const dvui = @import("dvui");
 
-const inkz_editor = @import("../root.zig");
+const dvui_editor = @import("../root.zig");
 
 pub const CanvasWidget = @This();
 
@@ -220,7 +220,7 @@ pub fn processEvents(self: *CanvasWidget) void {
                         }
                     }
                 } else if (me.action == .wheel_y or me.action == .wheel_x) {
-                    switch (inkz_editor.editor.settings.input_scheme) {
+                    switch (dvui_editor.editor.settings.input_scheme) {
                         .mouse => {
                             const base: f32 = if (me.mod.matchBind("shift")) 1.005 else 1.005;
                             if ((me.mod.matchBind("shift") and me.mod.matchBind("ctrl/cmd")) or !me.mod.matchBind("shift") and !me.mod.matchBind("ctrl/cmd")) {

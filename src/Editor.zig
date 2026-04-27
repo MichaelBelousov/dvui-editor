@@ -5,11 +5,10 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const known_folders = @import("known-folders");
 
-// pub const Colors = @import("Colors.zig");
 pub const Dialogs = @import("dialogs/Dialogs.zig");
+const dvui_editor = @import("root.zig");
+const App = dvui_editor.App;
 pub const Explorer = @import("explorer/Explorer.zig");
-const inkz_editor = @import("root.zig");
-const App = inkz_editor.App;
 pub const Keybinds = @import("Keybinds.zig");
 pub const Menu = @import("Menu.zig");
 pub const Panel = @import("Panel.zig");
@@ -18,6 +17,7 @@ pub const Settings = @import("Settings.zig");
 pub const Sidebar = @import("Sidebar.zig");
 pub const Workspace = @import("Workspace.zig");
 
+// pub const Colors = @import("Colors.zig");
 // const assets = @import("assets");
 // const icons = @import("icons");
 // const objc = @import("objc");
@@ -37,7 +37,7 @@ arena: std.heap.ArenaAllocator,
 config_folder: []const u8,
 palette_folder: []const u8,
 
-// atlas: inkz_editor.Internal.Atlas,
+// atlas: dvui_editor.Internal.Atlas,
 
 settings: Settings = undefined,
 // recents: Recents = undefined,
@@ -59,7 +59,7 @@ project: ?Project = null,
 
 themes: std.array_list.Managed(dvui.Theme) = undefined,
 
-open_files: std.array_hash_map.Auto(u64, inkz_editor.Internal.TextFile) = .empty,
+open_files: std.array_hash_map.Auto(u64, dvui_editor.Internal.TextFile) = .empty,
 
 // The actively focused workspace grouping ID
 // This will contain tabs for all open files with a matching grouping ID
@@ -70,59 +70,59 @@ file_id_counter: u64 = 0,
 
 window_opacity: f32 = 1.0,
 
-pending_native_menu_actions: [16]inkz_editor.backend.NativeMenuAction = undefined,
+pending_native_menu_actions: [16]dvui_editor.backend.NativeMenuAction = undefined,
 pending_native_menu_actions_len: u8 = 0,
 
 pub fn init(
     io: Io,
     app: *App,
 ) !Editor {
-    const config_folder = std.Io.Dir.path.join(inkz_editor.app.gpa, &.{
+    const config_folder = std.Io.Dir.path.join(dvui_editor.app.gpa, &.{
         try known_folders.getPath(io, dvui.currentWindow().arena(), app.environ.*, .local_configuration) orelse app.root_path,
-        "inkz-editor",
+        "dvui-editor",
     }) catch app.root_path;
     std.debug.print("config_folder: {s}", .{config_folder});
-    const palette_folder = std.Io.Dir.path.join(inkz_editor.app.gpa, &.{ config_folder, "Palettes" }) catch config_folder;
+    const palette_folder = std.Io.Dir.path.join(dvui_editor.app.gpa, &.{ config_folder, "Palettes" }) catch config_folder;
 
-    var inkz_editor_dark = dvui.themeGet();
+    var dvui_editor_dark = dvui.themeGet();
 
-    inkz_editor_dark.window = .{
+    dvui_editor_dark.window = .{
         .fill = .{ .r = 28, .g = 29, .b = 36, .a = 255 },
         .border = .{ .r = 34, .g = 35, .b = 42, .a = 255 },
         .text = .{ .r = 206, .g = 163, .b = 127, .a = 255 },
     };
 
-    inkz_editor_dark.control = .{
+    dvui_editor_dark.control = .{
         .fill = .{ .r = 28, .g = 29, .b = 36, .a = 255 },
         .border = .{ .r = 34, .g = 35, .b = 42, .a = 255 },
         .text = .{ .r = 134, .g = 138, .b = 148, .a = 255 },
     };
 
-    inkz_editor_dark.highlight = .{
+    dvui_editor_dark.highlight = .{
         .fill = .{ .r = 47, .g = 179, .b = 135, .a = 255 },
         .border = .{ .r = 47, .g = 179, .b = 135, .a = 255 },
-        .text = inkz_editor_dark.window.fill,
+        .text = dvui_editor_dark.window.fill,
     };
 
-    inkz_editor_dark.err = .{
+    dvui_editor_dark.err = .{
         .fill = .{ .r = 109, .g = 35, .b = 54, .a = 255 },
     };
 
     // theme.content
-    inkz_editor_dark.fill = .{ .r = 42, .g = 44, .b = 54, .a = 255 };
-    inkz_editor_dark.text = inkz_editor_dark.window.text.?;
-    inkz_editor_dark.focus = inkz_editor_dark.highlight.fill.?;
+    dvui_editor_dark.fill = .{ .r = 42, .g = 44, .b = 54, .a = 255 };
+    dvui_editor_dark.text = dvui_editor_dark.window.text.?;
+    dvui_editor_dark.focus = dvui_editor_dark.highlight.fill.?;
 
-    inkz_editor_dark.dark = true;
-    inkz_editor_dark.name = "Pixi Dark";
-    inkz_editor_dark.font_body = .find(.{ .family = "Vera Sans", .size = 8 });
-    inkz_editor_dark.font_title = .find(.{ .family = "Vera Sans", .size = 10, .weight = .bold });
-    inkz_editor_dark.font_heading = .find(.{ .family = "Vera Sans", .size = 8, .style = .italic });
-    inkz_editor_dark.font_mono = .find(.{ .family = "CozetteVector", .size = 10 });
+    dvui_editor_dark.dark = true;
+    dvui_editor_dark.name = "Pixi Dark";
+    dvui_editor_dark.font_body = .find(.{ .family = "Vera Sans", .size = 8 });
+    dvui_editor_dark.font_title = .find(.{ .family = "Vera Sans", .size = 10, .weight = .bold });
+    dvui_editor_dark.font_heading = .find(.{ .family = "Vera Sans", .size = 8, .style = .italic });
+    dvui_editor_dark.font_mono = .find(.{ .family = "CozetteVector", .size = 10 });
 
-    dvui.themeSet(inkz_editor_dark);
+    dvui.themeSet(dvui_editor_dark);
 
-    var moi: dvui.Theme = inkz_editor_dark;
+    var moi: dvui.Theme = dvui_editor_dark;
     moi.name = "Moi";
     moi.window = .{
         .fill = .{ .r = 84, .g = 12, .b = 26, .a = 255 },
@@ -143,31 +143,31 @@ pub fn init(
     moi.text = moi.window.text.?;
     moi.focus = moi.highlight.fill.?;
 
-    var inkz_editor_light = inkz_editor_dark;
-    inkz_editor_light.dark = false;
-    inkz_editor_light.name = "Pixi Light";
+    var dvui_editor_light = dvui_editor_dark;
+    dvui_editor_light.dark = false;
+    dvui_editor_light.name = "Pixi Light";
 
-    inkz_editor_light.window = .{
+    dvui_editor_light.window = .{
         .fill = .{ .r = 240, .g = 240, .b = 245, .a = 255 },
         .border = dvui.Theme.builtin.adwaita_light.window.border,
         .text = .{ .r = 120, .g = 70, .b = 65, .a = 255 },
     };
 
-    inkz_editor_light.control = dvui.Theme.builtin.adwaita_light.control;
+    dvui_editor_light.control = dvui.Theme.builtin.adwaita_light.control;
 
-    inkz_editor_light.highlight = .{
+    dvui_editor_light.highlight = .{
         .fill = .{ .r = 170, .g = 130, .b = 140, .a = 255 },
-        .text = inkz_editor_light.window.fill,
+        .text = dvui_editor_light.window.fill,
     };
 
-    inkz_editor_light.err = .{
+    dvui_editor_light.err = .{
         .fill = .{ .r = 109, .g = 35, .b = 54, .a = 255 },
     };
 
     // theme.content
-    inkz_editor_light.fill = .{ .r = 200, .g = 200, .b = 205, .a = 255 };
-    inkz_editor_light.text = .{ .r = 40, .g = 40, .b = 45, .a = 255 };
-    inkz_editor_light.focus = inkz_editor_light.highlight.fill.?;
+    dvui_editor_light.fill = .{ .r = 200, .g = 200, .b = 205, .a = 255 };
+    dvui_editor_light.text = .{ .r = 40, .g = 40, .b = 45, .a = 255 };
+    dvui_editor_light.focus = dvui_editor_light.highlight.fill.?;
 
     var editor: Editor = .{
         .config_folder = config_folder,
@@ -179,14 +179,14 @@ pub fn init(
         .arena = .init(std.heap.page_allocator),
         .last_titlebar_color = dvui.themeGet().color(.control, .fill),
         // .atlas = .{
-        //     .data = try .loadFromBytes(app.gpa, assets.files.@"inkz_editor.atlas"),
-        //     .source = try inkz_editor.image.fromImageFileBytes("inkz_editor.png", assets.files.@"inkz_editor.png", .ptr),
+        //     .data = try .loadFromBytes(app.gpa, assets.files.@"dvui_editor.atlas"),
+        //     .source = try dvui_editor.image.fromImageFileBytes("dvui_editor.png", assets.files.@"dvui_editor.png", .ptr),
         // },
         // .tools = try .init(app.gpa),
         .themes = .init(app.gpa),
     };
 
-    editor.themes.append(inkz_editor_dark) catch {
+    editor.themes.append(dvui_editor_dark) catch {
         dvui.log.err("Failed to append theme", .{});
         return error.FailedToAppendTheme;
     };
@@ -196,8 +196,8 @@ pub fn init(
         return error.FailedToAppendMoiTheme;
     };
 
-    editor.themes.append(inkz_editor_light) catch {
-        dvui.log.err("Failed to append inkz_editor light theme", .{});
+    editor.themes.append(dvui_editor_light) catch {
+        dvui.log.err("Failed to append dvui_editor light theme", .{});
         return error.FailedToAppendPixiLightTheme;
     };
 
@@ -232,14 +232,14 @@ pub fn init(
 
     // editor.settings = .{};
     editor.settings = Settings.load(app.io, app.gpa, try std.fs.path.join(app.gpa, &.{ editor.config_folder, "settings.json" })) catch .{
-        .theme = try app.gpa.dupe(u8, "inkz_editor_dark.json"),
+        .theme = try app.gpa.dupe(u8, "dvui_editor_dark.json"),
     };
-    // inkz_editor.perf.console_logging_enabled = editor.settings.perf_logging;
+    // dvui_editor.perf.console_logging_enabled = editor.settings.perf_logging;
     // editor.recents = Recents.load(app.gpa, try std.fs.path.join(app.gpa, &.{ editor.config_folder, "recents.json" })) catch .{
     //     .folders = .init(app.gpa),
     // };
 
-    // inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), inkz_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
+    // dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
 
     editor.explorer.* = .init();
     editor.panel.* = .init();
@@ -250,8 +250,8 @@ pub fn init(
     };
 
     // TODO: Enable again once assest system is working
-    // editor.colors.file_tree_palette = inkz_editor.Internal.Palette.loadFromBytes(app.gpa, "inkz_editor.hex", assets.files.palettes.@"inkz_editor.hex") catch null;
-    // editor.colors.palette = inkz_editor.Internal.Palette.loadFromBytes(app.gpa, "inkz_editor.hex", assets.files.palettes.@"inkz_editor.hex") catch null;
+    // editor.colors.file_tree_palette = dvui_editor.Internal.Palette.loadFromBytes(app.gpa, "dvui_editor.hex", assets.files.palettes.@"dvui_editor.hex") catch null;
+    // editor.colors.palette = dvui_editor.Internal.Palette.loadFromBytes(app.gpa, "dvui_editor.hex", assets.files.palettes.@"dvui_editor.hex") catch null;
 
     try Keybinds.register();
 
@@ -276,11 +276,11 @@ const handle_size = 10;
 const handle_dist = 60;
 
 pub fn tick(editor: *Editor) !dvui.App.Result {
-    const io = inkz_editor.app.io;
-    const environ = inkz_editor.app.environ;
+    const io = dvui_editor.app.io;
+    const environ = dvui_editor.app.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
-    if (inkz_editor.backend.pollPendingNativeMenuAction()) |action| {
+    if (dvui_editor.backend.pollPendingNativeMenuAction()) |action| {
         editor.queueNativeMenuAction(action);
     }
 
@@ -292,9 +292,9 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         dvui.log.err("Failed to rebuild workspaces", .{});
     };
 
-    // inkz_editor.render.frame_index +%= 1;
-    // if (inkz_editor.perf.record) inkz_editor.perf.beginFrame();
-    // defer if (inkz_editor.perf.record) inkz_editor.perf.endFrameAndMaybeLog();
+    // dvui_editor.render.frame_index +%= 1;
+    // if (dvui_editor.perf.record) dvui_editor.perf.beginFrame();
+    // defer if (dvui_editor.perf.record) dvui_editor.perf.endFrameAndMaybeLog();
 
     // if (editor.composite_warmup_pending) {
     //     editor.composite_warmup_pending = false;
@@ -305,7 +305,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     //             const area = @as(u64, w) * @as(u64, h);
     //             // Skip tiny canvases; large docs benefit most from moving split-target work off the first stroke.
     //             if (area >= 512 * 512) {
-    //                 inkz_editor.render.warmupDrawingComposites(file) catch |err| {
+    //                 dvui_editor.render.warmupDrawingComposites(file) catch |err| {
     //                     dvui.log.err("Composite warmup failed: {any}", .{err});
     //                 };
     //             }
@@ -315,17 +315,17 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
 
     // {
     //     var any_drawing = false;
-    //     inkz_editor.perf.draw_stroke_buf_count = 0; // no active stroke → 0; else first active file's map size
+    //     dvui_editor.perf.draw_stroke_buf_count = 0; // no active stroke → 0; else first active file's map size
     //     for (editor.open_files.values()) |*file| {
     //         if (file.editor.active_drawing) {
     //             any_drawing = true;
-    //             inkz_editor.perf.draw_stroke_buf_count = file.buffers.stroke.pixels.count();
+    //             dvui_editor.perf.draw_stroke_buf_count = file.buffers.stroke.pixels.count();
     //             break;
     //         }
     //     }
-    //     inkz_editor.perf.drawFrameBegin(any_drawing);
+    //     dvui_editor.perf.drawFrameBegin(any_drawing);
     // }
-    // defer inkz_editor.perf.drawFrameEnd();
+    // defer dvui_editor.perf.drawFrameEnd();
 
     // // TODO: Does this need to be here for touchscreen zooming? Or does that belong in canvas?
     // // var scaler = dvui.scale(
@@ -342,10 +342,10 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
 
     // switch (builtin.os.tag) {
     //     .macos => {
-    //         window_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
+    //         window_color = if (!dvui_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
     //     },
     //     .windows => {
-    //         window_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
+    //         window_color = if (!dvui_editor.backend.isMaximized(dvui.currentWindow())) window_color.opacity(editor.window_opacity).lighten((1.0 - editor.window_opacity) * 4.0) else window_color;
     //     },
     //     else => {},
     // }
@@ -361,7 +361,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     );
     defer overall_box.deinit();
 
-    //     if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) {
+    //     if (!dvui_editor.backend.isMaximized(dvui.currentWindow())) {
     //         var animation = dvui.animate(@src(), .{ .duration = 400_000, .kind = .vertical, .easing = dvui.easing.outBack }, .{});
     //         defer animation.deinit();
 
@@ -371,7 +371,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     //             .{
     //                 .expand = .horizontal,
     //                 .background = false,
-    //                 .min_size_content = .{ .w = 1, .h = inkz_editor.editor.settings.titlebar_height },
+    //                 .min_size_content = .{ .w = 1, .h = dvui_editor.editor.settings.titlebar_height },
     //             },
     //         );
     //         defer titlebar_box.deinit();
@@ -446,15 +446,15 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     // }
 
     // Draw the explorer paned widget, which will recursively draw the workspaces in the second pane
-    editor.explorer.paned = inkz_editor.dvui.paned(@src(), .{
+    editor.explorer.paned = dvui_editor.dvui.paned(@src(), .{
         .direction = .horizontal,
-        .collapsed_size = inkz_editor.editor.settings.min_window_size[0] + 1,
+        .collapsed_size = dvui_editor.editor.settings.min_window_size[0] + 1,
         .handle_size = handle_size,
         .handle_dynamic = .{
             .handle_size_max = handle_size,
             .distance_max = handle_dist,
         },
-        .uncollapse_ratio = inkz_editor.editor.settings.explorer_ratio,
+        .uncollapse_ratio = dvui_editor.editor.settings.explorer_ratio,
     }, .{
         .expand = .both,
         .background = false,
@@ -465,9 +465,9 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
 
     if (dvui.firstFrame(editor.explorer.paned.wd.id)) {
         editor.explorer.paned.split_ratio.* = 0.0;
-        editor.explorer.paned.animateSplit(inkz_editor.editor.settings.explorer_ratio, dvui.easing.outBack);
+        editor.explorer.paned.animateSplit(dvui_editor.editor.settings.explorer_ratio, dvui.easing.outBack);
 
-        if (inkz_editor.editor.settings.explorer_ratio < 0.01) {
+        if (dvui_editor.editor.settings.explorer_ratio < 0.01) {
             editor.explorer.closed = true;
         }
     } else if (editor.explorer.paned.dragging) {
@@ -504,9 +504,9 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         const workspace_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .background = false, .padding = .{ .w = handle_size } });
         defer workspace_vbox.deinit();
 
-        editor.panel.paned = inkz_editor.dvui.paned(@src(), .{
+        editor.panel.paned = dvui_editor.dvui.paned(@src(), .{
             .direction = .vertical,
-            .collapsed_size = inkz_editor.editor.settings.min_window_size[1] + 1,
+            .collapsed_size = dvui_editor.editor.settings.min_window_size[1] + 1,
             .handle_size = handle_size,
             .handle_dynamic = .{ .handle_size_max = handle_size, .distance_max = handle_dist },
             .uncollapse_ratio = 1.0,
@@ -518,8 +518,8 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
 
         // if (!editor.panel.paned.dragging) {
         //     if (editor.activeFile()) |_| {
-        //         if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and inkz_editor.editor.settings.panel_ratio > 0.0) {
-        //             editor.panel.paned.animateSplit(1.0 - inkz_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
+        //         if ((editor.panel.paned.split_ratio.* == 1.0 and !editor.panel.paned.collapsed()) and dvui_editor.editor.settings.panel_ratio > 0.0) {
+        //             editor.panel.paned.animateSplit(1.0 - dvui_editor.editor.settings.panel_ratio, dvui.easing.outQuint);
         //         }
         //     } else {
         //         if (!editor.panel.paned.animating and editor.panel.paned.split_ratio.* < 1.0) {
@@ -527,7 +527,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         //         }
         //     }
         // } else {
-        //     inkz_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
+        //     dvui_editor.editor.settings.panel_ratio = 1.0 - editor.panel.paned.split_ratio.*;
         // }
 
         if (editor.panel.paned.showSecond()) {
@@ -582,7 +582,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     return .ok;
 }
 
-fn queueNativeMenuAction(editor: *Editor, action: inkz_editor.backend.NativeMenuAction) void {
+fn queueNativeMenuAction(editor: *Editor, action: dvui_editor.backend.NativeMenuAction) void {
     if (editor.pending_native_menu_actions_len >= editor.pending_native_menu_actions.len) {
         // If we ever overflow, drop the action rather than crashing.
         return;
@@ -604,7 +604,7 @@ fn flushQueuedNativeMenuActions(editor: *Editor) void {
     }
 }
 
-pub fn handleNativeMenuAction(editor: *Editor, action: inkz_editor.backend.NativeMenuAction) !void {
+pub fn handleNativeMenuAction(editor: *Editor, action: dvui_editor.backend.NativeMenuAction) !void {
     switch (action) {
         .open_folder => {
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
@@ -681,12 +681,12 @@ pub fn handleNativeMenuAction(editor: *Editor, action: inkz_editor.backend.Nativ
 
 //     if (!std.mem.eql(u8, &editor.last_titlebar_color.toRGBA(), &color.toRGBA())) {
 //         editor.last_titlebar_color = color;
-//         inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), color.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
+//         dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), color.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
 //     }
 // }
 
 // pub fn setWindowStyle(_: *Editor) void {
-//     inkz_editor.backend.setWindowStyle(dvui.currentWindow());
+//     dvui_editor.backend.setWindowStyle(dvui.currentWindow());
 // }
 
 pub fn drawRadialMenu(editor: *Editor) !void {
@@ -753,7 +753,7 @@ pub fn drawRadialMenu(editor: *Editor) !void {
         }
 
         var color = dvui.themeGet().color(.control, .fill_hover);
-        if (inkz_editor.editor.colors.file_tree_palette) |*palette| {
+        if (dvui_editor.editor.colors.file_tree_palette) |*palette| {
             color = palette.getDVUIColor(i);
         }
 
@@ -805,13 +805,13 @@ pub fn drawRadialMenu(editor: *Editor) !void {
         }
 
         const sprite = switch (@as(Editor.Tools.Tool, @enumFromInt(i))) {
-            .pointer => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.cursor_default],
-            .pencil => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.pencil_default],
-            .eraser => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.eraser_default],
-            .bucket => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.bucket_default],
-            .selection => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.selection_default],
+            .pointer => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.cursor_default],
+            .pencil => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.pencil_default],
+            .eraser => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.eraser_default],
+            .bucket => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.bucket_default],
+            .selection => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.selection_default],
         };
-        const size: dvui.Size = dvui.imageSize(inkz_editor.editor.atlas.source) catch .{ .w = 0, .h = 0 };
+        const size: dvui.Size = dvui.imageSize(dvui_editor.editor.atlas.source) catch .{ .w = 0, .h = 0 };
 
         const uv = dvui.Rect{
             .x = @as(f32, @floatFromInt(sprite.source[0])) / size.w,
@@ -833,7 +833,7 @@ pub fn drawRadialMenu(editor: *Editor) !void {
         rs.r.w = w;
         rs.r.h = h;
 
-        dvui.renderImage(inkz_editor.editor.atlas.source, rs, .{
+        dvui.renderImage(dvui_editor.editor.atlas.source, rs, .{
             .uv = uv,
             .fade = 0.0,
         }) catch {
@@ -885,11 +885,11 @@ pub fn drawRadialMenu(editor: *Editor) !void {
 }
 
 pub fn rebuildWorkspaces(editor: *Editor) !void {
-    const gpa = inkz_editor.app.gpa;
+    const gpa = dvui_editor.app.gpa;
     // Create workspaces for each grouping ID
     for (editor.open_files.values()) |*file| {
         if (!editor.workspaces.contains(file.editor.grouping)) {
-            var workspace: inkz_editor.Editor.Workspace = .init(file.editor.grouping);
+            var workspace: dvui_editor.Editor.Workspace = .init(file.editor.grouping);
             for (editor.open_files.values()) |*f| {
                 if (f.editor.grouping == file.editor.grouping) {
                     workspace.open_file_index = editor.open_files.getIndex(f.id) orelse 0;
@@ -957,7 +957,7 @@ pub fn rebuildWorkspaces(editor: *Editor) !void {
 pub fn drawWorkspaces(editor: *Editor, index: usize) !dvui.App.Result {
     if (index >= editor.workspaces.count()) return .ok;
 
-    var s = inkz_editor.dvui.paned(@src(), .{
+    var s = dvui_editor.dvui.paned(@src(), .{
         .direction = .horizontal,
         .collapsed_size = if (index == editor.workspaces.count() - 1) std.math.floatMax(f32) else 0,
         .handle_size = handle_size,
@@ -1030,20 +1030,20 @@ pub fn close(app: *App, editor: *Editor) void {
 }
 
 pub fn setProjectFolder(editor: *Editor, path: []const u8) !void {
-    const io = inkz_editor.app.io;
+    const io = dvui_editor.app.io;
     if (editor.folder) |folder| {
         if (editor.project) |*project| {
             project.save(io) catch {
                 dvui.log.err("Failed to save project", .{});
             };
         }
-        inkz_editor.app.gpa.free(folder);
+        dvui_editor.app.gpa.free(folder);
     }
-    editor.folder = try inkz_editor.app.gpa.dupe(u8, path);
-    // try editor.recents.appendFolder(try inkz_editor.app.gpa.dupe(u8, path));
+    editor.folder = try dvui_editor.app.gpa.dupe(u8, path);
+    // try editor.recents.appendFolder(try dvui_editor.app.gpa.dupe(u8, path));
     editor.explorer.pane = .files;
 
-    // editor.project = Project.load(inkz_editor.app.gpa) catch null;
+    // editor.project = Project.load(dvui_editor.app.gpa) catch null;
 }
 
 pub fn saving(editor: *Editor) bool {
@@ -1064,8 +1064,8 @@ pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
         }
     }
 
-    if (inkz_editor.Internal.TextFile.fromPath(path) catch null) |file| {
-        try editor.open_files.put(inkz_editor.app.gpa, file.id, file);
+    if (dvui_editor.Internal.TextFile.fromPath(path) catch null) |file| {
+        try editor.open_files.put(dvui_editor.app.gpa, file.id, file);
         _ = grouping;
         // if (editor.open_files.getPtr(file.id)) |f| {
         //     f.editor.grouping = grouping;
@@ -1086,20 +1086,20 @@ pub fn requestCompositeWarmup(editor: *Editor) void {
     editor.composite_warmup_pending = true;
 }
 // TODO: Bring it back
-pub fn newFile(editor: *Editor, path: []const u8, options: inkz_editor.Internal.TextFile.InitOptions) !*inkz_editor.Internal.TextFile {
+pub fn newFile(editor: *Editor, path: []const u8, options: dvui_editor.Internal.TextFile.InitOptions) !*dvui_editor.Internal.TextFile {
     _ = path;
     _ = options;
     // if (editor.getFileFromPath(path)) |_| {
     //     return error.FileAlreadyExists;
     // }
 
-    // const file = inkz_editor.Internal.File.init(path, options) catch {
+    // const file = dvui_editor.Internal.File.init(path, options) catch {
     //     dvui.log.err("Failed to create file: {s}", .{path});
     //     return error.FailedToCreateFile;
     // };
-    const file: inkz_editor.Internal.TextFile = .{};
+    const file: dvui_editor.Internal.TextFile = .{};
 
-    try editor.open_files.put(inkz_editor.app.gpa, file.id, file);
+    try editor.open_files.put(dvui_editor.app.gpa, file.id, file);
     editor.setActiveFile(editor.open_files.count() - 1);
     // editor.composite_warmup_pending = true;
 
@@ -1118,7 +1118,7 @@ pub fn setActiveFile(editor: *Editor, index: usize) void {
 }
 
 /// Returns the actively focused file, through workspace grouping.
-pub fn activeFile(editor: *Editor) ?*inkz_editor.Internal.TextFile {
+pub fn activeFile(editor: *Editor) ?*dvui_editor.Internal.TextFile {
     if (editor.workspaces.get(editor.open_workspace_grouping)) |workspace| {
         return editor.getFile(workspace.open_file_index);
     }
@@ -1126,14 +1126,14 @@ pub fn activeFile(editor: *Editor) ?*inkz_editor.Internal.TextFile {
     return null;
 }
 
-pub fn getFile(editor: *Editor, index: usize) ?*inkz_editor.Internal.TextFile {
+pub fn getFile(editor: *Editor, index: usize) ?*dvui_editor.Internal.TextFile {
     if (editor.open_files.values().len == 0) return null;
     if (index >= editor.open_files.values().len) return null;
 
     return &editor.open_files.values()[index];
 }
 
-pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*inkz_editor.Internal.TextFile {
+pub fn getFileFromPath(editor: *Editor, path: []const u8) ?*dvui_editor.Internal.TextFile {
     if (editor.open_files.values().len == 0) return null;
 
     _ = path;
@@ -1208,7 +1208,7 @@ pub fn redo(editor: *Editor) !void {
 
 pub fn openInFileBrowser(_: *Editor, path: []const u8) !void {
     const cmd = if (builtin.os.tag == .macos) "open" else if (builtin.os.tag == .linux) "xdg-open" else "start";
-    _ = std.process.run(inkz_editor.app.gpa, inkz_editor.app.io, .{ .argv = &.{ cmd, path } }) catch {
+    _ = std.process.run(dvui_editor.app.gpa, dvui_editor.app.io, .{ .argv = &.{ cmd, path } }) catch {
         dvui.log.err("Failed to open file browser", .{});
         return;
     };
@@ -1245,8 +1245,8 @@ pub fn rawCloseFile(editor: *Editor, index: usize) !void {
     var file = editor.open_files.values()[index];
 
     if (editor.workspaces.getPtr(file.editor.grouping)) |workspace| {
-        if (workspace.open_file_index == inkz_editor.editor.open_files.getIndex(file.id)) {
-            for (inkz_editor.editor.open_files.values(), 0..) |f, i| {
+        if (workspace.open_file_index == dvui_editor.editor.open_files.getIndex(file.id)) {
+            for (dvui_editor.editor.open_files.values(), 0..) |f, i| {
                 if (f.grouping == workspace.grouping and f.id != file.id) {
                     workspace.open_file_index = i;
                     break;
@@ -1264,8 +1264,8 @@ pub fn rawCloseFileID(editor: *Editor, id: u64) !void {
 
         //editor.open_file_index = 0;
         if (editor.workspaces.getPtr(file.editor.grouping)) |workspace| {
-            if (workspace.open_file_index == inkz_editor.editor.open_files.getIndex(file.id)) {
-                for (inkz_editor.editor.open_files.values(), 0..) |f, i| {
+            if (workspace.open_file_index == dvui_editor.editor.open_files.getIndex(file.id)) {
+                for (dvui_editor.editor.open_files.values(), 0..) |f, i| {
                     if (f.editor.grouping == workspace.grouping and f.id != file.id) {
                         workspace.open_file_index = i;
                         break;
@@ -1280,7 +1280,7 @@ pub fn rawCloseFileID(editor: *Editor, id: u64) !void {
 
 pub fn closeReference(editor: *Editor, index: usize) !void {
     editor.open_reference_index = 0;
-    var reference: inkz_editor.Internal.Reference = editor.open_references.orderedRemove(index);
+    var reference: dvui_editor.Internal.Reference = editor.open_references.orderedRemove(index);
     reference.deinit();
 }
 
@@ -1288,23 +1288,23 @@ pub fn deinit(editor: *Editor) !void {
     // if (editor.colors.palette) |*palette| palette.deinit();
     // if (editor.colors.file_tree_palette) |*palette| palette.deinit();
 
-    // editor.recents.save(inkz_editor.app.gpa, try std.fs.path.join(inkz_editor.app.gpa, &.{ editor.config_folder, "recents.json" })) catch {
+    // editor.recents.save(dvui_editor.app.gpa, try std.fs.path.join(dvui_editor.app.gpa, &.{ editor.config_folder, "recents.json" })) catch {
     //     dvui.log.err("Failed to save recents", .{});
     // };
     // editor.recents.deinit();
 
-    try editor.settings.save(inkz_editor.app.io, inkz_editor.app.gpa, try std.fs.path.join(inkz_editor.app.gpa, &.{ editor.config_folder, "settings.json" }));
-    editor.settings.deinit(inkz_editor.app.gpa);
+    try editor.settings.save(dvui_editor.app.io, dvui_editor.app.gpa, try std.fs.path.join(dvui_editor.app.gpa, &.{ editor.config_folder, "settings.json" }));
+    editor.settings.deinit(dvui_editor.app.gpa);
 
     // if (editor.project) |*project| {
     //     project.save() catch {
     //         dvui.log.err("Failed to save project file", .{});
     //     };
-    //     project.deinit(inkz_editor.app.gpa);
+    //     project.deinit(dvui_editor.app.gpa);
     // }
 
     editor.explorer.deinit();
 
-    if (editor.folder) |folder| inkz_editor.app.gpa.free(folder);
+    if (editor.folder) |folder| dvui_editor.app.gpa.free(folder);
     editor.arena.deinit();
 }

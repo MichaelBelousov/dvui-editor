@@ -4,8 +4,8 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const nfd = @import("nfd");
 
-const inkz_editor = @import("../root.zig");
-const Editor = inkz_editor.Editor;
+const dvui_editor = @import("../root.zig");
+const Editor = dvui_editor.Editor;
 
 // const Core = @import("mach").Core;
 // const imgui = @import("zig-imgui");
@@ -16,30 +16,30 @@ pub fn draw() !void {
     });
     defer vbox.deinit();
 
-    if (dvui.Theme.picker(@src(), inkz_editor.editor.themes.items, .{})) {}
+    if (dvui.Theme.picker(@src(), dvui_editor.editor.themes.items, .{})) {}
 
     if (true) {
         // if (dvui.sliderEntry(@src(), "Window Opacity: {d:0.01}", .{
-        //     .value = &if (dvui.themeGet().dark) inkz_editor.editor.settings.window_opacity_dark else inkz_editor.editor.settings.window_opacity_light,
+        //     .value = &if (dvui.themeGet().dark) dvui_editor.editor.settings.window_opacity_dark else dvui_editor.editor.settings.window_opacity_light,
         //     .interval = 0.01,
         //     .max = 1.0,
         //     .min = 0.0,
         // }, .{
         //     .expand = .none,
         // })) {
-        //     inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui.themeGet().color(.content, .fill).opacity(if (dvui.themeGet().dark) inkz_editor.editor.settings.window_opacity_dark else inkz_editor.editor.settings.window_opacity_light));
+        //     dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui.themeGet().color(.content, .fill).opacity(if (dvui.themeGet().dark) dvui_editor.editor.settings.window_opacity_dark else dvui_editor.editor.settings.window_opacity_light));
         //     dvui.refresh(null, @src(), vbox.data().id);
         // }
 
         // if (dvui.sliderEntry(@src(), "Content Opacity: {d:0.01}", .{
-        //     .value = &inkz_editor.editor.settings.content_opacity,
+        //     .value = &dvui_editor.editor.settings.content_opacity,
         //     .interval = 0.01,
         //     .max = 1.0,
         //     .min = 0.0,
         // }, .{
         //     .expand = .none,
         // })) {
-        //     inkz_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui.themeGet().color(.content, .fill).opacity(inkz_editor.editor.settings.content_opacity));
+        //     dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui.themeGet().color(.content, .fill).opacity(dvui_editor.editor.settings.content_opacity));
         //     dvui.refresh(null, @src(), vbox.data().id);
         // }
 
@@ -62,7 +62,7 @@ pub fn draw() !void {
                 .gravity_x = 1.0,
             });
 
-            const label_text = switch (inkz_editor.editor.settings.transparency_effect) {
+            const label_text = switch (dvui_editor.editor.settings.transparency_effect) {
                 .none => "None",
                 .rainbow => "Rainbow",
                 .animation => "Animation",
@@ -81,15 +81,15 @@ pub fn draw() !void {
 
             if (dropdown.dropped()) {
                 if (dropdown.addChoiceLabel("None")) {
-                    inkz_editor.editor.settings.transparency_effect = .none;
+                    dvui_editor.editor.settings.transparency_effect = .none;
                     dvui.refresh(null, @src(), vbox.data().id);
                 }
                 if (dropdown.addChoiceLabel("Rainbow")) {
-                    inkz_editor.editor.settings.transparency_effect = .rainbow;
+                    dvui_editor.editor.settings.transparency_effect = .rainbow;
                     dvui.refresh(null, @src(), vbox.data().id);
                 }
                 if (dropdown.addChoiceLabel("Animation")) {
-                    inkz_editor.editor.settings.transparency_effect = .animation;
+                    dvui_editor.editor.settings.transparency_effect = .animation;
                     dvui.refresh(null, @src(), vbox.data().id);
                 }
             }
@@ -97,14 +97,14 @@ pub fn draw() !void {
             _ = dvui.spacer(@src(), .{ .min_size_content = .{ .w = 10, .h = 10 } });
         }
 
-        if (dvui.checkbox(@src(), &inkz_editor.editor.settings.show_rulers, "Show Rulers", .{
+        if (dvui.checkbox(@src(), &dvui_editor.editor.settings.show_rulers, "Show Rulers", .{
             .expand = .none,
         })) {}
 
-        // if (dvui.checkbox(@src(), &inkz_editor.editor.settings.perf_logging, "Console perf logging", .{
+        // if (dvui.checkbox(@src(), &dvui_editor.editor.settings.perf_logging, "Console perf logging", .{
         //     .expand = .none,
         // })) {
-        //     inkz_editor.perf.console_logging_enabled = inkz_editor.editor.settings.perf_logging;
+        //     dvui_editor.perf.console_logging_enabled = dvui_editor.editor.settings.perf_logging;
         // }
     }
 

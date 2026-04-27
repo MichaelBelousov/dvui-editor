@@ -4,9 +4,9 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const icons = @import("icons");
 
-const inkz_editor = @import("root.zig");
-const App = inkz_editor.App;
-const Editor = inkz_editor.Editor;
+const dvui_editor = @import("root.zig");
+const App = dvui_editor.App;
+const Editor = dvui_editor.Editor;
 
 /// Workspaces are drawn recursively inside of the explorer paned widget
 /// second pane, and contains drag/drop enabled tabs. Tabs can freely be dragged to
@@ -46,8 +46,8 @@ vertical_ruler_width: f32 = 0.0,
 pub fn init(grouping: u64) Workspace {
     return .{
         .grouping = grouping,
-        .columns_drag_name = std.fmt.allocPrint(inkz_editor.app.gpa, "column_drag_{d}", .{grouping}) catch "column_drag",
-        .rows_drag_name = std.fmt.allocPrint(inkz_editor.app.gpa, "row_drag_{d}", .{grouping}) catch "row_drag",
+        .columns_drag_name = std.fmt.allocPrint(dvui_editor.app.gpa, "column_drag_{d}", .{grouping}) catch "column_drag",
+        .rows_drag_name = std.fmt.allocPrint(dvui_editor.app.gpa, "row_drag_{d}", .{grouping}) catch "row_drag",
     };
 }
 
@@ -56,14 +56,14 @@ const handle_dist = 60;
 
 const opacity = 60;
 
-const color_0 = inkz_editor.math.Color.initBytes(0, 0, 0, 0);
-const color_1 = inkz_editor.math.Color.initBytes(230, 175, 137, opacity);
-const color_2 = inkz_editor.math.Color.initBytes(216, 145, 115, opacity);
-const color_3 = inkz_editor.math.Color.initBytes(41, 23, 41, opacity);
-const color_4 = inkz_editor.math.Color.initBytes(194, 109, 92, opacity);
-const color_5 = inkz_editor.math.Color.initBytes(180, 89, 76, opacity);
+const color_0 = dvui_editor.math.Color.initBytes(0, 0, 0, 0);
+const color_1 = dvui_editor.math.Color.initBytes(230, 175, 137, opacity);
+const color_2 = dvui_editor.math.Color.initBytes(216, 145, 115, opacity);
+const color_3 = dvui_editor.math.Color.initBytes(41, 23, 41, opacity);
+const color_4 = dvui_editor.math.Color.initBytes(194, 109, 92, opacity);
+const color_5 = dvui_editor.math.Color.initBytes(180, 89, 76, opacity);
 
-const logo_colors: [15]inkz_editor.math.Color = [_]inkz_editor.math.Color{
+const logo_colors: [15]dvui_editor.math.Color = [_]dvui_editor.math.Color{
     color_0, color_1, color_1,
     color_2, color_3, color_2,
     color_4, color_4, color_4,
@@ -97,12 +97,12 @@ pub fn draw(self: *Workspace) !dvui.App.Result {
 
         if (e.evt == .mouse) {
             if (e.evt.mouse.action == .press or (e.evt.mouse.action == .position and e.evt.mouse.mod.matchBind("ctrl/cmd"))) {
-                inkz_editor.editor.open_workspace_grouping = self.grouping;
+                dvui_editor.editor.open_workspace_grouping = self.grouping;
             }
         }
     }
 
-    if (inkz_editor.editor.explorer.pane == .project) {
+    if (dvui_editor.editor.explorer.pane == .project) {
         self.drawProject();
     } else {
         self.drawTabs();
@@ -116,8 +116,8 @@ fn drawProject(self: *Workspace) void {
     var canvas_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .id_extra = self.grouping });
     defer canvas_vbox.deinit();
 
-    // if (inkz_editor.packer.atlas) |*atlas| {
-    //     var image_widget = inkz_editor.dvui.ImageWidget.init(@src(), .{
+    // if (dvui_editor.packer.atlas) |*atlas| {
+    //     var image_widget = dvui_editor.dvui.ImageWidget.init(@src(), .{
     //         .source = atlas.source,
     //         .canvas = &atlas.canvas,
     //     }, .{
@@ -131,7 +131,7 @@ fn drawProject(self: *Workspace) void {
 }
 
 fn drawTabs(self: *Workspace) void {
-    if (inkz_editor.editor.open_files.values().len == 0) return;
+    if (dvui_editor.editor.open_files.values().len == 0) return;
 
     // Handle dragging of tabs between workspace reorderables (tab bars)
     defer self.processTabsDrag();
@@ -167,7 +167,7 @@ fn drawTabs(self: *Workspace) void {
             });
             defer tabs_hbox.deinit();
 
-            const files = inkz_editor.editor.open_files.values();
+            const files = dvui_editor.editor.open_files.values();
             const files_len = files.len;
 
             // Find the neighbouring tabs (within this workspace grouping) of the active tab.
@@ -175,7 +175,7 @@ fn drawTabs(self: *Workspace) void {
             var next_same_group_index: ?usize = null;
 
             const active_in_this_group = blk: {
-                if (inkz_editor.editor.open_workspace_grouping != self.grouping) break :blk false;
+                if (dvui_editor.editor.open_workspace_grouping != self.grouping) break :blk false;
                 if (self.open_file_index >= files_len) break :blk false;
                 if (files[self.open_file_index].editor.grouping != self.grouping) break :blk false;
                 break :blk true;
@@ -217,7 +217,7 @@ fn drawTabs(self: *Workspace) void {
                 });
                 defer reorderable.deinit();
 
-                const selected = self.open_file_index == i and inkz_editor.editor.open_workspace_grouping == self.grouping;
+                const selected = self.open_file_index == i and dvui_editor.editor.open_workspace_grouping == self.grouping;
 
                 var anim = dvui.animate(@src(), .{ .duration = 400_000, .kind = .horizontal, .easing = dvui.easing.outBack }, .{});
                 defer anim.deinit();
@@ -226,7 +226,7 @@ fn drawTabs(self: *Workspace) void {
                 hbox.init(@src(), .{ .dir = .horizontal }, .{
                     .expand = .none,
                     .border = .all(0),
-                    .color_fill = if (selected) .transparent else dvui.themeGet().color(.window, .fill).opacity(inkz_editor.editor.settings.content_opacity),
+                    .color_fill = if (selected) .transparent else dvui.themeGet().color(.window, .fill).opacity(dvui_editor.editor.settings.content_opacity),
                     .background = true,
                     .id_extra = i,
                     .padding = dvui.Rect.all(2),
@@ -236,7 +236,7 @@ fn drawTabs(self: *Workspace) void {
                 defer hbox.deinit();
 
                 var hovered = false;
-                if (inkz_editor.dvui.hovered(hbox.data())) {
+                if (dvui_editor.dvui.hovered(hbox.data())) {
                     hovered = true;
                 }
 
@@ -265,14 +265,14 @@ fn drawTabs(self: *Workspace) void {
                     if (prev_same_group_index) |prev_index| {
                         if (i == prev_index) {
                             // This tab is directly to the left of the active tab.
-                            inkz_editor.dvui.drawEdgeShadow(hbox.data().rectScale(), .right, .{});
+                            dvui_editor.dvui.drawEdgeShadow(hbox.data().rectScale(), .right, .{});
                         }
                     }
 
                     if (next_same_group_index) |next_index| {
                         if (i == next_index) {
                             // This tab is directly to the right of the active tab.
-                            inkz_editor.dvui.drawEdgeShadow(hbox.data().rectScale(), .left, .{});
+                            dvui_editor.dvui.drawEdgeShadow(hbox.data().rectScale(), .left, .{});
                         }
                     }
                 }
@@ -312,7 +312,7 @@ fn drawTabs(self: *Workspace) void {
                         .style = .err,
                         .expand = .both,
                     })) {
-                        inkz_editor.editor.closeFileID(file.id) catch |err| {
+                        dvui_editor.editor.closeFileID(file.id) catch |err| {
                             dvui.log.err("closeFile: {d} failed: {s}", .{ i, @errorName(err) });
                         };
                         break;
@@ -336,7 +336,7 @@ fn drawTabs(self: *Workspace) void {
                     switch (e.evt) {
                         .mouse => |me| {
                             if (me.action == .press and me.button.pointer()) {
-                                inkz_editor.editor.setActiveFile(i);
+                                dvui_editor.editor.setActiveFile(i);
                                 dvui.refresh(null, @src(), hbox.data().id);
 
                                 e.handle(@src(), hbox.data());
@@ -361,7 +361,7 @@ fn drawTabs(self: *Workspace) void {
                 }
             }
             if (tabs.finalSlot()) {
-                self.tabs_insert_before_index = inkz_editor.editor.open_files.values().len;
+                self.tabs_insert_before_index = dvui_editor.editor.open_files.values().len;
             }
         }
     }
@@ -371,45 +371,45 @@ pub fn processTabsDrag(self: *Workspace) void {
     if (self.tabs_insert_before_index) |insert_before| {
         if (self.tabs_removed_index) |removed| { // Dragging from this workspace
 
-            if (removed > inkz_editor.editor.open_files.count()) return;
+            if (removed > dvui_editor.editor.open_files.count()) return;
             if (removed > insert_before) {
-                std.mem.swap(inkz_editor.Internal.TextFile, &inkz_editor.editor.open_files.values()[removed], &inkz_editor.editor.open_files.values()[insert_before]);
-                std.mem.swap(u64, &inkz_editor.editor.open_files.keys()[removed], &inkz_editor.editor.open_files.keys()[insert_before]);
-                inkz_editor.editor.setActiveFile(insert_before);
+                std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
+                std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
+                dvui_editor.editor.setActiveFile(insert_before);
             } else {
                 if (insert_before > 0) {
-                    std.mem.swap(inkz_editor.Internal.TextFile, &inkz_editor.editor.open_files.values()[removed], &inkz_editor.editor.open_files.values()[insert_before - 1]);
-                    std.mem.swap(u64, &inkz_editor.editor.open_files.keys()[removed], &inkz_editor.editor.open_files.keys()[insert_before - 1]);
-                    inkz_editor.editor.setActiveFile(insert_before - 1);
+                    std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before - 1]);
+                    std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before - 1]);
+                    dvui_editor.editor.setActiveFile(insert_before - 1);
                 } else {
-                    std.mem.swap(inkz_editor.Internal.TextFile, &inkz_editor.editor.open_files.values()[removed], &inkz_editor.editor.open_files.values()[insert_before]);
-                    std.mem.swap(u64, &inkz_editor.editor.open_files.keys()[removed], &inkz_editor.editor.open_files.keys()[insert_before]);
-                    inkz_editor.editor.setActiveFile(insert_before);
+                    std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
+                    std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
+                    dvui_editor.editor.setActiveFile(insert_before);
                 }
             }
 
             self.tabs_removed_index = null;
             self.tabs_insert_before_index = null;
         } else { // Dragging from another workspace
-            for (inkz_editor.editor.workspaces.values()) |*workspace| {
+            for (dvui_editor.editor.workspaces.values()) |*workspace| {
                 if (workspace.tabs_removed_index) |removed| {
                     if (removed > insert_before) {
-                        std.mem.swap(inkz_editor.Internal.TextFile, &inkz_editor.editor.open_files.values()[removed], &inkz_editor.editor.open_files.values()[insert_before]);
-                        std.mem.swap(u64, &inkz_editor.editor.open_files.keys()[removed], &inkz_editor.editor.open_files.keys()[insert_before]);
+                        std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
+                        std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
 
-                        inkz_editor.editor.open_files.values()[insert_before].editor.grouping = self.grouping;
-                        inkz_editor.editor.setActiveFile(insert_before);
+                        dvui_editor.editor.open_files.values()[insert_before].editor.grouping = self.grouping;
+                        dvui_editor.editor.setActiveFile(insert_before);
                     } else {
                         if (insert_before > 0) {
-                            std.mem.swap(inkz_editor.Internal.TextFile, &inkz_editor.editor.open_files.values()[removed], &inkz_editor.editor.open_files.values()[insert_before - 1]);
-                            std.mem.swap(u64, &inkz_editor.editor.open_files.keys()[removed], &inkz_editor.editor.open_files.keys()[insert_before - 1]);
-                            inkz_editor.editor.open_files.values()[insert_before - 1].editor.grouping = self.grouping;
-                            inkz_editor.editor.setActiveFile(insert_before - 1);
+                            std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before - 1]);
+                            std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before - 1]);
+                            dvui_editor.editor.open_files.values()[insert_before - 1].editor.grouping = self.grouping;
+                            dvui_editor.editor.setActiveFile(insert_before - 1);
                         } else {
-                            std.mem.swap(inkz_editor.Internal.TextFile, &inkz_editor.editor.open_files.values()[removed], &inkz_editor.editor.open_files.values()[insert_before]);
-                            std.mem.swap(u64, &inkz_editor.editor.open_files.keys()[removed], &inkz_editor.editor.open_files.keys()[insert_before]);
-                            inkz_editor.editor.open_files.values()[insert_before].editor.grouping = self.grouping;
-                            inkz_editor.editor.setActiveFile(insert_before);
+                            std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
+                            std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
+                            dvui_editor.editor.open_files.values()[insert_before].editor.grouping = self.grouping;
+                            dvui_editor.editor.setActiveFile(insert_before);
                         }
                     }
 
@@ -430,13 +430,13 @@ pub fn processTabDrag(self: *Workspace, data: *dvui.WidgetData) void {
         for (dvui.events()) |*e| {
             if (!dvui.eventMatch(e, .{ .id = data.id, .r = data.rectScale().r, .drag_name = "tab_drag" })) continue;
 
-            for (inkz_editor.editor.workspaces.values()) |*workspace| {
+            for (dvui_editor.editor.workspaces.values()) |*workspace| {
                 if (workspace.tabs_drag_index) |drag_index| {
                     var right_side = data.rectScale().r;
                     right_side.w /= 2;
                     right_side.x += right_side.w;
 
-                    if (right_side.contains(e.evt.mouse.p) and inkz_editor.editor.workspaces.keys()[inkz_editor.editor.workspaces.keys().len - 1] == self.grouping) {
+                    if (right_side.contains(e.evt.mouse.p) and dvui_editor.editor.workspaces.keys()[dvui_editor.editor.workspaces.keys().len - 1] == self.grouping) {
                         if (e.evt == .mouse and e.evt.mouse.action == .position) {
                             right_side.fill(dvui.Rect.Physical.all(right_side.w / 8), .{
                                 .color = dvui.themeGet().color(.highlight, .fill).opacity(0.5),
@@ -450,18 +450,18 @@ pub fn processTabDrag(self: *Workspace, data: *dvui.WidgetData) void {
                             dvui.dragEnd();
                             dvui.refresh(null, @src(), data.id);
 
-                            var dragged_file = &inkz_editor.editor.open_files.values()[drag_index];
+                            var dragged_file = &dvui_editor.editor.open_files.values()[drag_index];
 
-                            if (workspace.open_file_index == inkz_editor.editor.open_files.getIndex(dragged_file.id)) {
-                                for (inkz_editor.editor.open_files.values()) |f| {
+                            if (workspace.open_file_index == dvui_editor.editor.open_files.getIndex(dragged_file.id)) {
+                                for (dvui_editor.editor.open_files.values()) |f| {
                                     if (f.editor.grouping == workspace.grouping and f.id != dragged_file.id) {
-                                        workspace.open_file_index = inkz_editor.editor.open_files.getIndex(f.id) orelse 0;
+                                        workspace.open_file_index = dvui_editor.editor.open_files.getIndex(f.id) orelse 0;
                                         break;
                                     }
                                 }
                             }
-                            dragged_file.editor.grouping = inkz_editor.editor.newGroupingID();
-                            inkz_editor.editor.open_workspace_grouping = dragged_file.editor.grouping;
+                            dragged_file.editor.grouping = dvui_editor.editor.newGroupingID();
+                            dvui_editor.editor.open_workspace_grouping = dragged_file.editor.grouping;
                         }
                     } else if (data.rectScale().r.contains(e.evt.mouse.p)) {
                         if (e.evt == .mouse and e.evt.mouse.action == .position) {
@@ -477,19 +477,19 @@ pub fn processTabDrag(self: *Workspace, data: *dvui.WidgetData) void {
                             dvui.dragEnd();
                             dvui.refresh(null, @src(), data.id);
 
-                            var dragged_file = &inkz_editor.editor.open_files.values()[drag_index];
+                            var dragged_file = &dvui_editor.editor.open_files.values()[drag_index];
 
-                            if (workspace.open_file_index == inkz_editor.editor.open_files.getIndex(dragged_file.id)) {
-                                for (inkz_editor.editor.open_files.values()) |f| {
+                            if (workspace.open_file_index == dvui_editor.editor.open_files.getIndex(dragged_file.id)) {
+                                for (dvui_editor.editor.open_files.values()) |f| {
                                     if (f.editor.grouping == workspace.grouping and f.id != dragged_file.id) {
-                                        workspace.open_file_index = inkz_editor.editor.open_files.getIndex(f.id) orelse 0;
+                                        workspace.open_file_index = dvui_editor.editor.open_files.getIndex(f.id) orelse 0;
                                         break;
                                     }
                                 }
                             }
                             dragged_file.editor.grouping = self.grouping;
-                            inkz_editor.editor.open_workspace_grouping = dragged_file.editor.grouping;
-                            self.open_file_index = inkz_editor.editor.open_files.getIndex(dragged_file.id) orelse 0;
+                            dvui_editor.editor.open_workspace_grouping = dragged_file.editor.grouping;
+                            self.open_file_index = dvui_editor.editor.open_files.getIndex(dragged_file.id) orelse 0;
                         }
                     }
                 }
@@ -503,15 +503,15 @@ pub fn drawEditor(self: *Workspace) !void {
 
     // switch (builtin.os.tag) {
     //     .macos => {
-    //         content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
+    //         content_color = if (!dvui_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(dvui_editor.editor.settings.content_opacity) else content_color;
     //     },
     //     .windows => {
-    //         content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
+    //         content_color = if (!dvui_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(dvui_editor.editor.settings.content_opacity) else content_color;
     //     },
     //     else => {},
     // }
 
-    const has_files = inkz_editor.editor.open_files.values().len > 0;
+    const has_files = dvui_editor.editor.open_files.values().len > 0;
 
     var text_editor_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .both,
@@ -525,16 +525,16 @@ pub fn drawEditor(self: *Workspace) !void {
     defer self.processTabDrag(text_editor_vbox.data());
 
     if (has_files) {
-        if (self.open_file_index >= inkz_editor.editor.open_files.values().len) {
-            self.open_file_index = inkz_editor.editor.open_files.values().len - 1;
+        if (self.open_file_index >= dvui_editor.editor.open_files.values().len) {
+            self.open_file_index = dvui_editor.editor.open_files.values().len - 1;
         }
 
-        const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
+        const file = &dvui_editor.editor.open_files.values()[self.open_file_index];
         // file.editor.text_edit_widget.id = text_editor_vbox.data().id;
         file.editor.workspace = self;
 
-        if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(text_editor_vbox.data().id)) {
-            defer inkz_editor.dvui.drawEdgeShadow(text_editor_vbox.data().rectScale(), .top, .{});
+        if (dvui_editor.editor.settings.show_rulers and !dvui.firstFrame(text_editor_vbox.data().id)) {
+            defer dvui_editor.dvui.drawEdgeShadow(text_editor_vbox.data().rectScale(), .top, .{});
             // self.drawRuler(.horizontal);
         }
 
@@ -542,16 +542,16 @@ pub fn drawEditor(self: *Workspace) !void {
         defer text_editor_hbox.deinit();
         // file.editor.text_edit_widget.id = text_editor_hbox.data().id;
 
-        // if (inkz_editor.editor.settings.show_rulers and !dvui.firstFrame(text_editor_vbox.data().id)) {
-        //     defer inkz_editor.dvui.drawEdgeShadow(text_editor_vbox.data().rectScale(), .left, .{});
+        // if (dvui_editor.editor.settings.show_rulers and !dvui.firstFrame(text_editor_vbox.data().id)) {
+        //     defer dvui_editor.dvui.drawEdgeShadow(text_editor_vbox.data().rectScale(), .left, .{});
         //     // self.drawRuler(.vertical);
         // }
 
         if (self.grouping != file.editor.grouping) return;
 
-        // inkz_editor.perf.canvasPaneDrawn();
+        // dvui_editor.perf.canvasPaneDrawn();
 
-        var file_widget = inkz_editor.dvui.TextEditWidget.init(@src(), file);
+        var file_widget = dvui_editor.dvui.TextEditWidget.init(@src(), file);
 
         defer file_widget.deinit();
         file_widget.processEvents();
@@ -580,7 +580,7 @@ pub const RulerOrientation = enum {
 };
 
 // pub fn drawRuler(self: *Workspace, orientation: RulerOrientation) void {
-//     const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
+//     const file = &dvui_editor.editor.open_files.values()[self.open_file_index];
 //     const font = dvui.Font.theme(.body).larger(-1);
 
 //     const largest_label = std.fmt.allocPrint(dvui.currentWindow().arena(), "{d}", .{file.lines - 1}) catch {
@@ -590,15 +590,15 @@ pub const RulerOrientation = enum {
 //     const largest_label_size = font.textSize(largest_label);
 //     const natural_scale = dvui.currentWindow().natural_scale;
 //     const largest_label_phys = largest_label_size.scale(natural_scale, dvui.Size.Physical);
-//     const base_ruler_size = largest_label_size.w + inkz_editor.editor.settings.ruler_padding;
+//     const base_ruler_size = largest_label_size.w + dvui_editor.editor.settings.ruler_padding;
 
 //     const ruler_thickness: f32 = switch (orientation) {
 //         .horizontal => blk: {
-//             self.horizontal_ruler_height = font.textSize("M").h + inkz_editor.editor.settings.ruler_padding;
+//             self.horizontal_ruler_height = font.textSize("M").h + dvui_editor.editor.settings.ruler_padding;
 //             break :blk self.horizontal_ruler_height;
 //         },
 //         .vertical => blk: {
-//             self.vertical_ruler_width = @max(base_ruler_size, font.textSize("M").h + inkz_editor.editor.settings.ruler_padding);
+//             self.vertical_ruler_width = @max(base_ruler_size, font.textSize("M").h + dvui_editor.editor.settings.ruler_padding);
 //             break :blk self.vertical_ruler_width;
 //         },
 //     };
@@ -645,7 +645,7 @@ pub const RulerOrientation = enum {
 // /// `largest_row_index_*` come from `drawRuler` (widest row index string and its measured size in physical pixels).
 // fn drawRulerContent(
 //     self: *Workspace,
-//     file: *inkz_editor.Internal.TextFile,
+//     file: *dvui_editor.Internal.TextFile,
 //     font: dvui.Font,
 //     orientation: RulerOrientation,
 //     ruler_size: f32,
@@ -719,7 +719,7 @@ pub const RulerOrientation = enum {
 //         .vertical => self.rows_drag_name,
 //     };
 
-//     var reorder = inkz_editor.dvui.reorder(@src(), .{ .drag_name = drag_name }, .{
+//     var reorder = dvui_editor.dvui.reorder(@src(), .{ .drag_name = drag_name }, .{
 //         .expand = .both,
 //         .margin = dvui.Rect.all(0),
 //         .padding = dvui.Rect.all(0),
@@ -769,7 +769,7 @@ pub const RulerOrientation = enum {
 //         .horizontal => .{ .w = @as(f32, @floatFromInt(file.column_width)), .h = 1.0 },
 //         .vertical => .{ .w = 1.0, .h = @as(f32, @floatFromInt(file.row_height)) },
 //     };
-//     const reorder_mode: inkz_editor.dvui.ReorderWidget.Reorderable.Mode = switch (orientation) {
+//     const reorder_mode: dvui_editor.dvui.ReorderWidget.Reorderable.Mode = switch (orientation) {
 //         .horizontal => .any_y,
 //         .vertical => .any_x,
 //     };
@@ -800,7 +800,7 @@ pub const RulerOrientation = enum {
 
 //         var button_color = if (reorder.drag_point != null) dvui.themeGet().color(.control, .fill).opacity(0.85) else dvui.themeGet().color(.window, .fill);
 
-//         if (inkz_editor.dvui.hovered(reorderable.data())) {
+//         if (dvui_editor.dvui.hovered(reorderable.data())) {
 //             button_color = dvui.themeGet().color(.control, .fill);
 //             dvui.cursorSet(.hand);
 //         }
@@ -976,7 +976,7 @@ pub fn drawRulerLabel(_: *Workspace, options: TextLabelOptions) void {
     else
         font.textSize(label).scale(natural, dvui.Size.Physical);
 
-    const padding = inkz_editor.editor.settings.ruler_padding * natural;
+    const padding = dvui_editor.editor.settings.ruler_padding * natural;
 
     var label_rect = rect;
 
@@ -1023,7 +1023,7 @@ pub fn drawRulerLabel(_: *Workspace, options: TextLabelOptions) void {
 
 //             if (columns_removed_index == columns_insert_before_index or columns_removed_index + 1 == columns_insert_before_index) return;
 
-//             const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
+//             const file = &dvui_editor.editor.open_files.values()[self.open_file_index];
 
 //             file.reorderColumns(columns_removed_index, columns_insert_before_index) catch {
 //                 dvui.log.err("Failed to reorder columns", .{});
@@ -1066,7 +1066,7 @@ pub fn drawRulerLabel(_: *Workspace, options: TextLabelOptions) void {
 //             defer self.rows_insert_before_index = null;
 //             if (rows_removed_index == rows_insert_before_index or rows_removed_index + 1 == rows_insert_before_index) return;
 
-//             const file = &inkz_editor.editor.open_files.values()[self.open_file_index];
+//             const file = &dvui_editor.editor.open_files.values()[self.open_file_index];
 
 //             file.reorderRows(rows_removed_index, rows_insert_before_index) catch {
 //                 dvui.log.err("Failed to reorder rows", .{});
@@ -1103,75 +1103,10 @@ pub fn drawRulerLabel(_: *Workspace, options: TextLabelOptions) void {
 // }
 
 pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
-    const logo_pixel_size = 32;
-    const logo_width = 3;
-    const logo_height = 5;
-
-    const logo_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
-        .expand = .none,
-        .gravity_x = 0.5,
-        .gravity_y = 0.5,
-        .background = false,
-        .padding = dvui.Rect.all(10),
-    });
-    defer logo_vbox.deinit();
-
-    { // Logo
-
-        const vbox2 = dvui.box(@src(), .{ .dir = .vertical }, .{
-            .expand = .none,
-            .gravity_x = 0.5,
-            .min_size_content = .{ .w = logo_pixel_size * logo_width, .h = logo_pixel_size * logo_height },
-            .padding = dvui.Rect.all(20),
-        });
-        defer vbox2.deinit();
-
-        for (0..5) |i| {
-            const hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{
-                .expand = .none,
-                .min_size_content = .{ .w = logo_pixel_size * logo_width, .h = logo_pixel_size },
-                .margin = dvui.Rect.all(0),
-                .padding = dvui.Rect.all(0),
-                .id_extra = i,
-            });
-            defer hbox.deinit();
-
-            for (0..3) |j| {
-                const index = i * logo_width + j;
-                var pixi_color = logo_colors[index];
-
-                if (pixi_color.value[3] < 1.0 and pixi_color.value[3] > 0.0) {
-                    const theme_bg = dvui.themeGet().color(.window, .fill);
-                    pixi_color = pixi_color.lerp(inkz_editor.math.Color.initBytes(theme_bg.r, theme_bg.g, theme_bg.b, 255), pixi_color.value[3]);
-                    pixi_color.value[3] = 1.0;
-                }
-
-                const color = pixi_color.bytes();
-
-                const pixel = dvui.box(@src(), .{ .dir = .horizontal }, .{
-                    .expand = .none,
-                    .min_size_content = .{ .w = logo_pixel_size, .h = logo_pixel_size },
-                    .id_extra = index,
-                    .background = false,
-                    .color_fill = .{ .r = color[0], .g = color[1], .b = color[2], .a = color[3] },
-                    .margin = dvui.Rect.all(0),
-                    .padding = dvui.Rect.all(0),
-                });
-
-                const rect = pixel.data().rect.outset(.{ .x = 0, .y = 0 });
-                const rs = pixel.data().rectScale();
-                pixel.deinit();
-
-                if (pixi_color.value[3] <= 0.0) continue;
-
-                try drawBubble(rect, rs, color, index);
-            }
-        }
-    }
-
     var vbox = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .none,
         .gravity_x = 0.5,
+        .gravity_y = 0.5,
     });
     {
         var button: dvui.ButtonWidget = undefined;
@@ -1188,7 +1123,7 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
         button.processEvents();
         button.drawBackground();
 
-        inkz_editor.dvui.labelWithKeybind(
+        dvui_editor.dvui.labelWithKeybind(
             "Open Folder",
             dvui.currentWindow().keybinds.get("open_folder") orelse .{},
             true,
@@ -1197,10 +1132,10 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
         );
 
         if (button.clicked()) {
-            // inkz_editor.backend.showOpenFolderDialog(setProjectFolderCallback, null);
+            // dvui_editor.backend.showOpenFolderDialog(setProjectFolderCallback, null);
 
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
-                try inkz_editor.editor.setProjectFolder(folder);
+                try dvui_editor.editor.setProjectFolder(folder);
             }
         }
     }
@@ -1220,7 +1155,7 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
         button.processEvents();
         button.drawBackground();
 
-        inkz_editor.dvui.labelWithKeybind(
+        dvui_editor.dvui.labelWithKeybind(
             "Open Files",
             dvui.currentWindow().keybinds.get("open_files") orelse .{},
             true,
@@ -1235,13 +1170,13 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
                 .filters = &.{ "*.pixi", "*.png" },
             })) |files| {
                 for (files) |file| {
-                    _ = inkz_editor.editor.openFilePath(file, inkz_editor.editor.open_workspace_grouping) catch {
+                    _ = dvui_editor.editor.openFilePath(file, dvui_editor.editor.open_workspace_grouping) catch {
                         std.log.err("Failed to open file: {s}", .{file});
                     };
                 }
             }
 
-            // inkz_editor.backend.showOpenFileDialog(openFilesCallback, &.{
+            // dvui_editor.backend.showOpenFileDialog(openFilesCallback, &.{
             //     .{ .name = "Image Files", .pattern = "pixi;png;jpg" },
             // }, "", null);
         }
@@ -1267,7 +1202,7 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
     //     });
     //     defer scroll_area.deinit();
 
-    //     var i: usize = inkz_editor.editor.recents.folders.items.len;
+    //     var i: usize = dvui_editor.editor.recents.folders.items.len;
     //     while (i > 0) : (i -= 1) {
     //         var anim = dvui.animate(@src(), .{
     //             .kind = .horizontal,
@@ -1279,7 +1214,7 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
     //         });
     //         defer anim.deinit();
 
-    //         const folder = inkz_editor.editor.recents.folders.items[i - 1];
+    //         const folder = dvui_editor.editor.recents.folders.items[i - 1];
     //         if (dvui.button(@src(), folder, .{
     //             .draw_focus = false,
     //         }, .{
@@ -1293,7 +1228,7 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
     //             .color_fill_press = dvui.themeGet().color(.window, .fill_press),
     //             .color_text = dvui.themeGet().color(.control, .text).opacity(0.5),
     //         })) {
-    //             try inkz_editor.editor.setProjectFolder(folder);
+    //             try dvui_editor.editor.setProjectFolder(folder);
     //         }
     //     }
     // }
@@ -1364,7 +1299,7 @@ pub fn drawBubble(rect: dvui.Rect, rs: dvui.RectScale, color: [4]u8, id_extra: u
 // This should never be able to return more than one folder
 pub fn setProjectFolderCallback(folder: ?[][:0]const u8) void {
     if (folder) |f| {
-        inkz_editor.editor.setProjectFolder(f[0]) catch {
+        dvui_editor.editor.setProjectFolder(f[0]) catch {
             dvui.log.err("Failed to set project folder: {s}", .{f[0]});
         };
     }
@@ -1373,7 +1308,7 @@ pub fn setProjectFolderCallback(folder: ?[][:0]const u8) void {
 pub fn openFilesCallback(files: ?[][:0]const u8) void {
     if (files) |f| {
         for (f) |file| {
-            _ = inkz_editor.editor.openFilePath(file, inkz_editor.editor.open_workspace_grouping) catch {
+            _ = dvui_editor.editor.openFilePath(file, dvui_editor.editor.open_workspace_grouping) catch {
                 dvui.log.err("Failed to open file: {s}", .{file});
             };
         }

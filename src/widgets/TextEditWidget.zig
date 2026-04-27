@@ -1,18 +1,18 @@
 const std = @import("std");
 
 const dvui = @import("dvui");
-
-const inkz_editor = @import("../root.zig");
-const App = inkz_editor.App;
-const Editor = inkz_editor.Editor;
 const Options = dvui.Options;
+
+const dvui_editor = @import("../root.zig");
+const App = dvui_editor.App;
+const Editor = dvui_editor.Editor;
 
 pub const TextEditWidget = @This();
 
 id: dvui.Id = undefined,
-file: *inkz_editor.Internal.TextFile = undefined,
+file: *dvui_editor.Internal.TextFile = undefined,
 
-pub fn init(src: std.builtin.SourceLocation, file: *inkz_editor.Internal.TextFile) TextEditWidget {
+pub fn init(src: std.builtin.SourceLocation, file: *dvui_editor.Internal.TextFile) TextEditWidget {
     // TODO: Do we need src? How do we track multiple files?
     _ = src;
     return .{
@@ -34,7 +34,7 @@ pub fn processEvents(self: *TextEditWidget) void {
             .scroll_horizontal = true,
             .text = .{
                 .buffer_dynamic = .{
-                    .allocator = inkz_editor.app.gpa,
+                    .allocator = dvui_editor.app.gpa,
                     .backing = &self.file.content,
                 },
             },

@@ -2,7 +2,7 @@ const std = @import("std");
 const Io = std.Io;
 const builtin = @import("builtin");
 
-const inkz_editor = @import("root.zig");
+const dvui_editor = @import("root.zig");
 
 const Settings = @This();
 
@@ -99,7 +99,7 @@ pub fn load(io: Io, gpa: std.mem.Allocator, path: []const u8) !Settings {
     }
 
     return .{
-        .theme = try gpa.dupe(u8, "inkz_editor_dark.json"),
+        .theme = try gpa.dupe(u8, "dvui_editor_dark.json"),
     };
 }
 

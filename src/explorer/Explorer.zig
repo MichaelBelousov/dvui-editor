@@ -5,10 +5,10 @@ const Core = @import("mach").Core;
 const dvui = @import("dvui");
 const nfd = @import("nfd");
 
-const inkz_editor = @import("../root.zig");
-const App = inkz_editor.App;
-const Editor = inkz_editor.Editor;
-const Packer = inkz_editor.Packer;
+const dvui_editor = @import("../root.zig");
+const App = dvui_editor.App;
+const Editor = dvui_editor.Editor;
+const Packer = dvui_editor.Packer;
 pub const files = @import("files.zig");
 pub const project = @import("project.zig");
 pub const settings = @import("settings.zig");
@@ -20,7 +20,7 @@ pub const Explorer = @This();
 // pub const keyframe_animations = @import("keyframe_animations.zig");
 tools: Tools = .{},
 pane: Pane = .files,
-paned: *inkz_editor.dvui.PanedWidget = undefined,
+paned: *dvui_editor.dvui.PanedWidget = undefined,
 scroll_info: dvui.ScrollInfo = .{
     .horizontal = .auto,
 },
@@ -43,7 +43,7 @@ pub const Pane = enum(u32) {
 
 pub fn init() Explorer {
     return .{
-        .open_branches = .init(inkz_editor.app.gpa),
+        .open_branches = .init(dvui_editor.app.gpa),
     };
 }
 
@@ -72,8 +72,8 @@ pub fn close(explorer: *Explorer) void {
 pub fn open(explorer: *Explorer) void {
     if (explorer.paned.collapsed()) return;
 
-    if (inkz_editor.editor.settings.explorer_ratio > 0.0) {
-        explorer.paned.animateSplit(inkz_editor.editor.settings.explorer_ratio, dvui.easing.outBack);
+    if (dvui_editor.editor.settings.explorer_ratio > 0.0) {
+        explorer.paned.animateSplit(dvui_editor.editor.settings.explorer_ratio, dvui.easing.outBack);
     } else {
         explorer.paned.animateSplit(0.2, dvui.easing.outBack);
     }
@@ -118,28 +118,28 @@ pub fn draw(explorer: *Explorer, io: std.Io, environ: *const std.process.Environ
     scroll.deinit();
 
     if (vertical_scroll > 0.0) {
-        inkz_editor.dvui.drawEdgeShadow(pane_vbox.data().contentRectScale(), .top, .{});
+        dvui_editor.dvui.drawEdgeShadow(pane_vbox.data().contentRectScale(), .top, .{});
     }
 
     if (explorer.scroll_info.virtual_size.h > explorer.scroll_info.viewport.h) {
-        inkz_editor.dvui.drawEdgeShadow(pane_vbox.data().contentRectScale(), .bottom, .{});
+        dvui_editor.dvui.drawEdgeShadow(pane_vbox.data().contentRectScale(), .bottom, .{});
     }
 
     pane_vbox.deinit();
 
     if (explorer.scroll_info.virtual_size.w > explorer.scroll_info.viewport.w) {
-        inkz_editor.dvui.drawEdgeShadow(vbox.data().contentRectScale(), .right, .{});
+        dvui_editor.dvui.drawEdgeShadow(vbox.data().contentRectScale(), .right, .{});
     }
 
     if (horizontal_scroll > 0.0) {
-        inkz_editor.dvui.drawEdgeShadow(vbox.data().contentRectScale(), .left, .{});
+        dvui_editor.dvui.drawEdgeShadow(vbox.data().contentRectScale(), .left, .{});
     }
 
     return .ok;
 }
 
 pub fn hovered(explorer: *Explorer) bool {
-    return inkz_editor.dvui.hovered(explorer.paned.data());
+    return dvui_editor.dvui.hovered(explorer.paned.data());
 }
 
 pub fn drawHeader(explorer: *Explorer) !void {

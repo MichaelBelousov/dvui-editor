@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 
 const dvui = @import("dvui");
 
-const inkz_editor = @import("root.zig");
+const dvui_editor = @import("root.zig");
 
 pub const Keybinds = @This();
 
@@ -70,7 +70,7 @@ pub fn tick() !void {
                         if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{
                             .title = "Open Project Folder",
                         })) |folder| {
-                            try inkz_editor.editor.setProjectFolder(folder);
+                            try dvui_editor.editor.setProjectFolder(folder);
                         }
                     }
 
@@ -80,7 +80,7 @@ pub fn tick() !void {
                             .{ .title = "Open Files...", .filter_description = ".txt, .md", .filters = &.{ "*.txt", "*.md" } },
                         )) |files| {
                             for (files) |file| {
-                                _ = inkz_editor.editor.openFilePath(file, inkz_editor.editor.open_workspace_grouping) catch {
+                                _ = dvui_editor.editor.openFilePath(file, dvui_editor.editor.open_workspace_grouping) catch {
                                     std.log.err("Failed to open file: {s}", .{file});
                                 };
                             }
@@ -90,78 +90,78 @@ pub fn tick() !void {
 
                 if (builtin.os.tag != .macos) {
                     if (ke.matchBind("explorer") and ke.action == .down) {
-                        if (inkz_editor.editor.explorer.closed) {
-                            inkz_editor.editor.explorer.open();
+                        if (dvui_editor.editor.explorer.closed) {
+                            dvui_editor.editor.explorer.open();
                         } else {
-                            inkz_editor.editor.explorer.close();
+                            dvui_editor.editor.explorer.close();
                         }
                     }
                 }
 
                 // if (ke.matchBind("activate") and ke.action == .down) {
-                //     inkz_editor.editor.accept() catch {
+                //     dvui_editor.editor.accept() catch {
                 //         std.log.err("Failed to accept", .{});
                 //     };
                 // }
 
                 // if (ke.matchBind("cancel") and ke.action == .down) {
-                //     inkz_editor.editor.cancel() catch {
+                //     dvui_editor.editor.cancel() catch {
                 //         std.log.err("Failed to cancel", .{});
                 //     };
                 // }
 
                 if (builtin.os.tag != .macos) {
                     if (ke.matchBind("undo") and (ke.action == .down or ke.action == .repeat)) {
-                        inkz_editor.editor.undo() catch {
+                        dvui_editor.editor.undo() catch {
                             std.log.err("Failed to undo", .{});
                         };
                     }
 
                     if (ke.matchBind("copy") and ke.action == .down) {
-                        inkz_editor.editor.copy() catch {
+                        dvui_editor.editor.copy() catch {
                             std.log.err("Failed to copy", .{});
                         };
                     }
 
                     if (ke.matchBind("paste") and ke.action == .down) {
-                        inkz_editor.editor.paste() catch {
+                        dvui_editor.editor.paste() catch {
                             std.log.err("Failed to paste", .{});
                         };
                     }
 
                     if (ke.matchBind("redo") and (ke.action == .down or ke.action == .repeat)) {
-                        inkz_editor.editor.redo() catch {
+                        dvui_editor.editor.redo() catch {
                             std.log.err("Failed to redo", .{});
                         };
                     }
 
                     if (ke.matchBind("save") and ke.action == .down) {
-                        inkz_editor.editor.save() catch {
+                        dvui_editor.editor.save() catch {
                             std.log.err("Failed to save", .{});
                         };
                     }
 
                     // if (ke.matchBind("transform") and ke.action == .down) {
-                    //     inkz_editor.editor.transform() catch {
+                    //     dvui_editor.editor.transform() catch {
                     //         std.log.err("Failed to transform", .{});
                     //     };
                     // }
                 }
 
                 // if (ke.matchBind("pencil") and ke.action == .down) {
-                //     inkz_editor.editor.tools.set(.pencil);
+                //     dvui_editor.editor.tools.set(.pencil);
                 // }
                 // if (ke.matchBind("eraser") and ke.action == .down) {
-                //     inkz_editor.editor.tools.set(.eraser);
+                //     dvui_editor.editor.tools.set(.eraser);
                 // }
                 // if (ke.matchBind("bucket") and ke.action == .down) {
-                //     inkz_editor.editor.tools.set(.bucket);
+                //     dvui_editor.editor.tools.set(.bucket);
                 // }
                 // if (ke.matchBind("pointer") and ke.action == .down) {
-                //     inkz_editor.editor.tools.set(.pointer);
+                //     dvui_editor.editor.tools.set(.pointer);
                 // }
                 // if (ke.matchBind("selection") and ke.action == .down) {
-                //     inkz_editor.editor.tools.set(.selection);
+                //     dvui_editor.editor.tools.set(.selection);
                 // }
             },
             else => {},

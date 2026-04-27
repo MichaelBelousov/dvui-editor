@@ -1,11 +1,13 @@
 // These are functions specific to the backend, which is currently SDL3
-const inkz_editor = @import("root.zig");
 const std = @import("std");
 const builtin = @import("builtin");
+
 const dvui = @import("dvui");
-const sdl3 = @import("backend").c;
 const objc = @import("objc");
+const sdl3 = @import("backend").c;
 const win32 = @import("win32");
+
+const dvui_editor = @import("root.zig");
 
 // AppKit geometry types for NSView frame/bounds (same layout as Foundation).
 const NSPoint = extern struct { x: f64, y: f64 };
@@ -741,44 +743,44 @@ pub fn showSimpleMessage(title: [:0]const u8, message: [:0]const u8) void {
 pub fn showSaveFileDialog(cb: *const fn (?[][:0]const u8) void, filters: []const sdl3.SDL_DialogFileFilter, default_filename: []const u8, default_folder: ?[]const u8) void {
     const default: [:0]const u8 = blk: {
         if (default_folder) |folder| {
-            break :blk std.fs.path.joinZ(inkz_editor.app.allocator, &.{ folder, default_filename }) catch "untitled";
-        } else if (inkz_editor.editor.recents.last_save_folder) |last_save_folder| {
-            break :blk std.fs.path.joinZ(inkz_editor.app.allocator, &.{ last_save_folder, default_filename }) catch "untitled";
+            break :blk std.fs.path.joinZ(dvui_editor.app.allocator, &.{ folder, default_filename }) catch "untitled";
+        } else if (dvui_editor.editor.recents.last_save_folder) |last_save_folder| {
+            break :blk std.fs.path.joinZ(dvui_editor.app.allocator, &.{ last_save_folder, default_filename }) catch "untitled";
         } else {
-            break :blk std.fs.path.joinZ(inkz_editor.app.allocator, &.{ inkz_editor.editor.folder orelse "", default_filename }) catch "untitled";
+            break :blk std.fs.path.joinZ(dvui_editor.app.allocator, &.{ dvui_editor.editor.folder orelse "", default_filename }) catch "untitled";
         }
     };
-    defer inkz_editor.app.allocator.free(default);
+    defer dvui_editor.app.allocator.free(default);
     sdl3.SDL_ShowSaveFileDialog(GenericSaveDialogCallback, @ptrCast(@alignCast(@constCast(cb))), dvui.currentWindow().backend.impl.window, filters.ptr, @intCast(filters.len), default);
 }
 
 pub fn showOpenFileDialog(cb: *const fn (?[][:0]const u8) void, filters: []const sdl3.SDL_DialogFileFilter, default_filename: []const u8, default_folder: ?[]const u8) void {
     const default: [:0]const u8 = blk: {
         if (default_folder) |folder| {
-            break :blk std.fs.path.joinZ(inkz_editor.app.allocator, &.{ folder, default_filename }) catch "untitled";
-        } else if (inkz_editor.editor.recents.last_open_folder) |last_open_folder| {
-            break :blk std.fs.path.joinZ(inkz_editor.app.allocator, &.{ last_open_folder, default_filename }) catch "untitled";
+            break :blk std.fs.path.joinZ(dvui_editor.app.allocator, &.{ folder, default_filename }) catch "untitled";
+        } else if (dvui_editor.editor.recents.last_open_folder) |last_open_folder| {
+            break :blk std.fs.path.joinZ(dvui_editor.app.allocator, &.{ last_open_folder, default_filename }) catch "untitled";
         } else {
-            break :blk std.fs.path.joinZ(inkz_editor.app.allocator, &.{ inkz_editor.editor.folder orelse "", default_filename }) catch "untitled";
+            break :blk std.fs.path.joinZ(dvui_editor.app.allocator, &.{ dvui_editor.editor.folder orelse "", default_filename }) catch "untitled";
         }
     };
-    defer inkz_editor.app.allocator.free(default);
+    defer dvui_editor.app.allocator.free(default);
     sdl3.SDL_ShowOpenFileDialog(GenericOpenDialogCallback, @ptrCast(@alignCast(@constCast(cb))), dvui.currentWindow().backend.impl.window, filters.ptr, @intCast(filters.len), default.ptr, true);
 }
 
 pub fn showOpenFolderDialog(cb: *const fn (?[][:0]const u8) void, default_folder: ?[]const u8) void {
     const default: [:0]const u8 = blk: {
         if (default_folder) |folder| {
-            break :blk std.fmt.allocPrintSentinel(inkz_editor.app.allocator, "{s}", .{folder}, 0) catch "untitled";
+            break :blk std.fmt.allocPrintSentinel(dvui_editor.app.allocator, "{s}", .{folder}, 0) catch "untitled";
         } else {
-            if (inkz_editor.editor.recents.last_open_folder) |last_open_folder| {
-                break :blk std.fmt.allocPrintSentinel(inkz_editor.app.allocator, "{s}", .{last_open_folder}, 0) catch "untitled";
+            if (dvui_editor.editor.recents.last_open_folder) |last_open_folder| {
+                break :blk std.fmt.allocPrintSentinel(dvui_editor.app.allocator, "{s}", .{last_open_folder}, 0) catch "untitled";
             } else {
-                break :blk std.fmt.allocPrintSentinel(inkz_editor.app.allocator, "{s}", .{inkz_editor.editor.folder orelse ""}, 0) catch "untitled";
+                break :blk std.fmt.allocPrintSentinel(dvui_editor.app.allocator, "{s}", .{dvui_editor.editor.folder orelse ""}, 0) catch "untitled";
             }
         }
     };
-    defer inkz_editor.app.allocator.free(default);
+    defer dvui_editor.app.allocator.free(default);
     sdl3.SDL_ShowOpenFolderDialog(GenericOpenDialogCallback, @ptrCast(@alignCast(@constCast(cb))), dvui.currentWindow().backend.impl.window, default.ptr, false);
 }
 
@@ -814,18 +816,18 @@ fn GenericDialogCallback(cb: ?*anyopaque, files: [*c]const [*c]const u8, mode: e
     { // Save the open or save folder for the next time the dialog is shown
         if (std.fs.path.dirname(zig_files[0])) |dir| {
             if (mode == .save) {
-                if (inkz_editor.editor.recents.last_save_folder) |last_save_folder| {
-                    inkz_editor.app.allocator.free(last_save_folder);
+                if (dvui_editor.editor.recents.last_save_folder) |last_save_folder| {
+                    dvui_editor.app.allocator.free(last_save_folder);
                 }
-                inkz_editor.editor.recents.last_save_folder = inkz_editor.app.allocator.dupe(u8, dir) catch {
+                dvui_editor.editor.recents.last_save_folder = dvui_editor.app.allocator.dupe(u8, dir) catch {
                     dvui.log.err("Failed to dupe directory {s}", .{dir});
                     return;
                 };
             } else {
-                if (inkz_editor.editor.recents.last_open_folder) |last_open_folder| {
-                    inkz_editor.app.allocator.free(last_open_folder);
+                if (dvui_editor.editor.recents.last_open_folder) |last_open_folder| {
+                    dvui_editor.app.allocator.free(last_open_folder);
                 }
-                inkz_editor.editor.recents.last_open_folder = inkz_editor.app.allocator.dupe(u8, dir) catch {
+                dvui_editor.editor.recents.last_open_folder = dvui_editor.app.allocator.dupe(u8, dir) catch {
                     dvui.log.err("Failed to dupe directory {s}", .{dir});
                     return;
                 };

@@ -5,22 +5,22 @@
 <key>CFBundleName</key>
 <string>Pixi</string>
 <key>CFBundleIdentifier</key>
-<string>com.foxnne.inkz_editor</string>
+<string>com.foxnne.dvui_editor</string>
 <key>CFBundleVersion</key>
 <string>0.0.1</string> Note: Follow Semantic versioning
 <key>CFBundleIconFile</key>
-<string>inkz_editor.icns</string>
+<string>dvui_editor.icns</string>
 <key>CFBundleDocumentTypes</key>
 <array>
 	<dict>
 		<key>CFBundleTypeExtensions</key>
 		<array>
-			<string>inkz_editor</string>
+			<string>dvui_editor</string>
             <string>png</string>
             <string>jpg</string>
 		</array>
 		<key>CFBundleTypeIconFile</key>
-		<string>inkz_editor.icns</string>
+		<string>dvui_editor.icns</string>
 		<key>CFBundleTypeName</key>
 		<string>Pixi art files</string>
 		<key>CFBundleTypeRole</key>

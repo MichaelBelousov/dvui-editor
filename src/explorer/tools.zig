@@ -4,7 +4,7 @@ const assets = @import("assets");
 const dvui = @import("dvui");
 const icons = @import("icons");
 
-const inkz_editor = @import("../root.zig");
+const dvui_editor = @import("../root.zig");
 
 const Tools = @This();
 
@@ -62,23 +62,23 @@ pub fn drawTools() !void {
         .padding = .{ .h = 10.0, .w = 4.0, .x = 4.0, .y = 4.0 },
     });
     defer toolbox.deinit();
-    // for (0..std.meta.fields(inkz_editor.Editor.Tools.Tool).len) |i| {
-    //     const tool: inkz_editor.Editor.Tools.Tool = @enumFromInt(i);
+    // for (0..std.meta.fields(dvui_editor.Editor.Tools.Tool).len) |i| {
+    //     const tool: dvui_editor.Editor.Tools.Tool = @enumFromInt(i);
     //     const id_extra = i;
 
-    //     const selected = inkz_editor.editor.tools.current == tool;
+    //     const selected = dvui_editor.editor.tools.current == tool;
 
     //     var color = dvui.themeGet().color(.control, .fill_hover);
-    //     if (inkz_editor.editor.colors.file_tree_palette) |*palette| {
+    //     if (dvui_editor.editor.colors.file_tree_palette) |*palette| {
     //         color = palette.getDVUIColor(i);
     //     }
 
     //     const sprite = switch (tool) {
-    //         .pointer => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.cursor_default],
-    //         .pencil => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.pencil_default],
-    //         .eraser => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.eraser_default],
-    //         .bucket => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.bucket_default],
-    //         .selection => inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.selection_default],
+    //         .pointer => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.cursor_default],
+    //         .pencil => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.pencil_default],
+    //         .eraser => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.eraser_default],
+    //         .bucket => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.bucket_default],
+    //         .selection => dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.selection_default],
     //     };
     //     var button: dvui.ButtonWidget = undefined;
     //     button.init(@src(), .{}, .{
@@ -101,13 +101,13 @@ pub fn drawTools() !void {
     //     });
     //     defer button.deinit();
 
-    //     inkz_editor.editor.tools.drawTooltip(tool, button.data().rectScale().r, id_extra) catch {};
+    //     dvui_editor.editor.tools.drawTooltip(tool, button.data().rectScale().r, id_extra) catch {};
 
     //     if (button.hovered()) {
     //         button.data().options.color_border = color;
     //     }
 
-    //     const size: dvui.Size = dvui.imageSize(inkz_editor.editor.atlas.source) catch .{ .w = 0, .h = 0 };
+    //     const size: dvui.Size = dvui.imageSize(dvui_editor.editor.atlas.source) catch .{ .w = 0, .h = 0 };
 
     //     const uv = dvui.Rect{
     //         .x = @as(f32, @floatFromInt(sprite.source[0])) / size.w,
@@ -129,7 +129,7 @@ pub fn drawTools() !void {
     //     rs.r.w = width;
     //     rs.r.h = height;
 
-    //     dvui.renderImage(inkz_editor.editor.atlas.source, rs, .{
+    //     dvui.renderImage(dvui_editor.editor.atlas.source, rs, .{
     //         .uv = uv,
     //         .fade = 0.0,
     //     }) catch {
@@ -137,7 +137,7 @@ pub fn drawTools() !void {
     //     };
 
     //     if (button.clicked()) {
-    //         inkz_editor.editor.tools.set(tool);
+    //         dvui_editor.editor.tools.set(tool);
     //     }
     // }
 }

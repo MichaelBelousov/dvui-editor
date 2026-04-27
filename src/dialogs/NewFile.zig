@@ -2,7 +2,7 @@ const std = @import("std");
 
 const dvui = @import("dvui");
 
-const inkz_editor = @import("../root.zig");
+const dvui_editor = @import("../root.zig");
 const Dialogs = @import("Dialogs.zig");
 
 pub var mode: enum(usize) {
@@ -193,9 +193,9 @@ pub fn callAfter(id: dvui.Id, response: dvui.enums.DialogResponse) anyerror!void
 
     switch (response) {
         .ok => {
-            const new_path = try std.fs.path.join(dvui.currentWindow().arena(), &.{ path, "untitled.inkz_editor" });
+            const new_path = try std.fs.path.join(dvui.currentWindow().arena(), &.{ path, "untitled.dvui_editor" });
 
-            const file = inkz_editor.editor.newFile(new_path, .{}) catch {
+            const file = dvui_editor.editor.newFile(new_path, .{}) catch {
                 dvui.log.err("Failed to create file: {s}", .{path});
                 return error.FailedToCreateFile;
             };
@@ -207,7 +207,7 @@ pub fn callAfter(id: dvui.Id, response: dvui.enums.DialogResponse) anyerror!void
             //     return error.FailedToSaveFile;
             // };
 
-            inkz_editor.Editor.Explorer.files.new_file_path = inkz_editor.app.gpa.dupe(u8, new_path) catch {
+            dvui_editor.Editor.Explorer.files.new_file_path = dvui_editor.app.gpa.dupe(u8, new_path) catch {
                 dvui.log.err("Failed to duplicate path: {s}", .{new_path});
                 return error.FailedToDuplicatePath;
             };

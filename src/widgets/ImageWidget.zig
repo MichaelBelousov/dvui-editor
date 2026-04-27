@@ -12,7 +12,7 @@ const ScrollAreaWidget = dvui.ScrollAreaWidget;
 const ScrollContainerWidget = dvui.ScrollContainerWidget;
 const ScaleWidget = dvui.ScaleWidget;
 
-const inkz_editor = @import("../root.zig");
+const dvui_editor = @import("../root.zig");
 const CanvasWidget = @import("CanvasWidget.zig");
 
 pub const ImageWidget = @This();
@@ -139,22 +139,22 @@ pub fn processSample(self: *ImageWidget) void {
 fn sample(self: *ImageWidget, point: dvui.Point) void {
     var color: [4]u8 = .{ 0, 0, 0, 0 };
 
-    if (inkz_editor.image.pixelIndex(self.init_options.source, point)) |index| {
-        const c = inkz_editor.image.pixels(self.init_options.source)[index];
+    if (dvui_editor.image.pixelIndex(self.init_options.source, point)) |index| {
+        const c = dvui_editor.image.pixels(self.init_options.source)[index];
         if (c[3] > 0) {
             color = c;
         }
     }
 
-    inkz_editor.editor.colors.primary = color;
+    dvui_editor.editor.colors.primary = color;
     self.sample_data_point = point;
 
     if (color[3] == 0) {
-        if (inkz_editor.editor.tools.current != .eraser) {
-            inkz_editor.editor.tools.set(.eraser);
+        if (dvui_editor.editor.tools.current != .eraser) {
+            dvui_editor.editor.tools.set(.eraser);
         }
     } else {
-        inkz_editor.editor.tools.set(inkz_editor.editor.tools.previous_drawing_tool);
+        dvui_editor.editor.tools.set(dvui_editor.editor.tools.previous_drawing_tool);
     }
 }
 
@@ -251,7 +251,7 @@ pub fn drawSample(self: *ImageWidget) void {
         });
         defer box.deinit();
 
-        const size = inkz_editor.image.size(self.init_options.source);
+        const size = dvui_editor.image.size(self.init_options.source);
 
         // Compute UVs for the region to sample, normalized to [0,1]
         const uv_rect = dvui.Rect{
@@ -369,10 +369,10 @@ pub fn processEvents(self: *ImageWidget) void {
 
     self.drawImage();
 
-    inkz_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .top, .{});
-    inkz_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .bottom, .{ .opacity = 0.15 });
-    inkz_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .left, .{});
-    inkz_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .right, .{ .opacity = 0.15 });
+    dvui_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .top, .{});
+    dvui_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .bottom, .{ .opacity = 0.15 });
+    dvui_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .left, .{});
+    dvui_editor.dvui.drawEdgeShadow(self.init_options.canvas.scroll_container.data().rectScale(), .right, .{ .opacity = 0.15 });
 
     self.drawCursor();
     self.drawSample();

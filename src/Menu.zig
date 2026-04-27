@@ -5,9 +5,9 @@ const dvui = @import("dvui");
 const icons = @import("icons");
 const zstbi = @import("zstbi");
 
-const inkz_editor = @import("root.zig");
-const Editor = inkz_editor.Editor;
-const settings = inkz_editor.settings;
+const dvui_editor = @import("root.zig");
+const Editor = dvui_editor.Editor;
+const settings = dvui_editor.settings;
 
 pub var mouse_distance: f32 = std.math.floatMax(f32);
 
@@ -48,7 +48,7 @@ pub fn draw() !dvui.App.Result {
             //.style = .control,
         }) != null) {
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
-                try inkz_editor.editor.setProjectFolder(folder);
+                try dvui_editor.editor.setProjectFolder(folder);
             }
             fw.close();
         }
@@ -63,7 +63,7 @@ pub fn draw() !dvui.App.Result {
                 .filters = &.{ "*.txt", "*.md" },
             })) |files| {
                 for (files) |file| {
-                    _ = inkz_editor.editor.openFilePath(file, inkz_editor.editor.open_workspace_grouping) catch {
+                    _ = dvui_editor.editor.openFilePath(file, dvui_editor.editor.open_workspace_grouping) catch {
                         std.log.err("Failed to open file: {s}", .{file});
                     };
                 }
@@ -99,9 +99,9 @@ pub fn draw() !dvui.App.Result {
             });
             defer vert_box.deinit();
 
-            var i: usize = inkz_editor.editor.recents.folders.items.len;
+            var i: usize = dvui_editor.editor.recents.folders.items.len;
             while (i > 0) : (i -= 1) {
-                const folder = inkz_editor.editor.recents.folders.items[i - 1];
+                const folder = dvui_editor.editor.recents.folders.items[i - 1];
                 if (menuItem(@src(), folder, .{}, .{
                     .expand = .horizontal,
                     .font = dvui.Font.theme(.mono).larger(-2.0),
@@ -109,18 +109,18 @@ pub fn draw() !dvui.App.Result {
                     .margin = dvui.Rect.all(1),
                     .padding = dvui.Rect.all(2),
                 })) |_| {
-                    try inkz_editor.editor.setProjectFolder(folder);
+                    try dvui_editor.editor.setProjectFolder(folder);
                 }
             }
         }
 
         _ = dvui.separator(@src(), .{ .expand = .horizontal });
 
-        if (menuItemWithHotkey(@src(), "Save", dvui.currentWindow().keybinds.get("save") orelse .{}, if (inkz_editor.editor.activeFile()) |file| if (file.dirty()) true else false else false, .{}, .{
+        if (menuItemWithHotkey(@src(), "Save", dvui.currentWindow().keybinds.get("save") orelse .{}, if (dvui_editor.editor.activeFile()) |file| if (file.dirty()) true else false else false, .{}, .{
             .expand = .horizontal,
             .color_text = dvui.themeGet().color(.window, .text),
         }) != null) {
-            if (inkz_editor.editor.activeFile()) |file| {
+            if (dvui_editor.editor.activeFile()) |file| {
                 file.saveAsync() catch {
                     std.log.err("Failed to save", .{});
                 };
@@ -154,12 +154,12 @@ pub fn draw() !dvui.App.Result {
             @src(),
             "Copy",
             dvui.currentWindow().keybinds.get("copy") orelse .{},
-            if (inkz_editor.editor.activeFile() != null) true else false,
+            if (dvui_editor.editor.activeFile() != null) true else false,
             .{},
             .{ .expand = .horizontal },
         ) != null) {
-            if (inkz_editor.editor.activeFile() != null) {
-                inkz_editor.editor.copy() catch {
+            if (dvui_editor.editor.activeFile() != null) {
+                dvui_editor.editor.copy() catch {
                     std.log.err("Failed to copy", .{});
                 };
                 fw.close();
@@ -170,12 +170,12 @@ pub fn draw() !dvui.App.Result {
             @src(),
             "Paste",
             dvui.currentWindow().keybinds.get("paste") orelse .{},
-            if (inkz_editor.editor.activeFile() != null) true else false,
+            if (dvui_editor.editor.activeFile() != null) true else false,
             .{},
             .{ .expand = .horizontal },
         ) != null) {
-            if (inkz_editor.editor.activeFile() != null) {
-                inkz_editor.editor.paste() catch {
+            if (dvui_editor.editor.activeFile() != null) {
+                dvui_editor.editor.paste() catch {
                     std.log.err("Failed to paste", .{});
                 };
                 fw.close();
@@ -188,11 +188,11 @@ pub fn draw() !dvui.App.Result {
             @src(),
             "Undo",
             dvui.currentWindow().keybinds.get("undo") orelse .{},
-            if (inkz_editor.editor.activeFile()) |file| if (file.history.undo_stack.items.len > 0) true else false else false,
+            if (dvui_editor.editor.activeFile()) |file| if (file.history.undo_stack.items.len > 0) true else false else false,
             .{},
             .{ .expand = .horizontal },
         ) != null) {
-            if (inkz_editor.editor.activeFile()) |file| {
+            if (dvui_editor.editor.activeFile()) |file| {
                 file.history.undoRedo(file, .undo) catch {
                     std.log.err("Failed to undo", .{});
                 };
@@ -203,11 +203,11 @@ pub fn draw() !dvui.App.Result {
             @src(),
             "Redo",
             dvui.currentWindow().keybinds.get("redo") orelse .{},
-            if (inkz_editor.editor.activeFile()) |file| if (file.history.redo_stack.items.len > 0) true else false else false,
+            if (dvui_editor.editor.activeFile()) |file| if (file.history.redo_stack.items.len > 0) true else false else false,
             .{},
             .{ .expand = .horizontal },
         ) != null) {
-            if (inkz_editor.editor.activeFile()) |file| {
+            if (dvui_editor.editor.activeFile()) |file| {
                 file.history.undoRedo(file, .redo) catch {
                     std.log.err("Failed to redo", .{});
                 };
@@ -220,12 +220,12 @@ pub fn draw() !dvui.App.Result {
             @src(),
             "Transform",
             dvui.currentWindow().keybinds.get("transform") orelse .{},
-            if (inkz_editor.editor.activeFile() != null) true else false,
+            if (dvui_editor.editor.activeFile() != null) true else false,
             .{},
             .{ .expand = .horizontal },
         ) != null) {
-            if (inkz_editor.editor.activeFile() != null) {
-                inkz_editor.editor.transform() catch {
+            if (dvui_editor.editor.activeFile() != null) {
+                dvui_editor.editor.transform() catch {
                     std.log.err("Failed to transform", .{});
                 };
                 fw.close();
@@ -250,7 +250,7 @@ pub fn draw() !dvui.App.Result {
 
         if (menuItemWithHotkey(
             @src(),
-            if (inkz_editor.editor.explorer.paned.split_ratio.* == 0.0) "Show Explorer" else "Hide Explorer",
+            if (dvui_editor.editor.explorer.paned.split_ratio.* == 0.0) "Show Explorer" else "Hide Explorer",
             dvui.currentWindow().keybinds.get("explorer") orelse .{},
             true,
             .{},
@@ -258,10 +258,10 @@ pub fn draw() !dvui.App.Result {
                 .expand = .horizontal,
             },
         ) != null) {
-            if (inkz_editor.editor.explorer.paned.split_ratio.* == 0.0) {
-                inkz_editor.editor.explorer.open();
+            if (dvui_editor.editor.explorer.paned.split_ratio.* == 0.0) {
+                dvui_editor.editor.explorer.open();
             } else {
-                inkz_editor.editor.explorer.close();
+                dvui_editor.editor.explorer.close();
             }
 
             fw.close();
@@ -286,7 +286,7 @@ pub fn menuItemWithHotkey(src: std.builtin.SourceLocation, label_str: []const u8
         ret = r;
     }
 
-    inkz_editor.dvui.labelWithKeybind(label_str, hotkey, enabled, opts, opts);
+    dvui_editor.dvui.labelWithKeybind(label_str, hotkey, enabled, opts, opts);
 
     mi.deinit();
 
@@ -305,7 +305,7 @@ pub fn menuItem(src: std.builtin.SourceLocation, label_str: []const u8, init_opt
     label_opts.margin = dvui.Rect.all(0);
     label_opts.padding = dvui.Rect.all(0);
 
-    if (inkz_editor.dvui.hovered(mi.data())) {
+    if (dvui_editor.dvui.hovered(mi.data())) {
         label_opts.color_text = dvui.themeGet().color(.window, .text);
     }
 
@@ -328,7 +328,7 @@ pub fn menuItemWithChevron(src: std.builtin.SourceLocation, label_str: []const u
     label_opts.margin = dvui.Rect.all(0);
     label_opts.padding = dvui.Rect.all(0);
 
-    if (inkz_editor.dvui.hovered(mi.data())) {
+    if (dvui_editor.dvui.hovered(mi.data())) {
         label_opts.color_text = dvui.themeGet().color(.window, .text);
     }
 

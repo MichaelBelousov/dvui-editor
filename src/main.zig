@@ -1,7 +1,7 @@
 const std = @import("std");
 const Io = std.Io;
 
-const inkz_editor = @import("inkz_editor");
+const dvui_editor = @import("dvui_editor");
 
 pub fn main(init: std.process.Init) !void {
     // Prints to stderr, unbuffered, ignoring potential errors.
@@ -26,7 +26,7 @@ pub fn main(init: std.process.Init) !void {
     var stdout_file_writer: Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
     const stdout_writer = &stdout_file_writer.interface;
 
-    try inkz_editor.printAnotherMessage(stdout_writer);
+    try dvui_editor.printAnotherMessage(stdout_writer);
 
     try stdout_writer.flush(); // Don't forget to flush!
 }

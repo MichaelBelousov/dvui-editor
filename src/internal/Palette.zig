@@ -2,7 +2,7 @@ const std = @import("std");
 
 const dvui = @import("dvui");
 
-const inkz_editor = @import("../root.zig");
+const dvui_editor = @import("../root.zig");
 
 const PackedColor = packed struct(u32) { r: u8, g: u8, b: u8, a: u8 };
 
@@ -20,8 +20,8 @@ pub fn loadFromFile(allocator: std.mem.Allocator, file: []const u8) !Palette {
     const ext = std.fs.path.extension(file);
 
     if (std.mem.eql(u8, ext, ".hex")) {
-        if (inkz_editor.fs.read(inkz_editor.app.gpa, file) catch null) |read| {
-            defer inkz_editor.app.gpa.free(read);
+        if (dvui_editor.fs.read(dvui_editor.app.gpa, file) catch null) |read| {
+            defer dvui_editor.app.gpa.free(read);
 
             return loadFromBytes(allocator, std.fs.path.basename(file), read);
         }
@@ -49,6 +49,6 @@ pub fn loadFromBytes(allocator: std.mem.Allocator, name: []const u8, bytes: []co
 }
 
 pub fn deinit(self: *Palette) void {
-    inkz_editor.app.gpa.free(self.name);
-    inkz_editor.app.gpa.free(self.colors);
+    dvui_editor.app.gpa.free(self.name);
+    dvui_editor.app.gpa.free(self.colors);
 }

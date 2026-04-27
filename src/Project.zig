@@ -3,7 +3,7 @@ const Io = std.Io;
 
 const dvui = @import("dvui");
 
-const inkz_editor = @import("root.zig");
+const dvui_editor = @import("root.zig");
 
 const Project = @This();
 
@@ -23,10 +23,10 @@ packed_atlas_output: ?[]const u8 = null,
 pack_on_save: bool = false,
 
 pub fn load(allocator: std.mem.Allocator) !?Project {
-    if (inkz_editor.editor.folder) |folder| {
-        const file = try std.fs.path.join(inkz_editor.editor.arena.allocator(), &.{ folder, ".pixiproject" });
+    if (dvui_editor.editor.folder) |folder| {
+        const file = try std.fs.path.join(dvui_editor.editor.arena.allocator(), &.{ folder, ".pixiproject" });
 
-        if (inkz_editor.fs.read(allocator, file) catch null) |r| {
+        if (dvui_editor.fs.read(allocator, file) catch null) |r| {
             read = r;
 
             const options = std.json.ParseOptions{ .duplicate_field_behavior = .use_first, .ignore_unknown_fields = true };
@@ -60,8 +60,8 @@ pub fn load(allocator: std.mem.Allocator) !?Project {
 }
 
 pub fn save(project: *Project, io: Io) !void {
-    if (inkz_editor.editor.folder) |folder| {
-        const file = try std.Io.Dir.path.join(inkz_editor.editor.arena.allocator(), &.{ folder, ".pixiproject" });
+    if (dvui_editor.editor.folder) |folder| {
+        const file = try std.Io.Dir.path.join(dvui_editor.editor.arena.allocator(), &.{ folder, ".pixiproject" });
         var handle = try std.Io.Dir.createFileAbsolute(io, file, .{});
         defer handle.close(io);
 
@@ -69,7 +69,7 @@ pub fn save(project: *Project, io: Io) !void {
         _ = project;
         // const options = std.json.Stringify.Options{};
 
-        // const str = try std.json.Stringify.valueAlloc(inkz_editor.app.gpa, Project{
+        // const str = try std.json.Stringify.valueAlloc(dvui_editor.app.gpa, Project{
         //     .packed_atlas_output = project.packed_atlas_output,
         //     .packed_image_output = project.packed_image_output,
         //     //.packed_heightmap_output = project.packed_heightmap_output,
@@ -87,11 +87,11 @@ pub fn save(project: *Project, io: Io) !void {
 /// Project output assets will be exported to a join of parent_folder and the individual output paths for each asset
 pub fn exportAssets(project: *Project) !void {
     if (project.packed_atlas_output) |packed_atlas_output| {
-        try inkz_editor.editor.atlas.save(packed_atlas_output, .data);
+        try dvui_editor.editor.atlas.save(packed_atlas_output, .data);
     }
 
     if (project.packed_image_output) |packed_image_output| {
-        try inkz_editor.editor.atlas.save(packed_image_output, .source);
+        try dvui_editor.editor.atlas.save(packed_image_output, .source);
     }
 
     // if (project.packed_heightmap_output) |packed_heightmap_output| {

@@ -1,8 +1,14 @@
 const std = @import("std");
 const Io = std.Io;
 const builtin = @import("builtin");
-const zmath = @import("zmath");
+
 const dvui = @import("dvui");
+pub const main = dvui.App.main;
+pub const panic = dvui.App.panic;
+const zmath = @import("zmath");
+
+const dvui_editor = @import("root.zig");
+const Editor = dvui_editor.Editor;
 
 const icon = @embedFile("zig-favicon.png");
 // const assets = @import("assets");
@@ -12,11 +18,7 @@ const icon = @embedFile("zig-favicon.png");
 // const cozette_ttf = assets.files.fonts.@"CozetteVector.ttf";
 // const cozette_bold_ttf = assets.files.fonts.@"CozetteVectorBold.ttf";
 
-const inkz_editor = @import("root.zig");
-
 const App = @This();
-const Editor = inkz_editor.Editor;
-
 // App fields
 io: Io,
 gpa: std.mem.Allocator = undefined,
@@ -40,8 +42,6 @@ pub const dvui_app: dvui.App = .{ .config = .{ .options = .{
     .transparent = if (builtin.os.tag == .macos or builtin.os.tag == .windows) true else false,
 } }, .frameFn = AppFrame, .initFn = AppInit, .deinitFn = AppDeinit };
 
-pub const main = dvui.App.main;
-pub const panic = dvui.App.panic;
 pub const std_options: std.Options = .{
     .logFn = dvui.App.logFn,
 };
@@ -59,8 +59,8 @@ pub fn AppInit(win: *dvui.Window) !void {
     // std.posix.chdir(path) catch {};
     const path = ".";
 
-    inkz_editor.app = try gpa.create(App);
-    inkz_editor.app.* = .{
+    dvui_editor.app = try gpa.create(App);
+    dvui_editor.app.* = .{
         .io = io,
         .gpa = gpa,
         .environ = environ,
@@ -68,8 +68,8 @@ pub fn AppInit(win: *dvui.Window) !void {
         .root_path = gpa.dupeZ(u8, path) catch ".",
     };
 
-    inkz_editor.editor = try gpa.create(Editor);
-    inkz_editor.editor.* = Editor.init(io, inkz_editor.app) catch unreachable;
+    dvui_editor.editor = try gpa.create(Editor);
+    dvui_editor.editor.* = Editor.init(io, dvui_editor.app) catch unreachable;
 
     // dvui.addFont("CozetteVector", cozette_ttf, null) catch {};
     // dvui.addFont("CozetteVectorBold", cozette_bold_ttf, null) catch {};
@@ -77,10 +77,10 @@ pub fn AppInit(win: *dvui.Window) !void {
 
 // Run as app is shutting down before dvui.Window.deinit()
 pub fn AppDeinit() void {
-    inkz_editor.editor.deinit() catch unreachable;
+    dvui_editor.editor.deinit() catch unreachable;
 }
 
 // Run each frame to do normal UI
 pub fn AppFrame() !dvui.App.Result {
-    return try inkz_editor.editor.tick();
+    return try dvui_editor.editor.tick();
 }

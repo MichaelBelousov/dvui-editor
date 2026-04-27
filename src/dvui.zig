@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const icons = @import("icons");
 
-const inkz_editor = @import("root.zig");
+const dvui_editor = @import("root.zig");
 const Widgets = @import("widgets/Widgets.zig");
 pub const TextEditWidget = Widgets.TextEditWidget;
 pub const TabsWidget = Widgets.TabsWidget;
@@ -77,9 +77,9 @@ pub fn defaultDialogDisplay(id: dvui.Id) anyerror!bool {
 
     _ = id;
 
-    // _ = inkz_editor.dvui.sprite(@src(), .{
-    //     .source = inkz_editor.editor.atlas.source,
-    //     .sprite = inkz_editor.editor.atlas.data.sprites[inkz_editor.atlas.sprites.fox_default],
+    // _ = dvui_editor.dvui.sprite(@src(), .{
+    //     .source = dvui_editor.editor.atlas.source,
+    //     .sprite = dvui_editor.editor.atlas.data.sprites[dvui_editor.atlas.sprites.fox_default],
     //     .scale = 2.0,
     // }, .{ .gravity_y = 0.5, .gravity_x = 0.5, .background = false });
 
@@ -127,7 +127,7 @@ pub fn dialogWindow(id: dvui.Id) anyerror!void {
     };
 
     if (modal) {
-        inkz_editor.editor.dim_titlebar = true;
+        dvui_editor.editor.dim_titlebar = true;
     }
 
     const title = dvui.dataGetSlice(null, id, "_title", []u8) orelse {
@@ -154,7 +154,7 @@ pub fn dialogWindow(id: dvui.Id) anyerror!void {
 
     const maxSize = dvui.dataGet(null, id, "_max_size", dvui.Options.MaxSize);
 
-    var win = inkz_editor.dvui.floatingWindow(@src(), .{
+    var win = dvui_editor.dvui.floatingWindow(@src(), .{
         .modal = modal,
         .center_on = center_on,
         .window_avoid = .nudge,
@@ -178,12 +178,12 @@ pub fn dialogWindow(id: dvui.Id) anyerror!void {
 
     if (dvui.animationGet(win.data().id, "_close_x")) |a| {
         if (a.done()) {
-            inkz_editor.Editor.Explorer.files.new_file_close_rect = null;
+            dvui_editor.Editor.Explorer.files.new_file_close_rect = null;
             dvui.dialogRemove(id);
         }
-    } else if (inkz_editor.Editor.Explorer.files.new_file_close_rect) |close_rect| {
+    } else if (dvui_editor.Editor.Explorer.files.new_file_close_rect) |close_rect| {
         dvui.dataSet(null, win.data().id, "_close_rect", close_rect);
-        inkz_editor.Editor.Explorer.files.new_file_close_rect = null;
+        dvui_editor.Editor.Explorer.files.new_file_close_rect = null;
     } else {
         win.autoSize();
     }
@@ -193,7 +193,7 @@ pub fn dialogWindow(id: dvui.Id) anyerror!void {
         defer vbox.deinit();
 
         var header_openflag = true;
-        win.dragAreaSet(inkz_editor.dvui.windowHeader(title, "", &header_openflag));
+        win.dragAreaSet(dvui_editor.dvui.windowHeader(title, "", &header_openflag));
         if (!header_openflag) {
             if (callafter) |ca| {
                 ca(id, .cancel) catch {
@@ -575,7 +575,7 @@ pub fn pathToSubdividedQuad(path: dvui.Path, allocator: std.mem.Allocator, optio
     return builder.build();
 }
 
-pub fn renderSprite(source: dvui.ImageSource, s: inkz_editor.Sprite, data_point: dvui.Point, scale: f32, opts: dvui.RenderTextureOptions) !void {
+pub fn renderSprite(source: dvui.ImageSource, s: dvui_editor.Sprite, data_point: dvui.Point, scale: f32, opts: dvui.RenderTextureOptions) !void {
     const atlas_size = dvui.imageSize(source) catch {
         std.log.err("Failed to get atlas size", .{});
         return;

@@ -2,10 +2,10 @@ const std = @import("std");
 
 const dvui = @import("dvui");
 
+const dvui_editor = @import("root.zig");
+const App = dvui_editor.App;
+const Editor = dvui_editor.Editor;
 const Pane = @import("explorer/Explorer.zig").Pane;
-const inkz_editor = @import("root.zig");
-const App = inkz_editor.App;
-const Editor = inkz_editor.Editor;
 
 pub const Sidebar = @This();
 
@@ -47,7 +47,7 @@ pub fn draw(_: Sidebar) !bool {
 }
 
 fn drawOption(option: Pane, icon: []const u8, size: f32) !bool {
-    const selected = option == inkz_editor.editor.explorer.pane;
+    const selected = option == dvui_editor.editor.explorer.pane;
     var ret: bool = false;
 
     const theme = dvui.themeGet();
@@ -74,7 +74,7 @@ fn drawOption(option: Pane, icon: []const u8, size: f32) !bool {
     );
 
     if (bw.clicked()) {
-        inkz_editor.editor.explorer.pane = option;
+        dvui_editor.editor.explorer.pane = option;
         ret = true;
     }
 
@@ -118,7 +118,7 @@ fn drawOption(option: Pane, icon: []const u8, size: f32) !bool {
                 .background = false,
                 .padding = dvui.Rect.all(4),
             });
-            tl2.format("{s}", .{inkz_editor.Editor.Explorer.title(option, true)}, .{
+            tl2.format("{s}", .{dvui_editor.Editor.Explorer.title(option, true)}, .{
                 .font = dvui.Font.theme(.title).larger(-4.0),
             });
             tl2.deinit();

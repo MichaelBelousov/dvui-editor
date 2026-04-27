@@ -1,18 +1,18 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const dvui = @import("dvui");
-const inkz_editor = @import("root.zig");
-
 const Core = @import("mach").Core;
-const App = inkz_editor.App;
-const Editor = inkz_editor.Editor;
-const Packer = inkz_editor.Packer;
+const dvui = @import("dvui");
+
+const dvui_editor = @import("root.zig");
+const App = dvui_editor.App;
+const Editor = dvui_editor.Editor;
+const Packer = dvui_editor.Packer;
 
 pub const Panel = @This();
 
 pane: Pane = .sprites,
-paned: *inkz_editor.dvui.PanedWidget = undefined,
+paned: *dvui_editor.dvui.PanedWidget = undefined,
 scroll_info: dvui.ScrollInfo = .{
     .horizontal = .auto,
 },
@@ -38,10 +38,10 @@ pub fn draw(panel: *Panel) !dvui.App.Result {
 
     // switch (builtin.os.tag) {
     //     .macos => {
-    //         content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
+    //         content_color = if (!dvui_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(dvui_editor.editor.settings.content_opacity) else content_color;
     //     },
     //     .windows => {
-    //         content_color = if (!inkz_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(inkz_editor.editor.settings.content_opacity) else content_color;
+    //         content_color = if (!dvui_editor.backend.isMaximized(dvui.currentWindow())) content_color.opacity(dvui_editor.editor.settings.content_opacity) else content_color;
     //     },
     //     else => {},
     // }
