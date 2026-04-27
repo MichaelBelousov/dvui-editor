@@ -45,7 +45,7 @@ pub fn draw(io: Io, environ: *const std.process.Environ.Map) !void {
 
         if (dvui.button(@src(), "Open Folder", .{ .draw_focus = false }, .{ .expand = .horizontal, .style = .highlight })) {
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
-                try inkz_editor.editor.setProjectFolder(io, folder);
+                try inkz_editor.editor.setProjectFolder(folder);
             }
         }
     }

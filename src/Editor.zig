@@ -70,8 +70,8 @@ file_id_counter: u64 = 0,
 
 window_opacity: f32 = 1.0,
 
-// pending_native_menu_actions: [16]inkz_editor.backend.NativeMenuAction = undefined,
-// pending_native_menu_actions_len: u8 = 0,
+pending_native_menu_actions: [16]inkz_editor.backend.NativeMenuAction = undefined,
+pending_native_menu_actions_len: u8 = 0,
 
 pub fn init(
     io: Io,
@@ -280,9 +280,9 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     const environ = inkz_editor.app.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
-    // if (inkz_editor.backend.pollPendingNativeMenuAction()) |action| {
-    //     editor.queueNativeMenuAction(action);
-    // }
+    if (inkz_editor.backend.pollPendingNativeMenuAction()) |action| {
+        editor.queueNativeMenuAction(action);
+    }
 
     defer editor.dim_titlebar = false;
     // editor.setTitlebarColor();
@@ -461,7 +461,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     });
     defer editor.explorer.paned.deinit();
 
-    // editor.flushQueuedNativeMenuActions();
+    editor.flushQueuedNativeMenuActions();
 
     if (dvui.firstFrame(editor.explorer.paned.wd.id)) {
         editor.explorer.paned.split_ratio.* = 0.0;
@@ -645,27 +645,21 @@ pub fn handleNativeMenuAction(editor: *Editor, action: inkz_editor.backend.Nativ
                 };
             }
         },
-        .undo => {
-            if (editor.activeFile()) |file| {
-                file.history.undoRedo(file, .undo) catch {
-                    std.log.err("Failed to undo", .{});
-                };
-            }
-        },
-        .redo => {
-            if (editor.activeFile()) |file| {
-                file.history.undoRedo(file, .redo) catch {
-                    std.log.err("Failed to redo", .{});
-                };
-            }
-        },
-        .transform => {
-            if (editor.activeFile() != null) {
-                editor.transform() catch {
-                    std.log.err("Failed to transform", .{});
-                };
-            }
-        },
+        // .undo => {
+        //     if (editor.activeFile()) |file| {
+        //         file.history.undoRedo(file, .undo) catch {
+        //             std.log.err("Failed to undo", .{});
+        //         };
+        //     }
+        // },
+        // .redo => {
+        //     if (editor.activeFile()) |file| {
+        //         file.history.undoRedo(file, .redo) catch {
+        //             std.log.err("Failed to redo", .{});
+        //         };
+        //     }
+        // },
+
         .toggle_explorer => {
             // Use .closed, not paned.split_ratio — split_ratio is only valid during draw
             if (editor.explorer.closed) {
@@ -1035,7 +1029,8 @@ pub fn close(app: *App, editor: *Editor) void {
     app.should_close = should_close;
 }
 
-pub fn setProjectFolder(editor: *Editor, io: Io, path: []const u8) !void {
+pub fn setProjectFolder(editor: *Editor, path: []const u8) !void {
+    const io = inkz_editor.app.io;
     if (editor.folder) |folder| {
         if (editor.project) |*project| {
             project.save(io) catch {
@@ -1183,216 +1178,11 @@ pub fn forceCloseFile(editor: *Editor, index: usize) !void {
 // }
 
 pub fn copy(editor: *Editor) !void {
-    if (editor.activeFile()) |file| {
-        if (file.editor.transform != null) return;
-
-        if (editor.sprite_clipboard) |*clipboard| {
-            inkz_editor.app.gpa.free(inkz_editor.image.bytes(clipboard.source));
-            editor.sprite_clipboard = null;
-        }
-
-        file.editor.transform_layer.clear();
-
-        var selected_layer = file.layers.get(file.selected_layer_index);
-        switch (editor.tools.current) {
-            .selection => {
-                // We are in the selection tool, so we should assume that the user has painted a selection
-                // into the selection layer mask, we need to copy the pixels into the transform layer itself for reducing
-                var pixel_iterator = file.editor.selection_layer.mask.iterator(.{ .kind = .set, .direction = .forward });
-                while (pixel_iterator.next()) |pixel_index| {
-                    @memcpy(&file.editor.transform_layer.pixels()[pixel_index], &selected_layer.pixels()[pixel_index]);
-                    file.editor.transform_layer.mask.set(pixel_index);
-                }
-            },
-            else => {
-                if (file.editor.selected_sprites.count() > 0) {
-                    var sprite_iterator = file.editor.selected_sprites.iterator(.{ .kind = .set, .direction = .forward });
-                    while (sprite_iterator.next()) |index| {
-                        const source_rect = file.spriteRect(index);
-                        if (selected_layer.pixelsFromRect(
-                            dvui.currentWindow().arena(),
-                            source_rect,
-                        )) |source_pixels| {
-                            file.editor.transform_layer.blit(
-                                source_pixels,
-                                source_rect,
-                                .{ .transparent = true, .mask = true },
-                            );
-                        }
-                    }
-                } else {
-                    if (file.editor.canvas.hovered) {
-                        if (file.spriteIndex(file.editor.canvas.dataFromScreenPoint(dvui.currentWindow().mouse_pt))) |sprite_index| {
-                            const rect = file.spriteRect(sprite_index);
-                            if (selected_layer.pixelsFromRect(
-                                dvui.currentWindow().arena(),
-                                rect,
-                            )) |source_pixels| {
-                                file.editor.transform_layer.blit(
-                                    source_pixels,
-                                    rect,
-                                    .{ .transparent = true, .mask = true },
-                                );
-                            }
-                        }
-                    } else if (file.selected_animation_index) |animation_index| {
-                        const animation = file.animations.get(animation_index);
-                        if (file.selected_animation_frame_index < animation.frames.len) {
-                            const rect = file.spriteRect(animation.frames[file.selected_animation_frame_index].sprite_index);
-                            if (selected_layer.pixelsFromRect(
-                                dvui.currentWindow().arena(),
-                                rect,
-                            )) |source_pixels| {
-                                file.editor.transform_layer.blit(
-                                    source_pixels,
-                                    rect,
-                                    .{ .transparent = true, .mask = true },
-                                );
-                            }
-                        }
-                    }
-                }
-            },
-        }
-
-        const source_rect = dvui.Rect.fromSize(file.editor.transform_layer.size());
-        if (file.editor.transform_layer.reduce(source_rect)) |reduced_data_rect| {
-            const sprite_tl = file.spritePoint(reduced_data_rect.topLeft());
-
-            editor.sprite_clipboard = .{
-                .source = inkz_editor.image.fromPixelsPMA(
-                    @ptrCast(file.editor.transform_layer.pixelsFromRect(inkz_editor.app.gpa, reduced_data_rect)),
-                    @intFromFloat(reduced_data_rect.w),
-                    @intFromFloat(reduced_data_rect.h),
-                    .ptr,
-                ) catch return error.MemoryAllocationFailed,
-                .offset = reduced_data_rect.topLeft().diff(sprite_tl),
-            };
-
-            // Show a toast so its evident a copy action was completed
-            {
-                const id_mutex = dvui.toastAdd(dvui.currentWindow(), @src(), 0, file.editor.canvas.id, inkz_editor.dvui.toastDisplay, 2_000_000);
-                const id = id_mutex.id;
-                const message = std.fmt.allocPrint(dvui.currentWindow().arena(), "Copied selection", .{}) catch "Copied selection.";
-                dvui.dataSetSlice(dvui.currentWindow(), id, "_message", message);
-                id_mutex.mutex.unlock();
-            }
-        }
-    }
+    _ = editor;
 }
 
 pub fn paste(editor: *Editor) !void {
-    if (editor.sprite_clipboard) |*clipboard| {
-        if (editor.activeFile()) |file| {
-            const active_layer = file.layers.get(file.selected_layer_index);
-
-            var dst_rect: dvui.Rect = .fromSize(inkz_editor.image.size(clipboard.source));
-
-            var sprite_iterator = file.editor.selected_sprites.iterator(.{ .kind = .set, .direction = .forward });
-            while (sprite_iterator.next()) |sprite_index| {
-                const sprite_rect = file.spriteRect(sprite_index);
-
-                dst_rect.x = sprite_rect.x + clipboard.offset.x;
-                dst_rect.y = sprite_rect.y + clipboard.offset.y;
-
-                file.editor.transform = .{
-                    .target_texture = dvui.textureCreateTarget(file.width(), file.height(), .nearest, .rgba_8_8_8_8) catch {
-                        dvui.log.err("Failed to create target texture", .{});
-                        return;
-                    },
-                    .file_id = file.id,
-                    .layer_id = active_layer.id,
-                    .data_points = .{
-                        dst_rect.topLeft(),
-                        dst_rect.topRight(),
-                        dst_rect.bottomRight(),
-                        dst_rect.bottomLeft(),
-                        dst_rect.center(),
-                        dst_rect.center(),
-                    },
-                    .source = clipboard.source,
-                };
-
-                for (file.editor.transform.?.data_points[0..4]) |*point| {
-                    const d = point.diff(file.editor.transform.?.point(.pivot).*);
-                    if (d.length() > file.editor.transform.?.radius) {
-                        file.editor.transform.?.radius = d.length() + 4;
-                    }
-                }
-
-                return;
-            }
-
-            dst_rect.x = clipboard.offset.x;
-            dst_rect.y = clipboard.offset.y;
-
-            if (file.spriteIndex(file.editor.canvas.dataFromScreenPoint(dvui.currentWindow().mouse_pt))) |sprite_index| {
-                const rect = file.spriteRect(sprite_index);
-                dst_rect.x = rect.x + clipboard.offset.x;
-                dst_rect.y = rect.y + clipboard.offset.y;
-            } else if (file.selected_animation_index) |animation_index| {
-                const animation = file.animations.get(animation_index);
-
-                if (file.selected_animation_frame_index < animation.frames.len) {
-                    const rect = file.spriteRect(animation.frames[file.selected_animation_frame_index].sprite_index);
-                    dst_rect.x = rect.x + clipboard.offset.x;
-                    dst_rect.y = rect.y + clipboard.offset.y;
-
-                    file.editor.transform = .{
-                        .target_texture = dvui.textureCreateTarget(file.width(), file.height(), .nearest, .rgba_8_8_8_8) catch {
-                            dvui.log.err("Failed to create target texture", .{});
-                            return;
-                        },
-                        .file_id = file.id,
-                        .layer_id = active_layer.id,
-                        .data_points = .{
-                            dst_rect.topLeft(),
-                            dst_rect.topRight(),
-                            dst_rect.bottomRight(),
-                            dst_rect.bottomLeft(),
-                            dst_rect.center(),
-                            dst_rect.center(),
-                        },
-                        .source = clipboard.source,
-                    };
-
-                    for (file.editor.transform.?.data_points[0..4]) |*point| {
-                        const d = point.diff(file.editor.transform.?.point(.pivot).*);
-                        if (d.length() > file.editor.transform.?.radius) {
-                            file.editor.transform.?.radius = d.length() + 4;
-                        }
-                    }
-
-                    return;
-                }
-            }
-
-            file.editor.transform = .{
-                .target_texture = dvui.textureCreateTarget(file.width(), file.height(), .nearest, .rgba_8_8_8_8) catch {
-                    dvui.log.err("Failed to create target texture", .{});
-                    return;
-                },
-                .file_id = file.id,
-                .layer_id = active_layer.id,
-                .data_points = .{
-                    dst_rect.topLeft(),
-                    dst_rect.topRight(),
-                    dst_rect.bottomRight(),
-                    dst_rect.bottomLeft(),
-                    dst_rect.center(),
-                    dst_rect.center(),
-                },
-                .source = clipboard.source,
-            };
-
-            for (file.editor.transform.?.data_points[0..4]) |*point| {
-                const d = point.diff(file.editor.transform.?.point(.pivot).*);
-                if (d.length() > file.editor.transform.?.radius) {
-                    file.editor.transform.?.radius = d.length() + 4;
-                }
-            }
-        }
-    }
+    _ = editor;
 }
 
 /// Performs a save operation on the currently open file.

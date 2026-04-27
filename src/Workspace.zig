@@ -1200,7 +1200,7 @@ pub fn drawHomePage(_: *Workspace, canvas_vbox: *dvui.BoxWidget) !void {
             // inkz_editor.backend.showOpenFolderDialog(setProjectFolderCallback, null);
 
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
-                try inkz_editor.editor.setProjectFolder(inkz_editor.app.io, folder);
+                try inkz_editor.editor.setProjectFolder(folder);
             }
         }
     }

@@ -74,6 +74,21 @@ pub fn build(b: *std.Build) void {
         exe.root_module.addImport("icons", dep.module("icons"));
     }
 
+    if (target.result.os.tag == .macos) {
+        if (b.lazyDependency("zig_objc", .{
+            .target = target,
+            .optimize = optimize,
+        })) |dep| {
+            exe.root_module.addImport("objc", dep.module("objc"));
+        }
+        // Target for macOS menu bar items (File menu); calls back into Zig via NativeMenuAction.
+        exe.root_module.addCSourceFile(.{ .file = std.Build.path(b, "src/MenuTarget.m") });
+    } else if (target.result.os.tag == .windows) {
+        if (b.lazyDependency("zigwin32", .{})) |dep| {
+            exe.root_module.addImport("win32", dep.module("win32"));
+        }
+        exe.root_module.linkSystemLibrary("comctl32", .{});
+    }
     // const assetpack = @import("assetpack");
     // const assets_module = assetpack.pack(b, b.path("assets"), .{});
     // exe.root_module.addImport("assets", assets_module);

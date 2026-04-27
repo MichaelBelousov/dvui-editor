@@ -35,6 +35,15 @@ pub fn fromPath(path: []const u8) !TextFile {
     };
 }
 
+pub fn saveAsync(self: *const TextFile) !void {
+    const io = inkz_editor.app.io;
+    try Io.Dir.cwd().writeFile(io, .{
+        .data = self.content,
+        .sub_path = self.path,
+        .flags = .{},
+    });
+}
+
 pub fn deinit(self: *TextFile) void {
     const gpa = inkz_editor.app.gpa;
     gpa.free(self.path);
