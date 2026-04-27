@@ -48,10 +48,6 @@
             .url = "git+https://github.com/nat3Github/zig-lib-icons.git#b7299b19fa11caa5be93ef49743d8fc31a4bf9a0",
             .hash = "icons-0.1.0-iJxA-VrGMwAVIStBxqDPFeC3wdnANtYyDrNfYXNz95OW",
         },
-        // .assetpack = .{
-        //     .url = "git+https://github.com/foxnne/assetpack#40314c96819d53ba44c3cab1b2b71219004de829",
-        //     .hash = "assetpack-0.1.0-5DA2d2VlAACfTN5RE7XvEVSPwr-a8IT2E58MFnONRXnP",
-        // },
         .known_folders = .{
             .url = "git+https://github.com/ziglibs/known-folders.git#b242672a6e94982aadb00c1f8ef9c9e9a8abcc3f",
             .hash = "known_folders-0.0.0-Fy-PJqXKAAAbtJ18aGk-fkcZ4dFp_VFXgPENA6ZcLukl",
