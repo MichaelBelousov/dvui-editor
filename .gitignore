@@ -1,3 +1,7 @@
+# Repo specific
+sample
+
+# Zig specific
 zig-pkg
 .zig-cache
 zig-out

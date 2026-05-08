@@ -52,10 +52,6 @@
             .url = "git+https://github.com/ziglibs/known-folders.git#b242672a6e94982aadb00c1f8ef9c9e9a8abcc3f",
             .hash = "known_folders-0.0.0-Fy-PJqXKAAAbtJ18aGk-fkcZ4dFp_VFXgPENA6ZcLukl",
         },
-        .zig_objc = .{
-            .url = "git+https://github.com/mitchellh/zig-objc.git#c8de82ff80281215ad92900866dab7103a8efa8b",
-            .hash = "zig_objc-0.0.0-Ir_Sp9gsAQCPAJc0oF5xoWePHWP6Y6tCphDeyNUThJoi",
-        },
         .win32 = .{
             .url = "git+https://github.com/marlersoft/zigwin32#ec98bb4d9eea532320a8551720a9e3ec6de64994",
             .hash = "win32-25.0.28-preview-mX5pFWMt5QPTVIGh3r2-OpPunpcCCjApyRbA6Zn6WALH",

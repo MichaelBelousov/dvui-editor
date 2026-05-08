@@ -75,14 +75,7 @@ pub fn build(b: *std.Build) void {
     }
 
     if (target.result.os.tag == .macos) {
-        if (b.lazyDependency("zig_objc", .{
-            .target = target,
-            .optimize = optimize,
-        })) |dep| {
-            exe.root_module.addImport("objc", dep.module("objc"));
-        }
-        // Target for macOS menu bar items (File menu); calls back into Zig via NativeMenuAction.
-        exe.root_module.addCSourceFile(.{ .file = std.Build.path(b, "src/MenuTarget.m") });
+        exe.root_module.addCSourceFile(.{ .file = std.Build.path(b, "src/macos_native.m") });
     } else if (target.result.os.tag == .windows) {
         if (b.lazyDependency("zigwin32", .{})) |dep| {
             exe.root_module.addImport("win32", dep.module("win32"));

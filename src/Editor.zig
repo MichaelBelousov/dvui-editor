@@ -240,6 +240,7 @@ pub fn init(
     // };
 
     // dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
+    dvui_editor.backend.setupMacOSMenuBar();
 
     editor.explorer.* = .init();
     editor.panel.* = .init();

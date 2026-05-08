@@ -3,16 +3,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const dvui = @import("dvui");
-const objc = @import("objc");
 const sdl3 = @import("backend").c;
 const win32 = @import("win32");
 
 const dvui_editor = @import("root.zig");
-
-// AppKit geometry types for NSView frame/bounds (same layout as Foundation).
-const NSPoint = extern struct { x: f64, y: f64 };
-const NSSize = extern struct { width: f64, height: f64 };
-const NSRect = extern struct { origin: NSPoint, size: NSSize };
 
 const DWMWA_SYSTEM_BACKDROP_TYPE: c_ulong = 20;
 const DWMWA_SYSTEM_BACKDROP_TYPE_DEFAULT: c_ulong = 0;
@@ -46,16 +40,6 @@ const ACCENT_POLICY = struct {
     animation_id: u32,
 };
 
-// NSWindowStyleMaskFullSizeContentView = 1 << 15 — content view extends under titlebar so vibrancy can cover it.
-const NSWindowStyleMaskFullSizeContentView: c_ulong = 1 << 15;
-const ns_visual_effect_material: c_long = 15;
-
-// NSEventModifierFlag for menu key equivalents (right-justified grey hotkey in menu)
-const NSEventModifierFlagCommand: c_ulong = 1 << 20;
-const NSEventModifierFlagShift: c_ulong = 1 << 17;
-const NSEventModifierFlagOption: c_ulong = 1 << 18;
-const NSEventModifierFlagControl: c_ulong = 1 << 19;
-
 // macOS native menu bar (top bar): action ids match PixiMenuTarget.m
 pub const NativeMenuAction = enum(c_int) {
     open_folder = 0,
@@ -69,78 +53,12 @@ pub const NativeMenuAction = enum(c_int) {
     show_dvui_demo = 9,
 };
 
-// Queue a single pending native action id.
-// This may be written from an AppKit callback thread, so use an atomic.
-var pending_native_menu_action_id: std.atomic.Value(c_int) = .init(-1);
-
-/// Called from PixiMenuTarget.m when user picks a native menu item. Runs on main thread.
-export fn PixiNativeMenuAction(id: c_int) void {
-    pending_native_menu_action_id.store(id, .release);
-}
-
-// Only referenced on macOS (from setupMacOSMenuBar).
-const pixi_get_selector = if (builtin.os.tag == .macos) struct {
-    extern fn PixiGetSelector(name: [*c]const u8) ?*anyopaque;
-    fn get(name: [*c]const u8) ?*anyopaque {
-        return PixiGetSelector(name);
-    }
-}.get else struct {
-    fn get(_: [*c]const u8) ?*anyopaque {
-        return null;
-    }
-}.get;
-
-/// Wraps the window's content view in an NSVisualEffectView so the window gets
-/// vibrancy (blur of the desktop behind it). Safe to call multiple times;
-/// only wraps once per window. Caller should set full-size content view style
-/// mask and titlebarAppearsTransparent before calling so the effect covers the titlebar.
-/// Uses PixiVisualEffectView (custom subclass) when available so right-click is forwarded to the content view.
-fn wrapContentViewWithVibrancy(window: objc.Object) void {
-    const content_view = window.msgSend(objc.Object, "contentView", .{});
-    if (content_view.value == 0) return;
-
-    const NSVisualEffectViewClass = objc.getClass("NSVisualEffectView") orelse return;
-    const fill_mask: c_ulong = 18; // NSViewWidthSizable | NSViewHeightSizable
-
-    const is_effect_view = content_view.msgSend(bool, "isKindOfClass:", .{NSVisualEffectViewClass.value});
-    if (is_effect_view) {
-        content_view.msgSend(void, "setMaterial:", .{ns_visual_effect_material});
-        content_view.msgSend(void, "setMenu:", .{@as(usize, 0)});
-        // Keep the content subview's nextResponder pointing at the window delegate so rightMouseDown reaches SDL.
-        const subviews = content_view.msgSend(objc.Object, "subviews", .{});
-        const count: usize = subviews.msgSend(usize, "count", .{});
-        if (count > 0) {
-            const sub = subviews.msgSend(objc.Object, "objectAtIndex:", .{@as(c_ulong, 0)});
-            const delegate = window.msgSend(objc.Object, "delegate", .{});
-            if (delegate.value != 0) sub.msgSend(void, "setNextResponder:", .{delegate.value});
-        }
-        return;
-    }
-
-    // Prefer custom subclass that forwards rightMouseDown to the content view (see vibrancy_rightclick_fix.m).
-    const EffectViewClass = objc.getClass("PixiVisualEffectView") orelse NSVisualEffectViewClass;
-    const effect_view = EffectViewClass.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "init", .{});
-    if (effect_view.value == 0) return;
-
-    effect_view.msgSend(void, "setBlendingMode:", .{@as(c_long, 0)}); // NSVisualEffectBlendingModeBehindWindow
-    effect_view.msgSend(void, "setState:", .{@as(c_long, 1)}); // NSVisualEffectStateActive
-    effect_view.msgSend(void, "setMaterial:", .{ns_visual_effect_material});
-    effect_view.msgSend(void, "setMenu:", .{@as(usize, 0)}); // no context menu so right-click can reach subview
-
-    window.msgSend(void, "setContentView:", .{effect_view.value});
-    effect_view.msgSend(void, "addSubview:", .{content_view.value});
-    content_view.msgSend(void, "setMenu:", .{@as(usize, 0)}); // no context menu so rightMouseDown is delivered
-    // SDL sets the content view's nextResponder to the window delegate (listener) so rightMouseDown reaches the handler.
-    // Adding the view as our subview made its nextResponder us; restore it so right-click events reach the app.
-    const delegate = window.msgSend(objc.Object, "delegate", .{});
-    if (delegate.value != 0) {
-        content_view.msgSend(void, "setNextResponder:", .{delegate.value});
-    }
-
-    const bounds = effect_view.msgSend(NSRect, "bounds", .{});
-    content_view.msgSend(void, "setFrame:", .{bounds});
-    content_view.msgSend(void, "setAutoresizingMask:", .{fill_mask});
-}
+const pixi_macos = if (builtin.os.tag == .macos) struct {
+    extern fn PixiMacOSSetWindowStyle(window: *anyopaque) void;
+    extern fn PixiMacOSSetTitlebarColor(window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool) void;
+    extern fn PixiMacOSSetupMenuBar() bool;
+    extern fn PixiMacOSPollPendingNativeMenuAction() c_int;
+} else struct {};
 
 // Window button action for custom-drawn title bar (app gets HTCLIENT there and calls this on click).
 pub const TitleBarButton = enum { minimize, maximize, close };
@@ -399,13 +317,7 @@ pub fn setWindowStyle(win: *dvui.Window) void {
             null,
         );
         if (raw_ptr != null) {
-            const window = objc.Object.fromId(raw_ptr);
-
-            // Allow content view to extend under the titlebar so vibrancy covers it.
-            const style_mask = window.msgSend(c_ulong, "styleMask", .{});
-            window.msgSend(void, "setStyleMask:", .{style_mask | NSWindowStyleMaskFullSizeContentView});
-            // This sets the titlebar to transparent so our effect view shows through.
-            window.msgSend(void, "setTitlebarAppearsTransparent:", .{true});
+            pixi_macos.PixiMacOSSetWindowStyle(@ptrCast(raw_ptr));
         }
     } else if (builtin.os.tag == .windows) {
         const hwnd = getWin32Hwnd(win) orelse return;
@@ -460,42 +372,14 @@ pub fn setTitlebarColor(win: *dvui.Window, color: dvui.Color) void {
             null,
         );
         if (raw_ptr != null) {
-            const window = objc.Object.fromId(raw_ptr);
-
-            setWindowStyle(win);
-
-            // Wrap content view in NSVisualEffectView once for vibrancy (blur behind window).
-            wrapContentViewWithVibrancy(window);
-
-            const NSColor = objc.getClass("NSColor").?;
-            const new_color = NSColor.msgSend(objc.Object, "colorWithRed:green:blue:alpha:", .{
+            pixi_macos.PixiMacOSSetTitlebarColor(
+                @ptrCast(raw_ptr),
                 @as(f64, @floatFromInt(color.r)) / 255.0,
                 @as(f64, @floatFromInt(color.g)) / 255.0,
                 @as(f64, @floatFromInt(color.b)) / 255.0,
                 @as(f64, @floatFromInt(color.a)) / 255.0,
-            });
-            // This sets both the titlebar and the window background color.
-            window.msgSend(void, "setBackgroundColor:", .{new_color.value});
-
-            // Set window NSAppearance so the app (title bar, traffic lights, vibrancy) matches dvui theme.
-            if (objc.getClass("NSAppearance")) |NSAppearance| {
-                if (objc.getClass("NSString")) |NSString| {
-                    const name_c: [*c]const u8 = if (dvui.themeGet().dark)
-                        "NSAppearanceNameVibrantDark"
-                    else
-                        "NSAppearanceNameVibrantLight";
-                    const name_obj = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{name_c});
-                    if (name_obj.value != 0) {
-                        const appearance = NSAppearance.msgSend(objc.Object, "appearanceNamed:", .{name_obj.value});
-                        if (appearance.value != 0) {
-                            window.msgSend(void, "setAppearance:", .{appearance.value});
-                        }
-                    }
-                }
-            }
-
-            // SDL3 currently removes the shadow when the transparency flag for the window is set. This brings it back.
-            window.msgSend(void, "setHasShadow:", .{true});
+                dvui.themeGet().dark,
+            );
         }
     } else if (builtin.os.tag == .windows) {
         const hwnd = getWin32Hwnd(win) orelse return;
@@ -519,217 +403,16 @@ pub fn setTitlebarColor(win: *dvui.Window, color: dvui.Color) void {
     }
 }
 
-var macos_menu_bar_set_up: bool = false;
-
 /// Inserts a "File" menu into the macOS app menu bar (between Apple and Window). Safe to call multiple times; runs once.
 pub fn setupMacOSMenuBar() void {
     if (builtin.os.tag != .macos) return;
-    if (macos_menu_bar_set_up) return;
-    const NSApplication = objc.getClass("NSApplication") orelse return;
-    const ns_app = NSApplication.msgSend(objc.Object, "sharedApplication", .{});
-    if (ns_app.value == 0) return;
-    const main_menu = ns_app.msgSend(objc.Object, "mainMenu", .{});
-    if (main_menu.value == 0) return;
-
-    const NSString = objc.getClass("NSString") orelse return;
-    const NSMenu = objc.getClass("NSMenu") orelse return;
-    const NSMenuItem = objc.getClass("NSMenuItem") orelse return;
-    const PixiMenuTargetClass = objc.getClass("PixiMenuTarget") orelse return;
-    const target = PixiMenuTargetClass.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "init", .{});
-    if (target.value == 0) return;
-
-    const file_menu_title_str = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"File".ptr});
-    const file_menu = NSMenu.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:", .{file_menu_title_str.value});
-    if (file_menu.value == 0) return;
-
-    const empty = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"".ptr});
-    const key_f = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"f".ptr});
-    const key_o = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"o".ptr});
-    const key_s = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"s".ptr});
-
-    const NSImage = objc.getClass("NSImage") orelse return;
-
-    // Open Folder — ⌘F, folder icon
-    {
-        const open_folder_title = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"Open Folder".ptr});
-        const open_folder_sel = pixi_get_selector("openFolder:") orelse return;
-        const open_folder_item = file_menu.msgSend(objc.Object, "addItemWithTitle:action:keyEquivalent:", .{
-            open_folder_title.value,
-            open_folder_sel,
-            key_f.value,
-        });
-        if (open_folder_item.value != 0) {
-            open_folder_item.msgSend(void, "setTarget:", .{target.value});
-            open_folder_item.msgSend(void, "setKeyEquivalentModifierMask:", .{NSEventModifierFlagCommand});
-            setMenuItemImage(open_folder_item, NSImage, NSString, "folder", "Open Folder");
-        }
-    }
-    // Open Files — ⌘O, doc icon
-    {
-        const open_files_title = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"Open Files".ptr});
-        const open_files_sel = pixi_get_selector("openFiles:") orelse return;
-        const open_files_item = file_menu.msgSend(objc.Object, "addItemWithTitle:action:keyEquivalent:", .{
-            open_files_title.value,
-            open_files_sel,
-            key_o.value,
-        });
-        if (open_files_item.value != 0) {
-            open_files_item.msgSend(void, "setTarget:", .{target.value});
-            open_files_item.msgSend(void, "setKeyEquivalentModifierMask:", .{NSEventModifierFlagCommand});
-            setMenuItemImage(open_files_item, NSImage, NSString, "doc.on.doc", "Open Files");
-        }
-    }
-
-    const separator = NSMenuItem.msgSend(objc.Object, "separatorItem", .{});
-    file_menu.msgSend(void, "addItem:", .{separator.value});
-
-    // Save — ⌘S
-    const save_title = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"Save".ptr});
-    const save_sel = pixi_get_selector("save:") orelse return;
-    const save_item = file_menu.msgSend(objc.Object, "addItemWithTitle:action:keyEquivalent:", .{
-        save_title.value,
-        save_sel,
-        key_s.value,
-    });
-    if (save_item.value != 0) {
-        save_item.msgSend(void, "setTarget:", .{target.value});
-        save_item.msgSend(void, "setKeyEquivalentModifierMask:", .{NSEventModifierFlagCommand});
-    }
-
-    const file_title = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"File".ptr});
-    const file_item = NSMenuItem.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:action:keyEquivalent:", .{
-        file_title.value,
-        @as(usize, 0),
-        empty.value,
-    });
-    if (file_item.value == 0) return;
-    file_item.msgSend(void, "setSubmenu:", .{file_menu.value});
-    main_menu.msgSend(void, "insertItem:atIndex:", .{ file_item.value, @as(c_ulong, 1) });
-
-    // Edit menu — Copy, Paste, Undo, Redo, Transform (match DVUI menu)
-    const key_c = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"c".ptr});
-    const key_v = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"v".ptr});
-    const key_z = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"z".ptr});
-    const key_t = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"t".ptr});
-    const key_e = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"e".ptr});
-    const key_m = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"m".ptr});
-
-    const edit_menu_title_str = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"Edit".ptr});
-    const edit_menu = NSMenu.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:", .{edit_menu_title_str.value});
-    if (edit_menu.value != 0) {
-        addNativeMenuItem(edit_menu, NSMenuItem, NSString, target, "Copy", "copy:", @intFromPtr(key_c.value), NSEventModifierFlagCommand, @intFromPtr(empty.value));
-        addNativeMenuItem(edit_menu, NSMenuItem, NSString, target, "Paste", "paste:", @intFromPtr(key_v.value), NSEventModifierFlagCommand, @intFromPtr(empty.value));
-        edit_menu.msgSend(void, "addItem:", .{NSMenuItem.msgSend(objc.Object, "separatorItem", .{}).value});
-        addNativeMenuItem(edit_menu, NSMenuItem, NSString, target, "Undo", "undo:", @intFromPtr(key_z.value), NSEventModifierFlagCommand, @intFromPtr(empty.value));
-        addNativeMenuItem(edit_menu, NSMenuItem, NSString, target, "Redo", "redo:", @intFromPtr(key_z.value), NSEventModifierFlagCommand | NSEventModifierFlagShift, @intFromPtr(empty.value));
-        edit_menu.msgSend(void, "addItem:", .{NSMenuItem.msgSend(objc.Object, "separatorItem", .{}).value});
-        addNativeMenuItem(edit_menu, NSMenuItem, NSString, target, "Transform", "transform:", @intFromPtr(key_t.value), NSEventModifierFlagCommand, @intFromPtr(empty.value));
-        const edit_title = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"Edit".ptr});
-        const edit_item = NSMenuItem.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:action:keyEquivalent:", .{
-            edit_title.value,
-            @as(usize, 0),
-            empty.value,
-        });
-        if (edit_item.value != 0) {
-            edit_item.msgSend(void, "setSubmenu:", .{edit_menu.value});
-            main_menu.msgSend(void, "insertItem:atIndex:", .{ edit_item.value, @as(c_ulong, 2) });
-        }
-    }
-
-    // View menu — Show/Hide Explorer, Show DVUI Demo
-    const view_menu_title_str = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"View".ptr});
-    const view_menu = NSMenu.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:", .{view_menu_title_str.value});
-    if (view_menu.value != 0) {
-        addNativeMenuItem(view_menu, NSMenuItem, NSString, target, "Show Explorer", "toggleExplorer:", @intFromPtr(key_e.value), NSEventModifierFlagCommand, @intFromPtr(empty.value));
-        view_menu.msgSend(void, "addItem:", .{NSMenuItem.msgSend(objc.Object, "separatorItem", .{}).value});
-        addNativeMenuItem(view_menu, NSMenuItem, NSString, target, "Show DVUI Demo", "showDvuiDemo:", @intFromPtr(empty.value), 0, @intFromPtr(empty.value));
-        const view_title = NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"View".ptr});
-        const view_item = NSMenuItem.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:action:keyEquivalent:", .{
-            view_title.value,
-            @as(usize, 0),
-            empty.value,
-        });
-        if (view_item.value != 0) {
-            view_item.msgSend(void, "setSubmenu:", .{view_menu.value});
-            main_menu.msgSend(void, "insertItem:atIndex:", .{ view_item.value, @as(c_ulong, 3) });
-        }
-    }
-
-    // Window submenu under the Pixi (app) menu — Minimize, Zoom, Bring All to Front (standard NS actions, target nil)
-    const app_menu_item = main_menu.msgSend(objc.Object, "itemAtIndex:", .{@as(c_ulong, 0)});
-    const app_submenu = app_menu_item.msgSend(objc.Object, "submenu", .{});
-    if (app_submenu.value != 0) {
-        if (pixi_get_selector("performMiniaturize:")) |perform_mini| {
-            if (pixi_get_selector("performZoom:")) |perform_zoom| {
-                if (pixi_get_selector("arrangeInFront:")) |arrange_front| {
-                    const window_menu = NSMenu.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:", .{NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"Window".ptr}).value});
-                    if (window_menu.value != 0) {
-                        addNativeMenuItemWithTarget(window_menu, NSMenuItem, NSString, null, "Minimize", perform_mini, @intFromPtr(key_m.value), NSEventModifierFlagCommand, @intFromPtr(empty.value));
-                        addNativeMenuItemWithTarget(window_menu, NSMenuItem, NSString, null, "Zoom", perform_zoom, @intFromPtr(empty.value), 0, @intFromPtr(empty.value));
-                        addNativeMenuItemWithTarget(window_menu, NSMenuItem, NSString, null, "Bring All to Front", arrange_front, @intFromPtr(empty.value), 0, @intFromPtr(empty.value));
-                        app_submenu.msgSend(void, "addItem:", .{NSMenuItem.msgSend(objc.Object, "separatorItem", .{}).value});
-                        const window_item = NSMenuItem.msgSend(objc.Object, "alloc", .{}).msgSend(objc.Object, "initWithTitle:action:keyEquivalent:", .{
-                            NSString.msgSend(objc.Object, "stringWithUTF8String:", .{"Window".ptr}).value,
-                            @as(usize, 0),
-                            empty.value,
-                        });
-                        if (window_item.value != 0) {
-                            window_item.msgSend(void, "setSubmenu:", .{window_menu.value});
-                            app_submenu.msgSend(void, "addItem:", .{window_item.value});
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    macos_menu_bar_set_up = true;
-}
-
-/// Sets an SF Symbol image on a menu item (macOS 11+). No-op if the image cannot be created.
-fn setMenuItemImage(menu_item: objc.Object, NSImageClass: objc.Class, NSStringClass: objc.Class, symbol_name: [*:0]const u8, accessibility_desc: [*:0]const u8) void {
-    const name_str = NSStringClass.msgSend(objc.Object, "stringWithUTF8String:", .{symbol_name});
-    const desc_str = NSStringClass.msgSend(objc.Object, "stringWithUTF8String:", .{accessibility_desc});
-    const img = NSImageClass.msgSend(objc.Object, "imageWithSystemSymbolName:accessibilityDescription:", .{
-        name_str.value,
-        desc_str.value,
-    });
-    if (img.value != 0) {
-        img.msgSend(void, "setTemplate:", .{true});
-        menu_item.msgSend(void, "setImage:", .{img.value});
-    }
-}
-
-fn addNativeMenuItem(menu: objc.Object, _: objc.Class, NSStringClass: objc.Class, target: objc.Object, title: [*:0]const u8, action_name: [*:0]const u8, key_equiv_value: usize, modifier_mask: c_ulong, empty_str: usize) void {
-    const sel = pixi_get_selector(action_name) orelse return;
-    const title_obj = NSStringClass.msgSend(objc.Object, "stringWithUTF8String:", .{title});
-    const item = menu.msgSend(objc.Object, "addItemWithTitle:action:keyEquivalent:", .{
-        title_obj.value,
-        @intFromPtr(sel),
-        if (key_equiv_value != 0) key_equiv_value else empty_str,
-    });
-    if (item.value != 0) {
-        item.msgSend(void, "setTarget:", .{target.value});
-        if (modifier_mask != 0) item.msgSend(void, "setKeyEquivalentModifierMask:", .{modifier_mask});
-    }
-}
-
-fn addNativeMenuItemWithTarget(menu: objc.Object, _: objc.Class, NSStringClass: objc.Class, target: ?objc.Object, title: [*:0]const u8, action: *const anyopaque, key_equiv_value: usize, modifier_mask: c_ulong, empty_str: usize) void {
-    const title_obj = NSStringClass.msgSend(objc.Object, "stringWithUTF8String:", .{title});
-    const item = menu.msgSend(objc.Object, "addItemWithTitle:action:keyEquivalent:", .{
-        title_obj.value,
-        @intFromPtr(action),
-        if (key_equiv_value != 0) key_equiv_value else empty_str,
-    });
-    if (item.value != 0) {
-        if (target) |t| item.msgSend(void, "setTarget:", .{t.value});
-        if (modifier_mask != 0) item.msgSend(void, "setKeyEquivalentModifierMask:", .{modifier_mask});
-    }
+    _ = pixi_macos.PixiMacOSSetupMenuBar();
 }
 
 /// Returns and clears a pending native menu action (macOS menu bar). Call once per frame; on non-macOS always returns null.
 pub fn pollPendingNativeMenuAction() ?NativeMenuAction {
-    const id = pending_native_menu_action_id.swap(-1, .acq_rel);
+    if (builtin.os.tag != .macos) return null;
+    const id = pixi_macos.PixiMacOSPollPendingNativeMenuAction();
     if (id < 0 or id > 9) return null;
     return @enumFromInt(id);
 }
