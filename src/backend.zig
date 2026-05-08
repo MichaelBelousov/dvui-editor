@@ -47,7 +47,8 @@ pub const NativeMenuAction = enum(c_int) {
     save = 2,
     copy = 3,
     paste = 4,
-    // undo = 5,
+    close_tab = 5,
+    // undo = 6,
     // redo = 6,
     toggle_explorer = 8,
     show_dvui_demo = 9,
@@ -58,6 +59,7 @@ const pixi_macos = if (builtin.os.tag == .macos) struct {
     extern fn PixiMacOSSetTitlebarColor(window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool) void;
     extern fn PixiMacOSSetupMenuBar() bool;
     extern fn PixiMacOSPollPendingNativeMenuAction() c_int;
+    extern fn PixiMacOSConsumeCloseTabSuppression() bool;
 } else struct {};
 
 // Window button action for custom-drawn title bar (app gets HTCLIENT there and calls this on click).
@@ -415,6 +417,11 @@ pub fn pollPendingNativeMenuAction() ?NativeMenuAction {
     const id = pixi_macos.PixiMacOSPollPendingNativeMenuAction();
     if (id < 0 or id > 9) return null;
     return @enumFromInt(id);
+}
+
+pub fn consumeMacOSCloseTabSuppression() bool {
+    if (builtin.os.tag != .macos) return false;
+    return pixi_macos.PixiMacOSConsumeCloseTabSuppression();
 }
 
 pub fn showSimpleMessage(title: [:0]const u8, message: [:0]const u8) void {

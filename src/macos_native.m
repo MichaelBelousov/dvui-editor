@@ -1,11 +1,16 @@
 #import <AppKit/AppKit.h>
 #include <stdbool.h>
 #include <stdatomic.h>
+#import <objc/runtime.h>
 
 static const NSUInteger PixiFullSizeContentViewMask = 1u << 15;
 static const NSVisualEffectMaterial PixiVisualEffectMaterial = 15;
 static bool pixi_menu_bar_set_up = false;
 static atomic_int pixi_pending_native_menu_action_id = -1;
+static atomic_bool pixi_suppress_close_tab_close = false;
+static const void *PixiWindowDelegateProxyAssociationKey = &PixiWindowDelegateProxyAssociationKey;
+
+static void pixiSuppressNextWindowCloseForCurrentWindow(void);
 
 @interface PixiVisualEffectView : NSVisualEffectView
 @end
@@ -21,15 +26,54 @@ static atomic_int pixi_pending_native_menu_action_id = -1;
 }
 @end
 
+@interface PixiWindowDelegateProxy : NSObject <NSWindowDelegate>
+@property (nonatomic, assign) id<NSWindowDelegate> originalDelegate;
+@property (nonatomic, assign) BOOL suppressNextWindowClose;
+- (instancetype)initWithOriginalDelegate:(id<NSWindowDelegate>)originalDelegate;
+@end
+
+@implementation PixiWindowDelegateProxy
+- (instancetype)initWithOriginalDelegate:(id<NSWindowDelegate>)originalDelegate {
+    self = [super init];
+    if (self != nil) {
+        _originalDelegate = originalDelegate;
+        _suppressNextWindowClose = NO;
+    }
+    return self;
+}
+
+- (BOOL)windowShouldClose:(NSWindow *)sender {
+    if (self.suppressNextWindowClose) {
+        self.suppressNextWindowClose = NO;
+        return NO;
+    }
+    if ([self.originalDelegate respondsToSelector:@selector(windowShouldClose:)]) {
+        return [self.originalDelegate windowShouldClose:sender];
+    }
+    return YES;
+}
+
+- (BOOL)respondsToSelector:(SEL)selector {
+    return [super respondsToSelector:selector] || [self.originalDelegate respondsToSelector:selector];
+}
+
+- (id)forwardingTargetForSelector:(SEL)selector {
+    if ([self.originalDelegate respondsToSelector:selector]) {
+        return self.originalDelegate;
+    }
+    return [super forwardingTargetForSelector:selector];
+}
+@end
+
 @interface PixiMenuTarget : NSObject
 - (void)openFolder:(id)sender;
 - (void)openFiles:(id)sender;
 - (void)save:(id)sender;
 - (void)copy:(id)sender;
 - (void)paste:(id)sender;
+- (void)closeTab:(id)sender;
 - (void)undo:(id)sender;
 - (void)redo:(id)sender;
-- (void)transform:(id)sender;
 - (void)toggleExplorer:(id)sender;
 - (void)showDvuiDemo:(id)sender;
 @end
@@ -40,9 +84,14 @@ static atomic_int pixi_pending_native_menu_action_id = -1;
 - (void)save:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 2); }
 - (void)copy:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 3); }
 - (void)paste:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 4); }
-- (void)undo:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 5); }
-- (void)redo:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 6); }
-- (void)transform:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 7); }
+- (void)closeTab:(id)sender {
+    (void)sender;
+    pixiSuppressNextWindowCloseForCurrentWindow();
+    atomic_store(&pixi_suppress_close_tab_close, true);
+    atomic_store(&pixi_pending_native_menu_action_id, 5);
+}
+- (void)undo:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 6); }
+- (void)redo:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 7); }
 - (void)toggleExplorer:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 8); }
 - (void)showDvuiDemo:(id)sender { (void)sender; atomic_store(&pixi_pending_native_menu_action_id, 9); }
 @end
@@ -110,6 +159,33 @@ static void pixiAddMenuItemWithTarget(NSMenu *menu, id target, NSString *title, 
     if (modifiers != 0) item.keyEquivalentModifierMask = modifiers;
 }
 
+static PixiWindowDelegateProxy *pixiInstallWindowDelegateProxy(NSWindow *window) {
+    if (window == nil) return nil;
+
+    PixiWindowDelegateProxy *proxy = objc_getAssociatedObject(window, PixiWindowDelegateProxyAssociationKey);
+    if (proxy != nil) return proxy;
+
+    id<NSWindowDelegate> originalDelegate = window.delegate;
+    if ([originalDelegate isKindOfClass:[PixiWindowDelegateProxy class]]) {
+        return (PixiWindowDelegateProxy *)originalDelegate;
+    }
+
+    proxy = [[PixiWindowDelegateProxy alloc] initWithOriginalDelegate:originalDelegate];
+    if (proxy == nil) return nil;
+
+    objc_setAssociatedObject(window, PixiWindowDelegateProxyAssociationKey, proxy, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    window.delegate = proxy;
+    return proxy;
+}
+
+static void pixiSuppressNextWindowCloseForCurrentWindow(void) {
+    NSWindow *window = NSApp.keyWindow ?: NSApp.mainWindow;
+    PixiWindowDelegateProxy *proxy = pixiInstallWindowDelegateProxy(window);
+    if (proxy != nil) {
+        proxy.suppressNextWindowClose = YES;
+    }
+}
+
 static NSMenu *pixiEnsureMainMenu(NSApplication *app) {
     NSMenu *mainMenu = app.mainMenu;
     if (mainMenu != nil) return mainMenu;
@@ -142,6 +218,7 @@ void PixiMacOSSetWindowStyle(void *window_ptr) {
     NSWindow *window = (__bridge NSWindow *)window_ptr;
     if (window == nil) return;
 
+    pixiInstallWindowDelegateProxy(window);
     window.styleMask |= PixiFullSizeContentViewMask;
     window.titlebarAppearsTransparent = YES;
 }
@@ -175,6 +252,7 @@ bool PixiMacOSSetupMenuBar(void) {
     pixiAddMenuItemWithImage(fileMenu, target, @"Open Files", @selector(openFiles:), @"o", NSEventModifierFlagCommand, @"doc.on.doc", @"Open Files");
     [fileMenu addItem:NSMenuItem.separatorItem];
     pixiAddMenuItem(fileMenu, target, @"Save", @selector(save:), @"s", NSEventModifierFlagCommand);
+    pixiAddMenuItem(fileMenu, target, @"Close Tab", @selector(closeTab:), @"w", NSEventModifierFlagCommand);
 
     NSMenuItem *fileItem = [[NSMenuItem alloc] initWithTitle:@"File" action:nil keyEquivalent:@""];
     if (fileItem == nil) return false;
@@ -188,8 +266,6 @@ bool PixiMacOSSetupMenuBar(void) {
         [editMenu addItem:NSMenuItem.separatorItem];
         pixiAddMenuItem(editMenu, target, @"Undo", @selector(undo:), @"z", NSEventModifierFlagCommand);
         pixiAddMenuItem(editMenu, target, @"Redo", @selector(redo:), @"z", NSEventModifierFlagCommand | NSEventModifierFlagShift);
-        [editMenu addItem:NSMenuItem.separatorItem];
-        pixiAddMenuItem(editMenu, target, @"Transform", @selector(transform:), @"t", NSEventModifierFlagCommand);
 
         NSMenuItem *editItem = [[NSMenuItem alloc] initWithTitle:@"Edit" action:nil keyEquivalent:@""];
         if (editItem != nil) {
@@ -235,4 +311,8 @@ bool PixiMacOSSetupMenuBar(void) {
 
 int PixiMacOSPollPendingNativeMenuAction(void) {
     return atomic_exchange(&pixi_pending_native_menu_action_id, -1);
+}
+
+bool PixiMacOSConsumeCloseTabSuppression(void) {
+    return atomic_exchange(&pixi_suppress_close_tab_close, false);
 }
