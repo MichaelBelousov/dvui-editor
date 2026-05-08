@@ -33,8 +33,8 @@
     // internet connectivity.
     .dependencies = .{
         .dvui = .{
-            .url = "git+https://github.com/david-vanderson/dvui?ref=zig16-dev#8e281a971d92b425fa6762bd02508744dffde640",
-            .hash = "dvui-0.5.0-dev-AQFJmXfU3AB8CuqTtoQpZdlWNibH1GMQE57f3IBjDtK2",
+            .url = "git+https://github.com/david-vanderson/dvui.git#14703fa6d6fea0c608886b5ce2071ef49323c8c0",
+            .hash = "dvui-0.5.0-dev-AQFJmbHY9QA1qvhf_l3RPazRT7QOF0pGjLtU4amMq2F-",
         },
         .nightwatch = .{
             .url = "git+https://github.com/neurocyte/nightwatch.git#cbb9baab0d2ed66e9a0859e28c4a6a2e61a47600",
