@@ -70,6 +70,12 @@ pub fn build(b: *std.Build) void {
     }).module("known-folders");
     exe.root_module.addImport("known-folders", known_folders);
 
+    const nightwatch = b.dependency("nightwatch", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("nightwatch");
+    exe.root_module.addImport("nightwatch", nightwatch);
+
     if (b.lazyDependency("icons", .{ .target = target, .optimize = optimize })) |dep| {
         exe.root_module.addImport("icons", dep.module("icons"));
     }

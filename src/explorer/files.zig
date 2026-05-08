@@ -106,10 +106,7 @@ pub fn drawFiles(io: Io, environ: *const std.process.Environ.Map, path: []const 
             if ((dvui.menuItemLabel(@src(), "Close", .{}, .{
                 .expand = .horizontal,
             })) != null) {
-                if (dvui_editor.editor.folder) |f| {
-                    dvui_editor.app.gpa.free(f);
-                    dvui_editor.editor.folder = null;
-                }
+                dvui_editor.editor.clearProjectFolder();
 
                 fw2.close();
             }

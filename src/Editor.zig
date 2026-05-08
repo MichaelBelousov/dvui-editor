@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 
 const dvui = @import("dvui");
 const known_folders = @import("known-folders");
+const nightwatch = @import("nightwatch");
 
 pub const Dialogs = @import("dialogs/Dialogs.zig");
 const dvui_editor = @import("root.zig");
@@ -24,6 +25,27 @@ pub const Workspace = @import("Workspace.zig");
 // const sdl3 = @import("backend").c;
 
 const Editor = @This();
+const ProjectFolderWatcher = nightwatch.Default;
+
+const ProjectFolderWatchState = struct {
+    handler: ProjectFolderWatcher.Handler = .{ .vtable = &vtable },
+    refresh_pending: std.atomic.Value(bool) = .init(false),
+
+    const vtable = ProjectFolderWatcher.Handler.VTable{
+        .change = change,
+        .rename = rename,
+    };
+
+    fn change(handler: *ProjectFolderWatcher.Handler, _: []const u8, _: nightwatch.EventType, _: nightwatch.ObjectType) error{HandlerFailed}!void {
+        const self: *ProjectFolderWatchState = @fieldParentPtr("handler", handler);
+        self.refresh_pending.store(true, .release);
+    }
+
+    fn rename(handler: *ProjectFolderWatcher.Handler, _: []const u8, _: []const u8, _: nightwatch.ObjectType) error{HandlerFailed}!void {
+        const self: *ProjectFolderWatchState = @fieldParentPtr("handler", handler);
+        self.refresh_pending.store(true, .release);
+    }
+};
 
 // pub const Recents = @import("Recents.zig");
 // pub const Tools = @import("Tools.zig");
@@ -69,6 +91,9 @@ grouping_id_counter: u64 = 0,
 file_id_counter: u64 = 0,
 
 window_opacity: f32 = 1.0,
+
+project_folder_watch: ProjectFolderWatchState = .{},
+project_folder_watcher: ?ProjectFolderWatcher = null,
 
 pending_native_menu_actions: [16]dvui_editor.backend.NativeMenuAction = undefined,
 pending_native_menu_actions_len: u8 = 0,
@@ -283,6 +308,10 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
 
     if (dvui_editor.backend.pollPendingNativeMenuAction()) |action| {
         editor.queueNativeMenuAction(action);
+    }
+
+    if (editor.project_folder_watch.refresh_pending.swap(false, .acq_rel)) {
+        dvui.refresh(null, @src(), dvui.currentWindow().data().id);
     }
 
     defer editor.dim_titlebar = false;
@@ -1032,6 +1061,7 @@ pub fn close(app: *App, editor: *Editor) void {
 
 pub fn setProjectFolder(editor: *Editor, path: []const u8) !void {
     const io = dvui_editor.app.io;
+    editor.stopProjectFolderWatcher();
     if (editor.folder) |folder| {
         if (editor.project) |*project| {
             project.save(io) catch {
@@ -1041,10 +1071,46 @@ pub fn setProjectFolder(editor: *Editor, path: []const u8) !void {
         dvui_editor.app.gpa.free(folder);
     }
     editor.folder = try dvui_editor.app.gpa.dupe(u8, path);
+    editor.startProjectFolderWatcher(path);
     // try editor.recents.appendFolder(try dvui_editor.app.gpa.dupe(u8, path));
     editor.explorer.pane = .files;
 
     // editor.project = Project.load(dvui_editor.app.gpa) catch null;
+}
+
+pub fn clearProjectFolder(editor: *Editor) void {
+    editor.stopProjectFolderWatcher();
+    if (editor.folder) |folder| {
+        dvui_editor.app.gpa.free(folder);
+        editor.folder = null;
+    }
+}
+
+fn startProjectFolderWatcher(editor: *Editor, path: []const u8) void {
+    var watcher = ProjectFolderWatcher.init(
+        dvui_editor.app.io,
+        dvui_editor.app.gpa,
+        &editor.project_folder_watch.handler,
+    ) catch |err| {
+        dvui.log.err("Failed to initialize project watcher: {s}", .{@errorName(err)});
+        return;
+    };
+
+    watcher.watch(path) catch |err| {
+        dvui.log.err("Failed to watch project folder {s}: {s}", .{ path, @errorName(err) });
+        watcher.deinit();
+        return;
+    };
+
+    editor.project_folder_watcher = watcher;
+}
+
+fn stopProjectFolderWatcher(editor: *Editor) void {
+    if (editor.project_folder_watcher) |*watcher| {
+        watcher.deinit();
+        editor.project_folder_watcher = null;
+    }
+    editor.project_folder_watch.refresh_pending.store(false, .release);
 }
 
 pub fn saving(editor: *Editor) bool {
@@ -1304,6 +1370,7 @@ pub fn deinit(editor: *Editor) !void {
     //     project.deinit(dvui_editor.app.gpa);
     // }
 
+    editor.stopProjectFolderWatcher();
     editor.explorer.deinit();
 
     if (editor.folder) |folder| dvui_editor.app.gpa.free(folder);
