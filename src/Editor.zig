@@ -982,6 +982,8 @@ pub fn rebuildWorkspaces(editor: *Editor) !void {
             }
         }
     }
+
+    editor.normalizeWorkspaceSelections();
 }
 
 pub fn drawWorkspaces(editor: *Editor, index: usize) !dvui.App.Result {
@@ -1133,14 +1135,13 @@ pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
 
     if (dvui_editor.Internal.TextFile.fromPath(path) catch null) |file| {
         try editor.open_files.put(dvui_editor.app.gpa, file.id, file);
-        _ = grouping;
-        // if (editor.open_files.getPtr(file.id)) |f| {
-        //     f.editor.grouping = grouping;
-        // }
+        if (editor.open_files.getPtr(file.id)) |f| {
+            f.editor.grouping = grouping;
+        }
 
         // At this point, if the workspace grouping doesn't exist, it will next frame
         // once the workspaces are rebuilt. Since we cant wait on that, go ahead and set it now
-        //editor.open_workspace_grouping = grouping;
+        editor.open_workspace_grouping = grouping;
 
         // If the workspace grouping does exist, go ahead and set the active file
         editor.setActiveFile(editor.open_files.count() - 1);
@@ -1167,6 +1168,9 @@ pub fn newFile(editor: *Editor, path: []const u8, options: dvui_editor.Internal.
     const file: dvui_editor.Internal.TextFile = .{};
 
     try editor.open_files.put(dvui_editor.app.gpa, file.id, file);
+    if (editor.open_files.getPtr(file.id)) |f| {
+        f.editor.grouping = editor.open_workspace_grouping;
+    }
     editor.setActiveFile(editor.open_files.count() - 1);
     // editor.composite_warmup_pending = true;
 
@@ -1175,13 +1179,90 @@ pub fn newFile(editor: *Editor, path: []const u8, options: dvui_editor.Internal.
 
 pub fn setActiveFile(editor: *Editor, index: usize) void {
     if (index >= editor.open_files.values().len) return;
-    // const file = editor.open_files.values()[index];
-    // const grouping = file.editor.grouping;
+    const file = editor.open_files.values()[index];
+    const grouping = file.editor.grouping;
 
-    // if (editor.workspaces.getPtr(grouping)) |workspace| {
-    //     editor.open_workspace_grouping = grouping;
-    //     workspace.open_file_index = index;
-    // }
+    editor.open_workspace_grouping = grouping;
+    if (editor.workspaces.getPtr(grouping)) |workspace| {
+        workspace.open_file_index = index;
+    }
+}
+
+pub fn setActiveFileID(editor: *Editor, id: u64) void {
+    const index = editor.open_files.getIndex(id) orelse return;
+    editor.setActiveFile(index);
+}
+
+pub fn firstFileIndexInGrouping(editor: *Editor, grouping: u64) ?usize {
+    for (editor.open_files.values(), 0..) |file, i| {
+        if (file.editor.grouping == grouping) return i;
+    }
+    return null;
+}
+
+pub fn normalizeWorkspaceSelections(editor: *Editor) void {
+    for (editor.workspaces.values()) |*workspace| {
+        const first_index = editor.firstFileIndexInGrouping(workspace.grouping) orelse continue;
+        if (workspace.open_file_index >= editor.open_files.values().len or
+            editor.open_files.values()[workspace.open_file_index].editor.grouping != workspace.grouping)
+        {
+            workspace.open_file_index = first_index;
+        }
+    }
+}
+
+pub fn moveOpenFile(editor: *Editor, from_index: usize, insert_before_index: usize, target_grouping: ?u64) !usize {
+    const count = editor.open_files.count();
+    if (from_index >= count) return error.IndexOutOfBounds;
+    if (count == 0) return error.IndexOutOfBounds;
+
+    const clamped_insert_before = @min(insert_before_index, count);
+    const dest_index = if (from_index < clamped_insert_before)
+        clamped_insert_before - 1
+    else
+        clamped_insert_before;
+
+    if (dest_index == from_index) {
+        if (target_grouping) |grouping| {
+            editor.open_files.values()[from_index].editor.grouping = grouping;
+            editor.normalizeWorkspaceSelections();
+        }
+        return from_index;
+    }
+
+    const old_keys = editor.open_files.keys();
+    const old_values = editor.open_files.values();
+    const moved_key = old_keys[from_index];
+    var moved_value = old_values[from_index];
+    if (target_grouping) |grouping| moved_value.editor.grouping = grouping;
+
+    const new_keys = try dvui_editor.app.gpa.alloc(u64, count);
+    defer dvui_editor.app.gpa.free(new_keys);
+    const new_values = try dvui_editor.app.gpa.alloc(dvui_editor.Internal.TextFile, count);
+    defer dvui_editor.app.gpa.free(new_values);
+
+    var out_index: usize = 0;
+    for (0..count) |old_index| {
+        if (out_index == dest_index) {
+            new_keys[out_index] = moved_key;
+            new_values[out_index] = moved_value;
+            out_index += 1;
+        }
+        if (old_index == from_index) continue;
+        new_keys[out_index] = old_keys[old_index];
+        new_values[out_index] = old_values[old_index];
+        out_index += 1;
+    }
+    if (out_index == dest_index) {
+        new_keys[out_index] = moved_key;
+        new_values[out_index] = moved_value;
+        out_index += 1;
+    }
+
+    std.debug.assert(out_index == count);
+    try editor.open_files.reinit(dvui_editor.app.gpa, new_keys, new_values);
+    editor.normalizeWorkspaceSelections();
+    return dest_index;
 }
 
 /// Returns the actively focused file, through workspace grouping.
@@ -1191,6 +1272,11 @@ pub fn activeFile(editor: *Editor) ?*dvui_editor.Internal.TextFile {
     }
 
     return null;
+}
+
+pub fn activeFileID(editor: *Editor) ?u64 {
+    const file = editor.activeFile() orelse return null;
+    return file.id;
 }
 
 pub fn getFile(editor: *Editor, index: usize) ?*dvui_editor.Internal.TextFile {

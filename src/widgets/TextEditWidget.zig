@@ -41,6 +41,7 @@ pub fn processEvents(self: *TextEditWidget) void {
         },
         .{
             .expand = .both,
+            .id_extra = self.file.id,
         },
     );
     defer text_edit.deinit();

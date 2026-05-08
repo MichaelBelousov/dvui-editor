@@ -169,6 +169,8 @@ fn drawTabs(self: *Workspace) void {
 
             const files = dvui_editor.editor.open_files.values();
             const files_len = files.len;
+            const active_file_id = dvui_editor.editor.activeFileID();
+            const active_index = if (active_file_id) |id| dvui_editor.editor.open_files.getIndex(id) else null;
 
             // Find the neighbouring tabs (within this workspace grouping) of the active tab.
             var prev_same_group_index: ?usize = null;
@@ -176,16 +178,17 @@ fn drawTabs(self: *Workspace) void {
 
             const active_in_this_group = blk: {
                 if (dvui_editor.editor.open_workspace_grouping != self.grouping) break :blk false;
-                if (self.open_file_index >= files_len) break :blk false;
-                if (files[self.open_file_index].editor.grouping != self.grouping) break :blk false;
+                const idx = active_index orelse break :blk false;
+                if (idx >= files_len) break :blk false;
+                if (files[idx].editor.grouping != self.grouping) break :blk false;
                 break :blk true;
             };
 
             if (active_in_this_group) {
-                const active_index = self.open_file_index;
+                const current_active_index = active_index.?;
 
                 // Scan left from the active tab to find the previous tab in this grouping.
-                var j: usize = active_index;
+                var j: usize = current_active_index;
                 while (j > 0) {
                     j -= 1;
                     if (files[j].editor.grouping == self.grouping) {
@@ -195,7 +198,7 @@ fn drawTabs(self: *Workspace) void {
                 }
 
                 // Scan right from the active tab to find the next tab in this grouping.
-                j = active_index + 1;
+                j = current_active_index + 1;
                 while (j < files_len) : (j += 1) {
                     if (files[j].editor.grouping == self.grouping) {
                         next_same_group_index = j;
@@ -217,7 +220,7 @@ fn drawTabs(self: *Workspace) void {
                 });
                 defer reorderable.deinit();
 
-                const selected = self.open_file_index == i and dvui_editor.editor.open_workspace_grouping == self.grouping;
+                const selected = active_file_id != null and active_file_id.? == file.id and dvui_editor.editor.open_workspace_grouping == self.grouping;
 
                 var anim = dvui.animate(@src(), .{ .duration = 400_000, .kind = .horizontal, .easing = dvui.easing.outBack }, .{});
                 defer anim.deinit();
@@ -336,13 +339,14 @@ fn drawTabs(self: *Workspace) void {
                     switch (e.evt) {
                         .mouse => |me| {
                             if (me.action == .press and me.button.pointer()) {
-                                dvui_editor.editor.setActiveFile(i);
-                                dvui.refresh(null, @src(), hbox.data().id);
-
                                 e.handle(@src(), hbox.data());
                                 dvui.captureMouse(hbox.data(), e.num);
                                 dvui.dragPreStart(me.p, .{ .size = reorderable.data().rectScale().r.size(), .offset = reorderable.data().rectScale().r.topLeft().diff(me.p) });
                             } else if (me.action == .release and me.button.pointer()) {
+                                if (dvui.captured(hbox.data().id) and !dvui.dragName("tab_drag")) {
+                                    dvui_editor.editor.setActiveFileID(file.id);
+                                    dvui.refresh(null, @src(), hbox.data().id);
+                                }
                                 dvui.captureMouse(null, e.num);
                                 dvui.dragEnd();
                             } else if (me.action == .motion) {
@@ -370,48 +374,18 @@ fn drawTabs(self: *Workspace) void {
 pub fn processTabsDrag(self: *Workspace) void {
     if (self.tabs_insert_before_index) |insert_before| {
         if (self.tabs_removed_index) |removed| { // Dragging from this workspace
-
-            if (removed > dvui_editor.editor.open_files.count()) return;
-            if (removed > insert_before) {
-                std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
-                std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
-                dvui_editor.editor.setActiveFile(insert_before);
-            } else {
-                if (insert_before > 0) {
-                    std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before - 1]);
-                    std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before - 1]);
-                    dvui_editor.editor.setActiveFile(insert_before - 1);
-                } else {
-                    std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
-                    std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
-                    dvui_editor.editor.setActiveFile(insert_before);
-                }
-            }
+            const new_index = dvui_editor.editor.moveOpenFile(removed, insert_before, null) catch return;
+            const moved_id = dvui_editor.editor.open_files.keys()[new_index];
+            dvui_editor.editor.setActiveFileID(moved_id);
 
             self.tabs_removed_index = null;
             self.tabs_insert_before_index = null;
         } else { // Dragging from another workspace
             for (dvui_editor.editor.workspaces.values()) |*workspace| {
                 if (workspace.tabs_removed_index) |removed| {
-                    if (removed > insert_before) {
-                        std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
-                        std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
-
-                        dvui_editor.editor.open_files.values()[insert_before].editor.grouping = self.grouping;
-                        dvui_editor.editor.setActiveFile(insert_before);
-                    } else {
-                        if (insert_before > 0) {
-                            std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before - 1]);
-                            std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before - 1]);
-                            dvui_editor.editor.open_files.values()[insert_before - 1].editor.grouping = self.grouping;
-                            dvui_editor.editor.setActiveFile(insert_before - 1);
-                        } else {
-                            std.mem.swap(dvui_editor.Internal.TextFile, &dvui_editor.editor.open_files.values()[removed], &dvui_editor.editor.open_files.values()[insert_before]);
-                            std.mem.swap(u64, &dvui_editor.editor.open_files.keys()[removed], &dvui_editor.editor.open_files.keys()[insert_before]);
-                            dvui_editor.editor.open_files.values()[insert_before].editor.grouping = self.grouping;
-                            dvui_editor.editor.setActiveFile(insert_before);
-                        }
-                    }
+                    const new_index = dvui_editor.editor.moveOpenFile(removed, insert_before, self.grouping) catch return;
+                    const moved_id = dvui_editor.editor.open_files.keys()[new_index];
+                    dvui_editor.editor.setActiveFileID(moved_id);
 
                     self.tabs_removed_index = null;
                     self.tabs_insert_before_index = null;
