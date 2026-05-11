@@ -116,17 +116,18 @@ pub fn draw() !dvui.App.Result {
 
         _ = dvui.separator(@src(), .{ .expand = .horizontal });
 
-        if (menuItemWithHotkey(@src(), "Save", dvui.currentWindow().keybinds.get("save") orelse .{}, if (dvui_editor.editor.activeFile()) |file| if (file.dirty()) true else false else false, .{}, .{
-            .expand = .horizontal,
-            .color_text = dvui.themeGet().color(.window, .text),
-        }) != null) {
-            if (dvui_editor.editor.activeFile()) |file| {
-                file.saveAsync() catch {
-                    std.log.err("Failed to save", .{});
-                };
-                fw.close();
-            }
-        }
+        // TODO: Bring back dirty flag in file
+        // if (menuItemWithHotkey(@src(), "Save", dvui.currentWindow().keybinds.get("save") orelse .{}, if (dvui_editor.editor.activeFile()) |file| if (file.dirty()) true else false else false, .{}, .{
+        //     .expand = .horizontal,
+        //     .color_text = dvui.themeGet().color(.window, .text),
+        // }) != null) {
+        //     if (dvui_editor.editor.activeFile()) |file| {
+        //         file.saveAsync() catch {
+        //             std.log.err("Failed to save", .{});
+        //         };
+        //         fw.close();
+        //     }
+        // }
     }
 
     if (menuItem(
@@ -184,53 +185,38 @@ pub fn draw() !dvui.App.Result {
 
         _ = dvui.separator(@src(), .{ .expand = .horizontal });
 
-        if (menuItemWithHotkey(
-            @src(),
-            "Undo",
-            dvui.currentWindow().keybinds.get("undo") orelse .{},
-            if (dvui_editor.editor.activeFile()) |file| if (file.history.undo_stack.items.len > 0) true else false else false,
-            .{},
-            .{ .expand = .horizontal },
-        ) != null) {
-            if (dvui_editor.editor.activeFile()) |file| {
-                file.history.undoRedo(file, .undo) catch {
-                    std.log.err("Failed to undo", .{});
-                };
-            }
-        }
+        // TODO: Bring back UNDO / REDO history
+        // if (menuItemWithHotkey(
+        //     @src(),
+        //     "Undo",
+        //     dvui.currentWindow().keybinds.get("undo") orelse .{},
+        //     if (dvui_editor.editor.activeFile()) |file| if (file.history.undo_stack.items.len > 0) true else false else false,
+        //     .{},
+        //     .{ .expand = .horizontal },
+        // ) != null) {
+        //     if (dvui_editor.editor.activeFile()) |file| {
+        //         file.history.undoRedo(file, .undo) catch {
+        //             std.log.err("Failed to undo", .{});
+        //         };
+        //     }
+        // }
 
-        if (menuItemWithHotkey(
-            @src(),
-            "Redo",
-            dvui.currentWindow().keybinds.get("redo") orelse .{},
-            if (dvui_editor.editor.activeFile()) |file| if (file.history.redo_stack.items.len > 0) true else false else false,
-            .{},
-            .{ .expand = .horizontal },
-        ) != null) {
-            if (dvui_editor.editor.activeFile()) |file| {
-                file.history.undoRedo(file, .redo) catch {
-                    std.log.err("Failed to redo", .{});
-                };
-            }
-        }
+        // if (menuItemWithHotkey(
+        //     @src(),
+        //     "Redo",
+        //     dvui.currentWindow().keybinds.get("redo") orelse .{},
+        //     if (dvui_editor.editor.activeFile()) |file| if (file.history.redo_stack.items.len > 0) true else false else false,
+        //     .{},
+        //     .{ .expand = .horizontal },
+        // ) != null) {
+        //     if (dvui_editor.editor.activeFile()) |file| {
+        //         file.history.undoRedo(file, .redo) catch {
+        //             std.log.err("Failed to redo", .{});
+        //         };
+        //     }
+        // }
 
         _ = dvui.separator(@src(), .{ .expand = .horizontal });
-
-        if (menuItemWithHotkey(
-            @src(),
-            "Transform",
-            dvui.currentWindow().keybinds.get("transform") orelse .{},
-            if (dvui_editor.editor.activeFile() != null) true else false,
-            .{},
-            .{ .expand = .horizontal },
-        ) != null) {
-            if (dvui_editor.editor.activeFile() != null) {
-                dvui_editor.editor.transform() catch {
-                    std.log.err("Failed to transform", .{});
-                };
-                fw.close();
-            }
-        }
     }
 
     if (menuItem(@src(), "View", .{ .submenu = true }, .{

@@ -14,6 +14,7 @@ pub const Keybinds = @import("Keybinds.zig");
 pub const Menu = @import("Menu.zig");
 pub const Panel = @import("Panel.zig");
 pub const Project = @import("Project.zig");
+pub const Recents = @import("Recents.zig");
 pub const Settings = @import("Settings.zig");
 pub const Sidebar = @import("Sidebar.zig");
 pub const Workspace = @import("Workspace.zig");
@@ -62,7 +63,7 @@ palette_folder: []const u8,
 // atlas: dvui_editor.Internal.Atlas,
 
 settings: Settings = undefined,
-// recents: Recents = undefined,
+recents: Recents = undefined,
 
 explorer: *Explorer,
 panel: *Panel,
@@ -1358,24 +1359,25 @@ pub fn paste(editor: *Editor) !void {
 
 /// Performs a save operation on the currently open file.
 pub fn save(editor: *Editor) !void {
-    std.print.debug("Save triggered");
+    dvui.log.debug("Save triggered", .{});
     if (editor.activeFile()) |file| {
-        std.print.debug("Saving file: {s}", .{file.path});
+        dvui.log.debug("Saving file: {s}", .{file.path});
         try file.saveAsync();
     }
 }
 
-pub fn undo(editor: *Editor) !void {
-    if (editor.activeFile()) |file| {
-        try file.history.undoRedo(file, .undo);
-    }
-}
+// TODO: Bring back UNDO / REDO
+// pub fn undo(editor: *Editor) !void {
+//     if (editor.activeFile()) |file| {
+//         try file.history.undoRedo(file, .undo);
+//     }
+// }
 
-pub fn redo(editor: *Editor) !void {
-    if (editor.activeFile()) |file| {
-        try file.history.undoRedo(file, .redo);
-    }
-}
+// pub fn redo(editor: *Editor) !void {
+//     if (editor.activeFile()) |file| {
+//         try file.history.undoRedo(file, .redo);
+//     }
+// }
 
 pub fn openInFileBrowser(_: *Editor, path: []const u8) !void {
     const cmd = if (builtin.os.tag == .macos) "open" else if (builtin.os.tag == .linux) "xdg-open" else "start";

@@ -109,11 +109,11 @@ pub fn tick() !void {
                 // }
 
                 if (builtin.os.tag != .macos) {
-                    if (ke.matchBind("undo") and (ke.action == .down or ke.action == .repeat)) {
-                        dvui_editor.editor.undo() catch {
-                            std.log.err("Failed to undo", .{});
-                        };
-                    }
+                    // if (ke.matchBind("undo") and (ke.action == .down or ke.action == .repeat)) {
+                    //     dvui_editor.editor.undo() catch {
+                    //         std.log.err("Failed to undo", .{});
+                    //     };
+                    // }
 
                     if (ke.matchBind("copy") and ke.action == .down) {
                         dvui_editor.editor.copy() catch {
@@ -127,23 +127,17 @@ pub fn tick() !void {
                         };
                     }
 
-                    if (ke.matchBind("redo") and (ke.action == .down or ke.action == .repeat)) {
-                        dvui_editor.editor.redo() catch {
-                            std.log.err("Failed to redo", .{});
-                        };
-                    }
+                    // if (ke.matchBind("redo") and (ke.action == .down or ke.action == .repeat)) {
+                    //     dvui_editor.editor.redo() catch {
+                    //         std.log.err("Failed to redo", .{});
+                    //     };
+                    // }
 
                     if (ke.matchBind("save") and ke.action == .down) {
                         dvui_editor.editor.save() catch {
                             std.log.err("Failed to save", .{});
                         };
                     }
-
-                    // if (ke.matchBind("transform") and ke.action == .down) {
-                    //     dvui_editor.editor.transform() catch {
-                    //         std.log.err("Failed to transform", .{});
-                    //     };
-                    // }
                 }
 
                 // if (ke.matchBind("pencil") and ke.action == .down) {
