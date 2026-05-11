@@ -1,5 +1,53 @@
 const std = @import("std");
 
+const EditorBuildOptions = struct {
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+};
+
+pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
+    const mod = b.createModule(.{
+        .root_source_file = b.path("src/App.zig"),
+        .target = opts.target,
+        .optimize = opts.optimize,
+    });
+
+    const dvui_dep = b.dependency("dvui", .{ .target = opts.target, .optimize = opts.optimize, .backend = .sdl3 });
+
+    // Or use a prelinked one:
+    mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+    mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
+
+    const known_folders = b.dependency("known_folders", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+    }).module("known-folders");
+    mod.addImport("known-folders", known_folders);
+
+    const nightwatch = b.dependency("nightwatch", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+    }).module("nightwatch");
+    mod.addImport("nightwatch", nightwatch);
+
+    if (b.lazyDependency("icons", .{ .target = opts.target, .optimize = opts.optimize })) |dep| {
+        mod.addImport("icons", dep.module("icons"));
+    }
+
+    if (opts.target.result.os.tag == .macos) {
+        mod.addCSourceFile(.{ .file = std.Build.path(b, "src/macos_native.m") });
+    } else if (opts.target.result.os.tag == .windows) {
+        if (b.lazyDependency("win32", .{})) |dep| {
+            mod.addImport("win32", dep.module("win32"));
+        }
+        mod.linkSystemLibrary("comctl32", .{});
+    }
+    // const assetpack = @import("assetpack");
+    // const assets_module = assetpack.pack(b, b.path("assets"), .{});
+    // exe.root_module.addImport("assets", assets_module);
+    return mod;
+}
+
 // Although this function looks imperative, it does not perform the build
 // directly and instead it mutates the build graph (`b`) that will be then
 // executed by an external runner. The functions in `std.Build` implement a DSL
@@ -41,108 +89,12 @@ pub fn build(b: *std.Build) void {
     //     .target = target,
     // });
 
-    const dvui_dep = b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .sdl3 });
-
-    const app_mod = b.createModule(.{
-        .root_source_file = b.path("src/App.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
+    const app_mod = editorMod(b, .{ .target = target, .optimize = optimize });
 
     const exe = b.addExecutable(.{
         .name = "dvui-editor",
         .root_module = app_mod,
     });
-
-    // Can either link the backend ourselves:
-    // const dvui_mod = dvui_dep.module("dvui");
-    // const sdl3_mod = dvui_dep.module("sdl3");
-    // @import("dvui").linkBackend(dvui_mod, sdl3_mod);
-    // mod.addImport("dvui", dvui_mod);
-
-    // Or use a prelinked one:
-    app_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-    app_mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
-
-    const known_folders = b.dependency("known_folders", .{
-        .target = target,
-        .optimize = optimize,
-    }).module("known-folders");
-    exe.root_module.addImport("known-folders", known_folders);
-
-    const nightwatch = b.dependency("nightwatch", .{
-        .target = target,
-        .optimize = optimize,
-    }).module("nightwatch");
-    exe.root_module.addImport("nightwatch", nightwatch);
-
-    if (b.lazyDependency("icons", .{ .target = target, .optimize = optimize })) |dep| {
-        exe.root_module.addImport("icons", dep.module("icons"));
-    }
-
-    if (target.result.os.tag == .macos) {
-        exe.root_module.addCSourceFile(.{ .file = std.Build.path(b, "src/macos_native.m") });
-    } else if (target.result.os.tag == .windows) {
-        if (b.lazyDependency("zigwin32", .{})) |dep| {
-            exe.root_module.addImport("win32", dep.module("win32"));
-        }
-        exe.root_module.linkSystemLibrary("comctl32", .{});
-    }
-    // const assetpack = @import("assetpack");
-    // const assets_module = assetpack.pack(b, b.path("assets"), .{});
-    // exe.root_module.addImport("assets", assets_module);
-
-    const dvui_sample_mod = b.createModule(.{
-        .root_source_file = b.path("src/app_sample.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const sample_exe = b.addExecutable(.{
-        .name = "dvui-sample",
-        .root_module = dvui_sample_mod,
-    });
-
-    dvui_sample_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-    dvui_sample_mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
-
-    const run_sample_step = b.step("run-sample", "Run the app");
-    const run_sample_cmd = b.addRunArtifact(sample_exe);
-    run_sample_step.dependOn(&run_sample_cmd.step);
-
-    // const assets_module = assetpack.pack(b, b.path("assets"), .{});
-    // exe.root_module.addImport("assets", assets_module)
-
-    // const exe = b.addExecutable(.{
-    //     .name = "dvui_editor",
-    //     .root_module = b.createModule(.{
-    //         // b.createModule defines a new module just like b.addModule but,
-    //         // unlike b.addModule, it does not expose the module to consumers of
-    //         // this package, which is why in this case we don't have to give it a name.
-    //         .root_source_file = b.path("src/main.zig"),
-    //         // Target and optimization levels must be explicitly wired in when
-    //         // defining an executable or library (in the root module), and you
-    //         // can also hardcode a specific target for an executable or library
-    //         // definition if desireable (e.g. firmware for embedded devices).
-    //         .target = target,
-    //         .optimize = optimize,
-    //         // List of modules available for import in source files part of the
-    //         // root module.
-    //         .imports = &.{
-    //             // Here "dvui_editor" is the name you will use in your source code to
-    //             // import this module (e.g. `@import("dvui_editor")`). The name is
-    //             // repeated because you are allowed to rename your imports, which
-    //             // can be extremely useful in case of collisions (which can happen
-    //             // importing modules from different packages).
-    //             .{ .name = "dvui_editor", .module = mod },
-    //         },
-    //     }),
-    // });
-
-    // This declares intent for the executable to be installed into the
-    // install prefix when running `zig build` (i.e. when executing the default
-    // step). By default the install prefix is `zig-out/` but can be overridden
-    // by passing `--prefix` or `-p`.
     b.installArtifact(exe);
 
     // This creates a top level step. Top level steps have a name and can be
@@ -198,6 +150,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
+    const ci_step = b.step("ci", "Run CI");
+    setupCi(b, ci_step);
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means
@@ -209,4 +164,28 @@ pub fn build(b: *std.Build) void {
     //
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
+}
+pub fn setupCi(b: *std.Build, step: *std.Build.Step) void {
+    const targets: []const std.Target.Query = &.{
+        // macOS cross-compilation requires the Apple SDK; build natively instead.
+        // .{ .cpu_arch = .aarch64, .os_tag = .macos },
+        // .{ .cpu_arch = .x86_64,  .os_tag = .macos },
+        .{ .cpu_arch = .aarch64, .os_tag = .linux },
+        .{ .cpu_arch = .x86_64, .os_tag = .linux },
+        .{ .cpu_arch = .x86_64, .os_tag = .windows },
+        // .{ .cpu_arch = .aarch64, .os_tag = .windows },
+    };
+
+    for (targets) |t| {
+        const target = b.resolveTargetQuery(t);
+        const app_mod = editorMod(b, .{ .target = target, .optimize = .Debug });
+        const exe = b.addExecutable(.{
+            .name = b.fmt("dvui-editor-{s}-{s}", .{
+                @tagName(t.cpu_arch.?),
+                @tagName(t.os_tag.?),
+            }),
+            .root_module = app_mod,
+        });
+        step.dependOn(&exe.step);
+    }
 }
