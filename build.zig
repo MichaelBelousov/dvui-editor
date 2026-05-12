@@ -36,6 +36,7 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
 
     if (opts.target.result.os.tag == .macos) {
         mod.addCSourceFile(.{ .file = std.Build.path(b, "src/macos_native.m") });
+        mod.addCSourceFile(.{ .file = std.Build.path(b, "src/ztray/macos_menu.m") });
     } else if (opts.target.result.os.tag == .windows) {
         if (b.lazyDependency("win32", .{})) |dep| {
             mod.addImport("win32", dep.module("win32"));

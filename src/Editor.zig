@@ -96,7 +96,7 @@ window_opacity: f32 = 1.0,
 project_folder_watch: ProjectFolderWatchState = .{},
 project_folder_watcher: ?ProjectFolderWatcher = null,
 
-pending_native_menu_actions: [16]dvui_editor.backend.NativeMenuAction = undefined,
+pending_native_menu_actions: [16]dvui_editor.ztray.Action = undefined,
 pending_native_menu_actions_len: u8 = 0,
 
 pub fn init(
@@ -266,7 +266,9 @@ pub fn init(
     // };
 
     // dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
-    dvui_editor.backend.setupMacOSMenuBar();
+    dvui_editor.ztray.installDefaultMainMenu(app.gpa, dvui.currentWindow()) catch |err| {
+        dvui.log.err("Failed to install native menu: {any}", .{err});
+    };
 
     editor.explorer.* = .init();
     editor.panel.* = .init();
@@ -308,7 +310,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
     if (builtin.os.tag == .macos) {
-        const suppress_close = dvui_editor.backend.consumeMacOSCloseTabSuppression();
+        const suppress_close = dvui_editor.ztray.consumeCloseTabSuppression();
         const wd = dvui.currentWindow().data();
         for (dvui.events()) |*e| {
             if (!dvui.eventMatchSimple(e, wd)) continue;
@@ -318,7 +320,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         }
     }
 
-    if (dvui_editor.backend.pollPendingNativeMenuAction()) |action| {
+    if (dvui_editor.ztray.pollAction()) |action| {
         editor.queueNativeMenuAction(action);
     }
 
@@ -535,8 +537,8 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         const bg_box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
         defer bg_box.deinit();
 
-        // On macOS, the menu is handled natively, so we don't need to draw it here
-        if (builtin.os.tag != .macos) {
+        // On macOS and Windows, the menu is handled natively.
+        if (builtin.os.tag != .macos and builtin.os.tag != .windows) {
             const result = try Menu.draw();
             if (result != .ok) {
                 return result;
@@ -624,7 +626,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     return .ok;
 }
 
-fn queueNativeMenuAction(editor: *Editor, action: dvui_editor.backend.NativeMenuAction) void {
+fn queueNativeMenuAction(editor: *Editor, action: dvui_editor.ztray.Action) void {
     if (editor.pending_native_menu_actions_len >= editor.pending_native_menu_actions.len) {
         // If we ever overflow, drop the action rather than crashing.
         return;
@@ -646,7 +648,7 @@ fn flushQueuedNativeMenuActions(editor: *Editor) void {
     }
 }
 
-pub fn handleNativeMenuAction(editor: *Editor, action: dvui_editor.backend.NativeMenuAction) !void {
+pub fn handleNativeMenuAction(editor: *Editor, action: dvui_editor.ztray.Action) !void {
     switch (action) {
         .open_folder => {
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {
@@ -694,20 +696,8 @@ pub fn handleNativeMenuAction(editor: *Editor, action: dvui_editor.backend.Nativ
                 };
             }
         },
-        // .undo => {
-        //     if (editor.activeFile()) |file| {
-        //         file.history.undoRedo(file, .undo) catch {
-        //             std.log.err("Failed to undo", .{});
-        //         };
-        //     }
-        // },
-        // .redo => {
-        //     if (editor.activeFile()) |file| {
-        //         file.history.undoRedo(file, .redo) catch {
-        //             std.log.err("Failed to redo", .{});
-        //         };
-        //     }
-        // },
+        .undo => {},
+        .redo => {},
 
         .toggle_explorer => {
             // Use .closed, not paned.split_ratio — split_ratio is only valid during draw

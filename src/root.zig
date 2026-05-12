@@ -36,6 +36,7 @@ pub const math = struct {
 
 pub const dvui = @import("dvui.zig");
 pub const backend = @import("backend.zig");
+pub const ztray = @import("ztray/main.zig");
 
 /// This is a documentation comment to explain the `printAnotherMessage` function below.
 ///
