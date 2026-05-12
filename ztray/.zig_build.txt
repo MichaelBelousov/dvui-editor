@@ -1,0 +1,10 @@
+ssteps
+einstall	Copy build artifacts to prefix path (default)
+euninstall	Remove build artifacts from prefix path
+sproject_options
+eDoptimize	Prioritize performance, safety, or binary size
+eDdvui_fallback	Compile DVUI immediate-mode menu fallback
+eDforce_dvui_menu	Use DVUI menu instead of native shell menus
+eDwio_example	Build ztray + wio native shell menu example (lazy-fetched wio)
+ssystem_integrations
+e(none)	

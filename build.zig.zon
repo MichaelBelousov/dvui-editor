@@ -32,6 +32,9 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
+        .ztray = .{
+            .path = "ztray",
+        },
         .dvui = .{
             .url = "git+https://github.com/david-vanderson/dvui.git#14703fa6d6fea0c608886b5ce2071ef49323c8c0",
             .hash = "dvui-0.5.0-dev-AQFJmbHY9QA1qvhf_l3RPazRT7QOF0pGjLtU4amMq2F-",
