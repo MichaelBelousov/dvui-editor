@@ -1,5 +1,37 @@
 const std = @import("std");
 
+fn createZtrayModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    dvui_fallback_enabled: bool,
+    force_dvui_menu: bool,
+) *std.Build.Module {
+    const zopts = b.addOptions();
+    zopts.addOption(bool, "dvui_fallback", dvui_fallback_enabled);
+    zopts.addOption(bool, "force_dvui_menu", force_dvui_menu);
+    const zopts_mod = zopts.createModule();
+
+    const ztray_mod = b.createModule(.{
+        .root_source_file = b.path("ztray/src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ztray_mod.addImport("ztray_build_options", zopts_mod);
+
+    if (dvui_fallback_enabled) {
+        const dvui_lazy = b.lazyDependency("dvui", .{
+            .target = target,
+            .optimize = optimize,
+            .backend = .sdl3,
+        }) orelse @panic("ztray DVUI fallback requires dependency 'dvui' (run: zig build --fetch)");
+        ztray_mod.addImport("dvui", dvui_lazy.module("dvui_sdl3"));
+        ztray_mod.addImport("sdl-backend", dvui_lazy.module("sdl3"));
+    }
+
+    return ztray_mod;
+}
+
 const EditorBuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -34,11 +66,7 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         mod.addImport("icons", dep.module("icons"));
     }
 
-    const ztray_mod = b.createModule(.{
-        .root_source_file = b.path("ztray/src/root.zig"),
-        .target = opts.target,
-        .optimize = opts.optimize,
-    });
+    const ztray_mod = createZtrayModule(b, opts.target, opts.optimize, false, false);
     mod.addImport("ztray", ztray_mod);
 
     if (opts.target.result.os.tag == .macos) {
@@ -169,6 +197,34 @@ pub fn build(b: *std.Build) void {
     const ci_step = b.step("ci", "Run CI");
     setupCi(b, ci_step);
 
+    const ztray_ex_ztray = createZtrayModule(b, target, optimize, true, true);
+    const ztray_example_mod = b.createModule(.{
+        .root_source_file = b.path("ztray/examples/dvui_fallback/App.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const dvui_ztray_ex = b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .sdl3 });
+    ztray_example_mod.addImport("dvui", dvui_ztray_ex.module("dvui_sdl3"));
+    ztray_example_mod.addImport("sdl-backend", dvui_ztray_ex.module("sdl3"));
+    ztray_example_mod.addImport("ztray", ztray_ex_ztray);
+
+    const ztray_example_exe = b.addExecutable(.{
+        .name = "ztray-dvui-fallback",
+        .root_module = ztray_example_mod,
+    });
+    b.installArtifact(ztray_example_exe);
+
+    const ztray_ex_step = b.step("ztray-dvui-fallback", "Compile the ztray DVUI menu fallback example");
+    ztray_ex_step.dependOn(&ztray_example_exe.step);
+
+    const run_ztray_ex = b.addRunArtifact(ztray_example_exe);
+    run_ztray_ex.step.dependOn(b.getInstallStep());
+    const run_ztray_ex_step = b.step("run-ztray-dvui-fallback", "Run the ztray DVUI menu fallback example");
+    run_ztray_ex_step.dependOn(&run_ztray_ex.step);
+    if (b.args) |args| {
+        run_ztray_ex.addArgs(args);
+    }
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means
@@ -203,5 +259,24 @@ pub fn setupCi(b: *std.Build, step: *std.Build.Step) void {
             .root_module = app_mod,
         });
         step.dependOn(&exe.step);
+
+        const ztray_ex_ztray = createZtrayModule(b, target, .Debug, true, true);
+        const ztray_example_mod = b.createModule(.{
+            .root_source_file = b.path("ztray/examples/dvui_fallback/App.zig"),
+            .target = target,
+            .optimize = .Debug,
+        });
+        const dvui_zex = b.dependency("dvui", .{ .target = target, .optimize = .Debug, .backend = .sdl3 });
+        ztray_example_mod.addImport("dvui", dvui_zex.module("dvui_sdl3"));
+        ztray_example_mod.addImport("sdl-backend", dvui_zex.module("sdl3"));
+        ztray_example_mod.addImport("ztray", ztray_ex_ztray);
+        const ztray_ex = b.addExecutable(.{
+            .name = b.fmt("ztray-dvui-fallback-{s}-{s}", .{
+                @tagName(t.cpu_arch.?),
+                @tagName(t.os_tag.?),
+            }),
+            .root_module = ztray_example_mod,
+        });
+        step.dependOn(&ztray_ex.step);
     }
 }

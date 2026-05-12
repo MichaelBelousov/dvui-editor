@@ -1,8 +1,10 @@
 //! Host-agnostic native menu bar (macOS NSMenu, Win32 HMENU, Linux DBusMenu). No SDL or window toolkit dependency.
+//! Optional compile-time DVUI immediate-mode menu via `ztray_build_options` + `drawMenuBar`.
 const std = @import("std");
 const builtin = @import("builtin");
 
 const types = @import("types.zig");
+const build_opts = @import("ztray_build_options");
 
 pub const ActionId = types.ActionId;
 pub const Modifier = types.Modifier;
@@ -14,8 +16,37 @@ pub const MenuBar = types.MenuBar;
 pub const modifierMask = types.modifierMask;
 pub const formatWindowsShortcut = types.formatWindowsShortcut;
 
+const dvui_fb = if (build_opts.dvui_fallback)
+    @import("dvui_fallback.zig")
+else
+    struct {
+        pub fn installMainMenu(_: std.mem.Allocator, _: MenuBar) !void {}
+        pub fn drawMenuBar() !void {}
+        pub fn pollActionId() ?ActionId {
+            return null;
+        }
+        pub fn shutdownMenu() void {}
+    };
+
+/// When compile-time DVUI fallback is enabled, draws the menu bar for this frame (immediate mode). No-op otherwise.
+pub fn drawMenuBar() !void {
+    if (!build_opts.dvui_fallback) return;
+    try dvui_fb.drawMenuBar();
+}
+
+/// Release menu storage from [`installMainMenu`] when using DVUI fallback (optional).
+pub fn shutdownDvuiMenu() void {
+    if (!build_opts.dvui_fallback) return;
+    dvui_fb.shutdownMenu();
+}
+
 /// Installs the menu bar. On Windows `hwnd` must be the top-level window handle; on macOS it is ignored.
+/// When `force_dvui_menu` is set at compile time, registers an in-app DVUI menu only (call [`drawMenuBar`] each frame).
 pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, hwnd: ?*anyopaque) !void {
+    if (build_opts.dvui_fallback and build_opts.force_dvui_menu) {
+        return dvui_fb.installMainMenu(allocator, menu_bar);
+    }
+
     switch (builtin.os.tag) {
         .macos => return macos.installMainMenu(allocator, menu_bar),
         .windows => {
@@ -29,6 +60,10 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, hwnd: ?*
 
 /// Returns and clears the last menu action id, or null if none.
 pub fn pollActionId() ?ActionId {
+    if (build_opts.dvui_fallback and build_opts.force_dvui_menu) {
+        return dvui_fb.pollActionId();
+    }
+
     const id = switch (builtin.os.tag) {
         .macos => macos.pollActionId(),
         .windows => windows.pollActionId(),
@@ -41,6 +76,7 @@ pub fn pollActionId() ?ActionId {
 
 /// macOS only: whether the last "close tab" style action requested consuming the next window close / quit.
 pub fn consumeCloseTabSuppression() bool {
+    if (build_opts.force_dvui_menu) return false;
     return switch (builtin.os.tag) {
         .macos => macos.consumeCloseTabSuppression(),
         else => false,
