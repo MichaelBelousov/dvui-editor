@@ -37,7 +37,6 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
     const ztray_dep = b.dependency("ztray", .{
         .target = opts.target,
         .optimize = opts.optimize,
-        .dvui_fallback = false,
         .force_dvui_menu = false,
     });
     mod.addImport("ztray", ztray_dep.module("ztray"));
@@ -170,45 +169,6 @@ pub fn build(b: *std.Build) void {
     const ci_step = b.step("ci", "Run CI");
     setupCi(b, ci_step);
 
-    const ztray_ex_dep = b.dependency("ztray", .{
-        .target = target,
-        .optimize = optimize,
-        .dvui_fallback = true,
-        .force_dvui_menu = true,
-    });
-    const ztray_example_exe = ztray_ex_dep.artifact("ztray-dvui-fallback");
-
-    const ztray_ex_step = b.step("ztray-dvui-fallback", "Compile the ztray DVUI menu fallback example");
-    ztray_ex_step.dependOn(&ztray_example_exe.step);
-
-    const run_ztray_ex = b.addRunArtifact(ztray_example_exe);
-    run_ztray_ex.step.dependOn(b.getInstallStep());
-    const run_ztray_ex_step = b.step("run-ztray-dvui-fallback", "Run the ztray DVUI menu fallback example");
-    run_ztray_ex_step.dependOn(&run_ztray_ex.step);
-    if (b.args) |args| {
-        run_ztray_ex.addArgs(args);
-    }
-
-    const ztray_wio_dep = b.dependency("ztray", .{
-        .target = target,
-        .optimize = optimize,
-        .dvui_fallback = false,
-        .force_dvui_menu = false,
-        .wio_example = true,
-    });
-    const ztray_wio_exe = ztray_wio_dep.artifact("ztray-wio-native");
-
-    const ztray_wio_step = b.step("ztray-wio-native", "Compile the ztray + wio native menu example");
-    ztray_wio_step.dependOn(&ztray_wio_exe.step);
-
-    const run_ztray_wio = b.addRunArtifact(ztray_wio_exe);
-    run_ztray_wio.step.dependOn(b.getInstallStep());
-    const run_ztray_wio_step = b.step("run-ztray-wio-native", "Run the ztray + wio native menu example");
-    run_ztray_wio_step.dependOn(&run_ztray_wio.step);
-    if (b.args) |args| {
-        run_ztray_wio.addArgs(args);
-    }
-
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means
@@ -243,22 +203,5 @@ pub fn setupCi(b: *std.Build, step: *std.Build.Step) void {
             .root_module = app_mod,
         });
         step.dependOn(&exe.step);
-
-        const ztray_ex_dep = b.dependency("ztray", .{
-            .target = target,
-            .optimize = .Debug,
-            .dvui_fallback = true,
-            .force_dvui_menu = true,
-        });
-        step.dependOn(&ztray_ex_dep.artifact("ztray-dvui-fallback").step);
-
-        const ztray_wio_ci = b.dependency("ztray", .{
-            .target = target,
-            .optimize = .Debug,
-            .dvui_fallback = false,
-            .force_dvui_menu = false,
-            .wio_example = true,
-        });
-        step.dependOn(&ztray_wio_ci.artifact("ztray-wio-native").step);
     }
 }

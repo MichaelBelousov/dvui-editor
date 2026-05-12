@@ -1,20 +1,35 @@
-//! Minimal DVUI app that uses ztray with compile-time forced DVUI menu (`zig build run-ztray-dvui-fallback`).
+//! DVUI app + ztray: **native** shell menu by default; in-app DVUI menu bar only with `-Dforce_dvui_menu=true` in this package’s `zig build`.
 const std = @import("std");
 const builtin = @import("builtin");
 
 const dvui = @import("dvui");
 pub const main = dvui.App.main;
 pub const panic = dvui.App.panic;
-
+const sdl3 = @import("sdl-backend").c;
+const zbo = @import("ztray_build_options");
 const ztray = @import("ztray");
+
 const menu_def = @import("menu_def.zig");
 
 var hello_count: u32 = 0;
 
+fn menuHostHwnd(win: *dvui.Window) ?*anyopaque {
+    if (builtin.os.tag != .windows) return null;
+    const raw = sdl3.SDL_GetPointerProperty(
+        sdl3.SDL_GetWindowProperties(win.backend.impl.window),
+        sdl3.SDL_PROP_WINDOW_WIN32_HWND_POINTER,
+        null,
+    );
+    return if (raw != null) @ptrCast(raw) else null;
+}
+
 pub const dvui_app: dvui.App = .{ .config = .{ .options = .{
     .size = .{ .w = 720.0, .h = 480.0 },
     .min_size = .{ .w = 400.0, .h = 300.0 },
-    .title = "ztray DVUI fallback",
+    .title = if (zbo.force_dvui_menu)
+        "ztray + DVUI (in-app menu)"
+    else
+        "ztray + DVUI (native menu)",
     .transparent = if (builtin.os.tag == .macos or builtin.os.tag == .windows) true else false,
 } }, .frameFn = AppFrame, .initFn = AppInit, .deinitFn = AppDeinit };
 
@@ -23,7 +38,7 @@ pub const std_options: std.Options = .{
 };
 
 pub fn AppInit(win: *dvui.Window) !void {
-    ztray.installMainMenu(win.gpa, menu_def.menu_bar, null) catch |err| {
+    ztray.installMainMenu(win.gpa, menu_def.menu_bar, menuHostHwnd(win)) catch |err| {
         std.log.err("ztray installMainMenu: {s}", .{@errorName(err)});
     };
 }
@@ -33,14 +48,28 @@ pub fn AppDeinit() void {
 }
 
 pub fn AppFrame() !dvui.App.Result {
-    try ztray.drawMenuBar();
+    if (zbo.force_dvui_menu) {
+        try ztray.drawMenuBar();
+    }
+
+    if (builtin.os.tag == .macos) {
+        const suppress_close = ztray.consumeCloseTabSuppression();
+        const wd = dvui.currentWindow().data();
+        for (dvui.events()) |*e| {
+            if (!dvui.eventMatchSimple(e, wd)) continue;
+            if (suppress_close and ((e.evt == .window and e.evt.window.action == .close) or (e.evt == .app and e.evt.app.action == .quit))) {
+                e.handle(@src(), wd);
+            }
+        }
+    }
 
     if (ztray.pollActionId()) |raw| {
         if (std.enums.fromInt(menu_def.DemoAction, raw)) |action| {
             switch (action) {
                 .say_hello => {
                     hello_count += 1;
-                    std.log.info("Hello from ztray DVUI fallback (#{d})", .{hello_count});
+                    const src: []const u8 = if (zbo.force_dvui_menu) "DVUI menu" else "native menu";
+                    std.log.info("Hello from ztray ({s}) (#{d})", .{ src, hello_count });
                 },
                 .toggle_demo => {
                     dvui.Examples.show_demo_window = !dvui.Examples.show_demo_window;
@@ -55,7 +84,13 @@ pub fn AppFrame() !dvui.App.Result {
     var box = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
     defer box.deinit();
 
-    dvui.labelNoFmt(@src(), "Compile this example with:\n  zig build run-ztray-dvui-fallback\n\nMenu bar above uses ztray + DVUI only (no native shell menus).", .{}, .{ .expand = .horizontal });
+    const hint =
+        \\Default: native shell menu (Windows HMENU / macOS NSMenu / Linux D-Bus).
+        \\In-app DVUI menu bar: zig build -Dforce_dvui_menu=true then zig build run-dvui
+        \\
+        \\From ztray/: zig build run-dvui (native menu).
+    ;
+    dvui.labelNoFmt(@src(), hint, .{}, .{ .expand = .horizontal });
 
     dvui.Examples.demo(.lite);
 

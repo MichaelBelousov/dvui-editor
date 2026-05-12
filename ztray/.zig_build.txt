@@ -1,10 +1,13 @@
 ssteps
 einstall	Copy build artifacts to prefix path (default)
 euninstall	Remove build artifacts from prefix path
+erun-dvui	Run the DVUI + ztray sample (same zig build invocation: add -Dforce_dvui_menu=true for in-app menu; underscores, not hyphens)
+erun-wio-native	Run the ztray + wio native menu sample
 sproject_options
 eDoptimize	Prioritize performance, safety, or binary size
-eDdvui_fallback	Compile DVUI immediate-mode menu fallback
-eDforce_dvui_menu	Use DVUI menu instead of native shell menus
-eDwio_example	Build ztray + wio native shell menu example (lazy-fetched wio)
+eDforce_dvui_menu	Use in-app DVUI menu bar instead of native shell menus (only with dvui_sample or dvui_fallback)
 ssystem_integrations
-e(none)	
+esdl3	
+eaccesskit	
+efreetype	
+ewio	

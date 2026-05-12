@@ -1,4 +1,4 @@
-//! Demo menu for the ztray DVUI fallback example (numeric ids match typical app conventions).
+//! Demo menu for the ztray + DVUI sample (native shell menu by default; in-app bar with `-Dforce_dvui_menu=true`).
 const ztray = @import("ztray");
 
 pub const DemoAction = enum(ztray.ActionId) {
