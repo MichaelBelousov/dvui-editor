@@ -1,4 +1,4 @@
-//! Host-agnostic native menu bar (macOS NSMenu, Win32 HMENU). No SDL or window toolkit dependency.
+//! Host-agnostic native menu bar (macOS NSMenu, Win32 HMENU, Linux DBusMenu). No SDL or window toolkit dependency.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -22,6 +22,7 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, hwnd: ?*
             const h = hwnd orelse return error.MissingWindowsHwnd;
             return windows.installMainMenu(allocator, h, menu_bar);
         },
+        .linux => return linux.installMainMenu(allocator, menu_bar),
         else => {},
     }
 }
@@ -31,6 +32,7 @@ pub fn pollActionId() ?ActionId {
     const id = switch (builtin.os.tag) {
         .macos => macos.pollActionId(),
         .windows => windows.pollActionId(),
+        .linux => linux.pollActionId(),
         else => -1,
     };
     if (id < 0) return null;
@@ -57,6 +59,13 @@ const macos = if (builtin.os.tag == .macos) @import("macos.zig") else struct {
 
 const windows = if (builtin.os.tag == .windows) @import("windows.zig") else struct {
     fn installMainMenu(_: std.mem.Allocator, _: ?*anyopaque, _: MenuBar) error{OutOfMemory, MenuInstallFailed, ActionIdOutOfRange}!void {}
+    fn pollActionId() c_int {
+        return -1;
+    }
+};
+
+const linux = if (builtin.os.tag == .linux) @import("linux.zig") else struct {
+    fn installMainMenu(_: std.mem.Allocator, _: MenuBar) !void {}
     fn pollActionId() c_int {
         return -1;
     }
