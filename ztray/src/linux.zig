@@ -158,7 +158,8 @@ pub fn pollActionId() c_int {
     return ztray_linux_dbus_take_pending();
 }
 
-pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_name: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory }!void {
+pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_name: ?[]const u8, icon_png: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory }!void {
+    _ = icon_png;
     if (tray_session_active.swap(true, .acq_rel)) return error.TrayAlreadyInstalled;
     errdefer _ = tray_session_active.store(false, .release);
 

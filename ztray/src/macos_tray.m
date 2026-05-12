@@ -40,7 +40,7 @@ static NSEventModifierFlags ztrayTrayModifierFlags(unsigned int modifiers) {
     return flags;
 }
 
-bool ZTrayMacOSTrayInstall(const char *tooltip, const char *icon_path_utf8_or_null) {
+bool ZTrayMacOSTrayInstall(const char *tooltip, const char *icon_path_utf8_or_null, const unsigned char *png_bytes, size_t png_len) {
     if (ztray_tray_status_item != nil) return false;
 
     if (ztray_tray_menu_target == nil) {
@@ -62,7 +62,14 @@ bool ZTrayMacOSTrayInstall(const char *tooltip, const char *icon_path_utf8_or_nu
     ztray_tray_status_item.menu = ztray_tray_menu;
     ztray_tray_status_item.button.toolTip = ztrayTrayString(tooltip);
 
-    if (icon_path_utf8_or_null != NULL && icon_path_utf8_or_null[0] != '\0') {
+    if (png_len > 0 && png_bytes != NULL) {
+        NSData *d = [NSData dataWithBytes:png_bytes length:png_len];
+        NSImage *img = [[NSImage alloc] initWithData:d];
+        if (img != nil) {
+            img.size = NSMakeSize(18, 18);
+            ztray_tray_status_item.button.image = img;
+        }
+    } else if (icon_path_utf8_or_null != NULL && icon_path_utf8_or_null[0] != '\0') {
         NSString *p = [NSString stringWithUTF8String:icon_path_utf8_or_null];
         NSImage *img = [[NSImage alloc] initWithContentsOfFile:p];
         if (img != nil) {

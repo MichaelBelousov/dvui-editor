@@ -19,11 +19,16 @@ pub const MenuBar = types.MenuBar;
 /// Same [`Menu`] shape as menubar submenus; the root `title` is only used on some Linux paths.
 pub const TrayMenu = Menu;
 
+/// PNG bytes for the tray sample icon (`src/zig-favicon.png`, same image as `examples/zig-favicon.png`).
+pub const zig_favicon_png = @embedFile("zig-favicon.png");
+
 pub const modifierMask = types.modifierMask;
 pub const formatWindowsShortcut = types.formatWindowsShortcut;
 
 pub const TrayIconOptions = struct {
     tooltip: []const u8,
+    /// Raw PNG bytes (e.g. `@embedFile("icon.png")`). When non-empty, used in preference to `icon_file` on macOS and Windows.
+    icon_png: ?[]const u8 = null,
     /// Optional UTF-8 path to an icon file (e.g. `.ico` on Windows, image on macOS). On Linux prefer `linux_icon_name`.
     icon_file: ?[]const u8 = null,
     /// Freedesktop icon name for Linux StatusNotifierItem (`IconName`).
@@ -32,8 +37,8 @@ pub const TrayIconOptions = struct {
     windows_hwnd: ?*anyopaque = null,
 };
 
-pub const InstallTrayIconError = error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory };
-pub const SetTrayMenuError = error{ OutOfMemory, MenuInstallFailed, ActionIdOutOfRange, DBusUnavailable };
+pub const InstallTrayIconError = error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory, InvalidWtf8 };
+pub const SetTrayMenuError = error{ OutOfMemory, MenuInstallFailed, ActionIdOutOfRange, DBusUnavailable, InvalidWtf8 };
 
 /// Pump native tray-related events (D-Bus on Linux, short Cocoa run-loop slice on macOS, `PeekMessage` on Windows).
 pub fn pumpTrayEvents() void {
@@ -114,14 +119,15 @@ pub fn consumeCloseTabSuppression() bool {
 
 pub fn installTrayIcon(allocator: std.mem.Allocator, options: TrayIconOptions) InstallTrayIconError!void {
     switch (builtin.os.tag) {
-        .macos => return macos.installTrayIcon(allocator, options.tooltip, options.icon_file),
+        .macos => return macos.installTrayIcon(allocator, options.tooltip, options.icon_file, options.icon_png),
         .windows => return windows.installTrayIcon(
             allocator,
             @ptrCast(options.windows_hwnd orelse null),
             options.tooltip,
             options.icon_file,
+            options.icon_png,
         ),
-        .linux => return linux.installTrayIcon(allocator, options.tooltip, options.linux_icon_name orelse options.icon_file),
+        .linux => return linux.installTrayIcon(allocator, options.tooltip, options.linux_icon_name orelse options.icon_file, options.icon_png),
         else => return error.TrayInstallFailed,
     }
 }
@@ -163,7 +169,7 @@ const macos = if (builtin.os.tag == .macos) @import("macos.zig") else struct {
     fn consumeCloseTabSuppression() bool {
         return false;
     }
-    fn installTrayIcon(_: std.mem.Allocator, _: []const u8, _: ?[]const u8) InstallTrayIconError!void {
+    fn installTrayIcon(_: std.mem.Allocator, _: []const u8, _: ?[]const u8, _: ?[]const u8) InstallTrayIconError!void {
         return error.TrayInstallFailed;
     }
     fn setTrayMenu(_: std.mem.Allocator, _: Menu) SetTrayMenuError!void {
@@ -181,7 +187,7 @@ const windows = if (builtin.os.tag == .windows) @import("windows.zig") else stru
     fn pollActionId() c_int {
         return -1;
     }
-    fn installTrayIcon(_: std.mem.Allocator, _: ?*anyopaque, _: []const u8, _: ?[]const u8) InstallTrayIconError!void {
+    fn installTrayIcon(_: std.mem.Allocator, _: ?*anyopaque, _: []const u8, _: ?[]const u8, _: ?[]const u8) InstallTrayIconError!void {
         return error.TrayInstallFailed;
     }
     fn setTrayMenu(_: std.mem.Allocator, _: Menu) SetTrayMenuError!void {
@@ -199,7 +205,7 @@ const linux = if (builtin.os.tag == .linux) @import("linux.zig") else struct {
     fn pollActionId() c_int {
         return -1;
     }
-    fn installTrayIcon(_: std.mem.Allocator, _: []const u8, _: ?[]const u8) InstallTrayIconError!void {
+    fn installTrayIcon(_: std.mem.Allocator, _: []const u8, _: ?[]const u8, _: ?[]const u8) InstallTrayIconError!void {
         return error.TrayInstallFailed;
     }
     fn setTrayMenu(_: std.mem.Allocator, _: Menu) SetTrayMenuError!void {

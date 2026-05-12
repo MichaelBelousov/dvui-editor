@@ -63,6 +63,10 @@ var tray_hwnd_owned: bool = false;
 var tray_popup_menu: HMENU = null;
 var tray_callback_msg: UINT = WM_APP + 80;
 var tray_nid: UINT = 1;
+var tray_icon_handle: HICON = null;
+var tray_icon_destroy_on_shutdown: bool = false;
+
+extern fn ztray_win32_icon_from_png(data: [*]const u8, len: c_int) callconv(.c) HICON;
 
 extern "user32" fn CreateMenu() callconv(.winapi) HMENU;
 extern "user32" fn CreatePopupMenu() callconv(.winapi) HMENU;
@@ -80,6 +84,7 @@ extern "user32" fn SetForegroundWindow(hWnd: HWND) callconv(.winapi) BOOL;
 extern "user32" fn PostMessageW(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) BOOL;
 extern "user32" fn LoadIconW(hInstance: HINSTANCE, lpIconName: UINT_PTR) callconv(.winapi) HICON;
 extern "user32" fn LoadImageW(hInstance: HINSTANCE, name: UINT_PTR, type: UINT, cx: i32, cy: i32, fuLoad: UINT) callconv(.winapi) HICON;
+extern "user32" fn DestroyIcon(hIcon: HICON) callconv(.winapi) BOOL;
 
 extern "shell32" fn Shell_NotifyIconW(dwMessage: DWORD, lpData: *NOTIFYICONDATAW) callconv(.winapi) BOOL;
 
@@ -274,26 +279,41 @@ fn createMessageOnlyTrayWindow() !HWND {
 fn fillNotifyTip(out: *[128]WCHAR, tooltip: []const u8) void {
     @memset(std.mem.sliceAsBytes(out)[0..], 0);
     const max_utf16 = out.len - 1;
-    const n = std.unicode.wtf8ToWtf16Le(tooltip, out[0..max_utf16]) catch {
+    const n = std.unicode.wtf8ToWtf16Le(out[0..max_utf16], tooltip) catch {
         out[0] = 0;
         return;
     };
     out[n] = 0;
 }
 
-fn loadTrayIcon(allocator: std.mem.Allocator, icon_file_utf8: ?[]const u8) !HICON {
-    if (icon_file_utf8) |path| {
-        const wide = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, path);
-        defer allocator.free(wide);
-        if (LoadImageW(null, @intFromPtr(wide.ptr), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE)) |ico| {
-            return ico;
+const TrayLoadedIcon = struct {
+    icon: HICON,
+    destroy_on_done: bool,
+};
+
+fn loadTrayIcon(allocator: std.mem.Allocator, icon_png: ?[]const u8, icon_file_utf8: ?[]const u8) !TrayLoadedIcon {
+    if (icon_png) |png| {
+        if (png.len > 0) {
+            if (png.len > @as(usize, @intCast(std.math.maxInt(c_int)))) return error.TrayInstallFailed;
+            const h = ztray_win32_icon_from_png(@ptrCast(png.ptr), @intCast(png.len));
+            if (h == null) return error.TrayInstallFailed;
+            return .{ .icon = h, .destroy_on_done = true };
         }
     }
-    return LoadIconW(null, IDI_APPLICATION) orelse return error.TrayInstallFailed;
+    if (icon_file_utf8) |path| {
+        if (path.len > 0) {
+            const wide = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, path);
+            defer allocator.free(wide);
+            const h = LoadImageW(null, @intFromPtr(wide.ptr), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE) orelse return error.TrayInstallFailed;
+            return .{ .icon = h, .destroy_on_done = true };
+        }
+    }
+    const h = LoadIconW(null, IDI_APPLICATION) orelse return error.TrayInstallFailed;
+    return .{ .icon = h, .destroy_on_done = false };
 }
 
 /// `host_hwnd` null = internal message-only window (tray-only apps).
-pub fn installTrayIcon(allocator: std.mem.Allocator, host_hwnd: HWND, tooltip_utf8: []const u8, icon_file_utf8: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory }!void {
+pub fn installTrayIcon(allocator: std.mem.Allocator, host_hwnd: HWND, tooltip_utf8: []const u8, icon_file_utf8: ?[]const u8, icon_png: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory, InvalidWtf8 }!void {
     if (tray_icon_installed.swap(true, .acq_rel)) return error.TrayAlreadyInstalled;
 
     tray_hwnd = host_hwnd orelse createMessageOnlyTrayWindow() catch |err| {
@@ -310,7 +330,7 @@ pub fn installTrayIcon(allocator: std.mem.Allocator, host_hwnd: HWND, tooltip_ut
         return error.TrayInstallFailed;
     }
 
-    const hicon = loadTrayIcon(allocator, icon_file_utf8) catch |err| {
+    const loaded = loadTrayIcon(allocator, icon_png, icon_file_utf8) catch |err| {
         _ = RemoveWindowSubclass(tray_hwnd, traySubclassProc, tray_subclass_id);
         if (tray_hwnd_owned) _ = DestroyWindow(tray_hwnd);
         tray_hwnd = null;
@@ -325,12 +345,13 @@ pub fn installTrayIcon(allocator: std.mem.Allocator, host_hwnd: HWND, tooltip_ut
         .uID = tray_nid,
         .uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
         .uCallbackMessage = tray_callback_msg,
-        .hIcon = hicon,
+        .hIcon = loaded.icon,
         .szTip = undefined,
     };
     fillNotifyTip(&nid.szTip, tooltip_utf8);
 
     if (Shell_NotifyIconW(NIM_ADD, &nid) == 0) {
+        if (loaded.destroy_on_done) _ = DestroyIcon(loaded.icon);
         _ = RemoveWindowSubclass(tray_hwnd, traySubclassProc, tray_subclass_id);
         if (tray_hwnd_owned) _ = DestroyWindow(tray_hwnd);
         tray_hwnd = null;
@@ -339,11 +360,14 @@ pub fn installTrayIcon(allocator: std.mem.Allocator, host_hwnd: HWND, tooltip_ut
         return error.TrayInstallFailed;
     }
 
+    tray_icon_handle = loaded.icon;
+    tray_icon_destroy_on_shutdown = loaded.destroy_on_done;
+
     nid.uVersion = NOTIFYICON_VERSION_4;
     _ = Shell_NotifyIconW(NIM_SETVERSION, &nid);
 }
 
-pub fn setTrayMenu(allocator: std.mem.Allocator, menu: types.Menu) error{ OutOfMemory, MenuInstallFailed, ActionIdOutOfRange }!void {
+pub fn setTrayMenu(allocator: std.mem.Allocator, menu: types.Menu) error{ OutOfMemory, MenuInstallFailed, ActionIdOutOfRange, InvalidWtf8 }!void {
     if (tray_hwnd == null) return error.MenuInstallFailed;
 
     if (tray_popup_menu) |old| {
@@ -372,6 +396,11 @@ pub fn shutdownTray() void {
             .szTip = [_]WCHAR{0} ** 128,
         };
         _ = Shell_NotifyIconW(NIM_DELETE, &nid);
+        if (tray_icon_destroy_on_shutdown) {
+            if (tray_icon_handle) |hi| _ = DestroyIcon(hi);
+            tray_icon_handle = null;
+            tray_icon_destroy_on_shutdown = false;
+        }
         _ = RemoveWindowSubclass(hwnd, traySubclassProc, tray_subclass_id);
         if (tray_popup_menu) |m| {
             _ = DestroyMenu(m);

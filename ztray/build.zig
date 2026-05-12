@@ -8,8 +8,10 @@ fn linkNativeMenu(ztray_mod: *std.Build.Module, b: *std.Build, target: std.Build
             ztray_mod.addCSourceFile(.{ .file = b.path("src/macos_tray.m") });
         },
         .windows => {
+            ztray_mod.addCSourceFile(.{ .file = b.path("src/windows_tray_png.c") });
             ztray_mod.linkSystemLibrary("comctl32", .{});
             ztray_mod.linkSystemLibrary("shell32", .{});
+            ztray_mod.linkSystemLibrary("gdi32", .{});
         },
         .linux => {
             const native_linux = b.graph.host.result.os.tag == .linux;

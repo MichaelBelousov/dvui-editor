@@ -18,7 +18,7 @@ extern fn ZTrayMacOSEndMainMenu() bool;
 extern fn ZTrayMacOSPollAction() c_int;
 extern fn ZTrayMacOSConsumeCloseTabSuppression() bool;
 
-extern fn ZTrayMacOSTrayInstall(tooltip: [*:0]const u8, icon_path_utf8_or_null: ?[*:0]const u8) bool;
+extern fn ZTrayMacOSTrayInstall(tooltip: [*:0]const u8, icon_path_utf8_or_null: ?[*:0]const u8, png_bytes: ?[*]const u8, png_len: usize) bool;
 extern fn ZTrayMacOSTrayClearMenu() bool;
 extern fn ZTrayMacOSTrayAddItem(
     title: [*:0]const u8,
@@ -82,7 +82,7 @@ pub fn consumeCloseTabSuppression() bool {
     return ZTrayMacOSConsumeCloseTabSuppression();
 }
 
-pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_file_utf8: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory }!void {
+pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_file_utf8: ?[]const u8, icon_png: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory }!void {
     if (macos_tray_active.swap(true, .acq_rel)) return error.TrayAlreadyInstalled;
     errdefer _ = macos_tray_active.store(false, .release);
 
@@ -92,9 +92,15 @@ pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_f
     const icon_z: ?[:0]u8 = if (icon_file_utf8) |p| try allocator.dupeZ(u8, p) else null;
     defer if (icon_z) |z| allocator.free(z);
 
+    const png = icon_png orelse &[0]u8{};
+    const png_ptr: ?[*]const u8 = if (png.len > 0) png.ptr else null;
+    const png_len: usize = if (png.len > 0) png.len else 0;
+
     if (!ZTrayMacOSTrayInstall(
         tip_z.ptr,
         if (icon_z) |z| z.ptr else null,
+        png_ptr,
+        png_len,
     )) {
         _ = macos_tray_active.store(false, .release);
         return error.TrayInstallFailed;
