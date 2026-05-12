@@ -167,4 +167,126 @@ pub fn build(b: *std.Build) void {
             run_tray_cmd.addArgs(args);
         }
     }
+
+    const ci_step = b.step(
+        "ci",
+        "Build all ztray examples for CI targets (Linux aarch64/x86_64, Windows x86_64; native macOS when host is macOS)",
+    );
+    setupZtrayCi(b, ci_step, force_dvui_menu);
+}
+
+/// Cross-compiles every example executable for the same targets as the parent repo’s `setupCi` (see root `build.zig`).
+/// macOS is built only when the build graph host is macOS (Apple SDK; no Linux→macOS cross here).
+fn setupZtrayCi(b: *std.Build, ci_step: *std.Build.Step, force_dvui_menu: bool) void {
+    const optimize: std.builtin.OptimizeMode = .Debug;
+
+    const cross_targets: []const std.Target.Query = &.{
+        .{ .cpu_arch = .aarch64, .os_tag = .linux, .abi = .gnu },
+        .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu },
+        .{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .gnu },
+    };
+
+    for (cross_targets) |q| {
+        addZtrayCiExamplesForTarget(b, ci_step, b.resolveTargetQuery(q), optimize, force_dvui_menu);
+    }
+
+    if (b.graph.host.result.os.tag == .macos) {
+        addZtrayCiExamplesForTarget(b, ci_step, b.graph.host, optimize, force_dvui_menu);
+    }
+}
+
+fn addZtrayCiExamplesForTarget(
+    b: *std.Build,
+    ci_step: *std.Build.Step,
+    resolved: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    force_dvui_menu: bool,
+) void {
+    const zopts = b.addOptions();
+    zopts.addOption(bool, "dvui_fallback", true);
+    zopts.addOption(bool, "force_dvui_menu", force_dvui_menu);
+    const zopts_mod = zopts.createModule();
+
+    const ztray_mod = b.addModule("ztray", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = resolved,
+        .optimize = optimize,
+    });
+    ztray_mod.addImport("ztray_build_options", zopts_mod);
+
+    linkNativeMenu(ztray_mod, b, resolved);
+
+    const dvui_dep = b.dependency("dvui", .{
+        .target = resolved,
+        .optimize = optimize,
+        .backend = .sdl3,
+    });
+    ztray_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+    ztray_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
+
+    const os_tag = @tagName(resolved.result.os.tag);
+    const arch_tag = @tagName(resolved.result.cpu.arch);
+
+    {
+        const example_mod = b.createModule(.{
+            .root_source_file = b.path("examples/dvui_fallback/App.zig"),
+            .target = resolved,
+            .optimize = optimize,
+        });
+        example_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+        example_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
+        example_mod.addImport("ztray", ztray_mod);
+        example_mod.addImport("ztray_build_options", zopts_mod);
+
+        const exe = b.addExecutable(.{
+            .name = b.fmt("ztray-dvui-{s}-{s}", .{ arch_tag, os_tag }),
+            .root_module = example_mod,
+        });
+        ci_step.dependOn(&exe.step);
+    }
+
+    {
+        const wio_dep = b.dependency("wio", .{
+            .target = resolved,
+            .optimize = optimize,
+        });
+
+        const example_mod = b.createModule(.{
+            .root_source_file = b.path("examples/wio_native/App.zig"),
+            .target = resolved,
+            .optimize = optimize,
+        });
+        example_mod.addImport("wio", wio_dep.module("wio"));
+        example_mod.addImport("ztray", ztray_mod);
+
+        const exe = b.addExecutable(.{
+            .name = b.fmt("ztray-wio-native-{s}-{s}", .{ arch_tag, os_tag }),
+            .root_module = example_mod,
+        });
+        if (resolved.result.os.tag == .linux) {
+            exe.linkage = .dynamic;
+        }
+        ci_step.dependOn(&exe.step);
+    }
+
+    {
+        const example_mod = b.createModule(.{
+            .root_source_file = b.path("examples/tray_minimal/App.zig"),
+            .target = resolved,
+            .optimize = optimize,
+        });
+        example_mod.addImport("ztray", ztray_mod);
+
+        const exe = b.addExecutable(.{
+            .name = b.fmt("ztray-tray-minimal-{s}-{s}", .{ arch_tag, os_tag }),
+            .root_module = example_mod,
+        });
+        if (resolved.result.os.tag == .macos) {
+            exe.root_module.linkFramework("AppKit", .{});
+        }
+        if (resolved.result.os.tag == .linux) {
+            exe.linkage = .dynamic;
+        }
+        ci_step.dependOn(&exe.step);
+    }
 }
