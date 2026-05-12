@@ -10,15 +10,11 @@ There is no runtime dependency on SDL or a window toolkit inside the core `ztray
 
 ## Using ztray in another project
 
-Add a path (or fetched) dependency on this package, then import the module exposed by `build.zig` (named `ztray`). Pass the same `target` / `optimize` as your app, and set **`force_dvui_menu`** on the dependency if you want the DVUI-only menu path instead of native menus.
+Add a path (or fetched) dependency on this package, then **`addImport("ztray", dep.module("ztray"))`** on your app module. Use the same **`target`** and **`optimize`** as your executable, and set **`force_dvui_menu`** on the dependency if you want the in-app DVUI menu path instead of native shell menus.
 
-You must still **link platform glue** into the final executable (or static library) that contains menu code, same as this repo’s editor does:
+This package’s **`build.zig`** attaches the native implementation (Objective-C on macOS, `comctl32` on Windows, D-Bus menu C or stub on Linux) to the **`ztray` module** itself, so you do **not** list `ztray`’s `.m` / `.c` files or `dbus-1` / `comctl32` in your own `build.zig` unless you have other reasons to.
 
-| OS | What to add |
-|----|-------------|
-| **macOS** | Compile `src/macos_menu.m` (Objective-C). |
-| **Windows** | Link `comctl32`. Pass the top-level **`HWND`** as `?*anyopaque` to `installMainMenu` (e.g. from SDL `SDL_PROP_WINDOW_WIN32_HWND_POINTER`). |
-| **Linux** | If building **on** Linux: compile `src/linux_dbus_menu.c` and link `dbus-1`. When cross-compiling from a non-Linux host, use `src/linux_dbus_stub.c` instead so the linker does not require D-Bus. |
+On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to `installMainMenu` (for example from SDL’s `SDL_PROP_WINDOW_WIN32_HWND_POINTER`).
 
 ## API (summary)
 
@@ -52,7 +48,7 @@ Option names use **underscores** (Zig’s `zig build -D` convention), e.g. `-Dfo
 | Artifact | Step | Notes |
 |----------|------|--------|
 | `ztray-dvui` | `zig build run-dvui` | DVUI window + ztray; native menu unless `-Dforce_dvui_menu=true`. |
-| `ztray-wio-native` | `zig build run-wio-native` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
+| `ztray-wio` | `zig build run-wio` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
 
 On **Linux**, the wio example is linked **dynamically** (wio’s default Unix path expects dynamic linking when system integration is off).
 

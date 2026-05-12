@@ -43,19 +43,9 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
 
     if (opts.target.result.os.tag == .macos) {
         mod.addCSourceFile(.{ .file = std.Build.path(b, "src/macos_native.m") });
-        mod.addCSourceFile(.{ .file = b.path("ztray/src/macos_menu.m") });
     } else if (opts.target.result.os.tag == .windows) {
         if (b.lazyDependency("win32", .{})) |dep| {
             mod.addImport("win32", dep.module("win32"));
-        }
-        mod.linkSystemLibrary("comctl32", .{});
-    } else if (opts.target.result.os.tag == .linux) {
-        const native_linux = b.graph.host.result.os.tag == .linux;
-        if (native_linux) {
-            mod.addCSourceFile(.{ .file = b.path("ztray/src/linux_dbus_menu.c") });
-            mod.linkSystemLibrary("dbus-1", .{});
-        } else {
-            mod.addCSourceFile(.{ .file = b.path("ztray/src/linux_dbus_stub.c") });
         }
     }
     // const assetpack = @import("assetpack");

@@ -1,5 +1,27 @@
 const std = @import("std");
 
+/// Native menu implementation files; attached to the `ztray` module so consumers only `addImport("ztray", ...)`.
+fn linkNativeMenu(ztray_mod: *std.Build.Module, b: *std.Build, target: std.Build.ResolvedTarget) void {
+    switch (target.result.os.tag) {
+        .macos => {
+            ztray_mod.addCSourceFile(.{ .file = b.path("src/macos_menu.m") });
+        },
+        .windows => {
+            ztray_mod.linkSystemLibrary("comctl32", .{});
+        },
+        .linux => {
+            const native_linux = b.graph.host.result.os.tag == .linux;
+            if (native_linux) {
+                ztray_mod.addCSourceFile(.{ .file = b.path("src/linux_dbus_menu.c") });
+                ztray_mod.linkSystemLibrary("dbus-1", .{});
+            } else {
+                ztray_mod.addCSourceFile(.{ .file = b.path("src/linux_dbus_stub.c") });
+            }
+        },
+        else => {},
+    }
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -19,6 +41,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     ztray_mod.addImport("ztray_build_options", zopts_mod);
+
+    linkNativeMenu(ztray_mod, b, target);
 
     {
         const dvui_dep = b.lazyDependency("dvui", .{
@@ -51,25 +75,6 @@ pub fn build(b: *std.Build) void {
             .name = "ztray-dvui",
             .root_module = example_mod,
         });
-
-        switch (target.result.os.tag) {
-            .macos => {
-                example_exe.root_module.addCSourceFile(.{ .file = b.path("src/macos_menu.m") });
-            },
-            .windows => {
-                example_exe.root_module.linkSystemLibrary("comctl32", .{});
-            },
-            .linux => {
-                const native_linux = b.graph.host.result.os.tag == .linux;
-                if (native_linux) {
-                    example_exe.root_module.addCSourceFile(.{ .file = b.path("src/linux_dbus_menu.c") });
-                    example_exe.root_module.linkSystemLibrary("dbus-1", .{});
-                } else {
-                    example_exe.root_module.addCSourceFile(.{ .file = b.path("src/linux_dbus_stub.c") });
-                }
-            },
-            else => {},
-        }
 
         b.installArtifact(example_exe);
 
@@ -110,32 +115,13 @@ pub fn build(b: *std.Build) void {
             example_exe.linkage = .dynamic;
         }
 
-        switch (target.result.os.tag) {
-            .macos => {
-                example_exe.root_module.addCSourceFile(.{ .file = b.path("src/macos_menu.m") });
-            },
-            .windows => {
-                example_exe.root_module.linkSystemLibrary("comctl32", .{});
-            },
-            .linux => {
-                const native_linux = b.graph.host.result.os.tag == .linux;
-                if (native_linux) {
-                    example_exe.root_module.addCSourceFile(.{ .file = b.path("src/linux_dbus_menu.c") });
-                    example_exe.root_module.linkSystemLibrary("dbus-1", .{});
-                } else {
-                    example_exe.root_module.addCSourceFile(.{ .file = b.path("src/linux_dbus_stub.c") });
-                }
-            },
-            else => {},
-        }
-
         b.installArtifact(example_exe);
 
         const run_wio_cmd = b.addRunArtifact(example_exe);
         run_wio_cmd.step.dependOn(b.getInstallStep());
 
         const run_wio_native_step = b.step(
-            "run-wio-native",
+            "run-wio",
             "Run the ztray + wio native menu sample",
         );
         run_wio_native_step.dependOn(&run_wio_cmd.step);
