@@ -59,7 +59,8 @@ Option names use **underscores** (Zig’s `zig build -D` convention), e.g. `-Dfo
 | Artifact | Step | Notes |
 |----------|------|--------|
 | `ztray-dvui` | `zig build run-dvui` | DVUI window + ztray; native menu unless `-Dforce_dvui_menu=true`. |
-| `ztray-wio` | `zig build run-wio` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
+| `ztray-wio-native` | `zig build run-wio` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
+| `ztray-wio-tray` | `zig build run-wio-tray` | wio window + native menubar + system tray (`windows_hwnd` = main window on Windows). |
 | `ztray-tray-minimal` | `zig build run-tray` | Tray icon + context menu only (message-only HWND on Windows). |
 
 On **Linux**, the wio and tray examples are linked **dynamically** where applicable (wio’s default Unix path expects dynamic linking when system integration is off).

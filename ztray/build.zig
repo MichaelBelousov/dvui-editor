@@ -135,6 +135,48 @@ pub fn build(b: *std.Build) void {
     }
 
     {
+        const wio_dep = b.lazyDependency("wio", .{
+            .target = target,
+            .optimize = optimize,
+        }) orelse @panic("ztray wio example requires dependency 'wio' (run: zig build --fetch)");
+
+        const wio_mod = wio_dep.module("wio");
+
+        const example_mod = b.createModule(.{
+            .root_source_file = b.path("examples/wio_tray/App.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        example_mod.addImport("wio", wio_mod);
+        example_mod.addImport("ztray", ztray_mod);
+
+        const example_exe = b.addExecutable(.{
+            .name = "ztray-wio-tray",
+            .root_module = example_mod,
+        });
+        if (target.result.os.tag == .linux) {
+            example_exe.linkage = .dynamic;
+        }
+        if (target.result.os.tag == .macos) {
+            example_exe.root_module.linkFramework("AppKit", .{});
+        }
+
+        b.installArtifact(example_exe);
+
+        const run_wio_tray_cmd = b.addRunArtifact(example_exe);
+        run_wio_tray_cmd.step.dependOn(b.getInstallStep());
+
+        const run_wio_tray_step = b.step(
+            "run-wio-tray",
+            "Run the ztray + wio sample with native menubar and system tray",
+        );
+        run_wio_tray_step.dependOn(&run_wio_tray_cmd.step);
+        if (b.args) |args| {
+            run_wio_tray_cmd.addArgs(args);
+        }
+    }
+
+    {
         const example_mod = b.createModule(.{
             .root_source_file = b.path("examples/tray_minimal/App.zig"),
             .target = target,
@@ -170,7 +212,7 @@ pub fn build(b: *std.Build) void {
 
     const ci_step = b.step(
         "ci",
-        "Build all ztray examples for CI targets (Linux aarch64/x86_64, Windows x86_64; native macOS when host is macOS)",
+        "Build all ztray examples for CI targets (Linux aarch64/x86_64, Windows x86_64; native macOS when host is macOS). Includes wio_tray.",
     );
     setupZtrayCi(b, ci_step, force_dvui_menu);
 }
@@ -265,6 +307,33 @@ fn addZtrayCiExamplesForTarget(
         });
         if (resolved.result.os.tag == .linux) {
             exe.linkage = .dynamic;
+        }
+        ci_step.dependOn(&exe.step);
+    }
+
+    {
+        const wio_dep = b.dependency("wio", .{
+            .target = resolved,
+            .optimize = optimize,
+        });
+
+        const example_mod = b.createModule(.{
+            .root_source_file = b.path("examples/wio_tray/App.zig"),
+            .target = resolved,
+            .optimize = optimize,
+        });
+        example_mod.addImport("wio", wio_dep.module("wio"));
+        example_mod.addImport("ztray", ztray_mod);
+
+        const exe = b.addExecutable(.{
+            .name = b.fmt("ztray-wio-tray-{s}-{s}", .{ arch_tag, os_tag }),
+            .root_module = example_mod,
+        });
+        if (resolved.result.os.tag == .linux) {
+            exe.linkage = .dynamic;
+        }
+        if (resolved.result.os.tag == .macos) {
+            exe.root_module.linkFramework("AppKit", .{});
         }
         ci_step.dependOn(&exe.step);
     }
