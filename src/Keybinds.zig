@@ -61,7 +61,7 @@ pub fn tick() !void {
 
         switch (e.evt) {
             .key => |ke| {
-                // macOS: NSMenu key equivalents already call `PixiNativeMenuAction` (see Editor.flushQueuedNativeMenuActions).
+                // macOS: NSMenu key equivalents already enqueue `native_menu.NativeMenuAction` (see Editor.flushQueuedNativeMenuActions).
                 // SDL still delivers the same key events, so handling them here too would run the action twice.
                 if (builtin.os.tag != .macos) {
                     if (ke.matchBind("open_folder") and ke.action == .down) {

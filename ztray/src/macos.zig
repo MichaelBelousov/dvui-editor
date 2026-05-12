@@ -1,17 +1,24 @@
 const std = @import("std");
 
-const ztray = @import("main.zig");
+const types = @import("types.zig");
 
 extern fn ZTrayMacOSBeginMainMenu() bool;
 extern fn ZTrayMacOSBeginMenu(title: [*:0]const u8) bool;
-extern fn ZTrayMacOSAddItem(title: [*:0]const u8, action_id: c_int, key: [*:0]const u8, modifiers: u32, enabled: bool) bool;
+extern fn ZTrayMacOSAddItem(
+    title: [*:0]const u8,
+    action_id: c_int,
+    key: [*:0]const u8,
+    modifiers: u32,
+    enabled: bool,
+    suppress_next_window_close: bool,
+) bool;
 extern fn ZTrayMacOSAddSeparator() bool;
 extern fn ZTrayMacOSEndMenu() bool;
 extern fn ZTrayMacOSEndMainMenu() bool;
 extern fn ZTrayMacOSPollAction() c_int;
 extern fn ZTrayMacOSConsumeCloseTabSuppression() bool;
 
-pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: ztray.MenuBar) !void {
+pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) !void {
     if (!ZTrayMacOSBeginMainMenu()) return error.MenuInstallFailed;
 
     for (menu_bar.menus) |menu| {
@@ -31,10 +38,15 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: ztray.MenuBar) !v
                     const key = if (action.shortcut) |shortcut| try allocator.dupeZ(u8, shortcut.key) else try allocator.dupeZ(u8, "");
                     defer allocator.free(key);
 
-                    const modifiers = if (action.shortcut) |shortcut| ztray.modifierMask(shortcut) else 0;
-                    if (!ZTrayMacOSAddItem(item_title.ptr, @intFromEnum(action.action), key.ptr, modifiers, action.enabled)) {
-                        return error.MenuInstallFailed;
-                    }
+                    const modifiers = if (action.shortcut) |shortcut| types.modifierMask(shortcut) else 0;
+                    if (!ZTrayMacOSAddItem(
+                        item_title.ptr,
+                        action.action_id,
+                        key.ptr,
+                        modifiers,
+                        action.enabled,
+                        action.suppress_next_window_close,
+                    )) return error.MenuInstallFailed;
                 },
             }
         }

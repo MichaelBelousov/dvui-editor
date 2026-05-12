@@ -34,9 +34,16 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         mod.addImport("icons", dep.module("icons"));
     }
 
+    const ztray_mod = b.createModule(.{
+        .root_source_file = b.path("ztray/src/root.zig"),
+        .target = opts.target,
+        .optimize = opts.optimize,
+    });
+    mod.addImport("ztray", ztray_mod);
+
     if (opts.target.result.os.tag == .macos) {
         mod.addCSourceFile(.{ .file = std.Build.path(b, "src/macos_native.m") });
-        mod.addCSourceFile(.{ .file = std.Build.path(b, "src/ztray/macos_menu.m") });
+        mod.addCSourceFile(.{ .file = b.path("ztray/src/macos_menu.m") });
     } else if (opts.target.result.os.tag == .windows) {
         if (b.lazyDependency("win32", .{})) |dep| {
             mod.addImport("win32", dep.module("win32"));

@@ -91,10 +91,16 @@ static void ztraySuppressNextWindowCloseForCurrentWindow(void) {
 @implementation ZTrayMenuTarget
 - (void)performZTrayAction:(id)sender {
     NSInteger tag = [sender respondsToSelector:@selector(tag)] ? [sender tag] : -1;
-    if (tag == 5) {
-        ztraySuppressNextWindowCloseForCurrentWindow();
-        atomic_store(&ztray_suppress_close_tab_close, true);
+
+    if ([sender isKindOfClass:[NSMenuItem class]]) {
+        NSMenuItem *item = (NSMenuItem *)sender;
+        id rep = item.representedObject;
+        if ([rep isKindOfClass:[NSNumber class]] && [(NSNumber *)rep boolValue]) {
+            ztraySuppressNextWindowCloseForCurrentWindow();
+            atomic_store(&ztray_suppress_close_tab_close, true);
+        }
     }
+
     atomic_store(&ztray_pending_action_id, (int)tag);
 }
 @end
@@ -183,7 +189,7 @@ bool ZTrayMacOSBeginMenu(const char *title) {
     return ztray_pending_menu != nil;
 }
 
-bool ZTrayMacOSAddItem(const char *title, int action_id, const char *key, unsigned int modifiers, bool enabled) {
+bool ZTrayMacOSAddItem(const char *title, int action_id, const char *key, unsigned int modifiers, bool enabled, bool suppress_next_window_close) {
     if (ztray_pending_menu == nil) return false;
 
     NSMenuItem *item = [ztray_pending_menu addItemWithTitle:ztrayString(title) action:@selector(performZTrayAction:) keyEquivalent:ztrayString(key)];
@@ -193,6 +199,7 @@ bool ZTrayMacOSAddItem(const char *title, int action_id, const char *key, unsign
     item.tag = action_id;
     item.enabled = enabled ? YES : NO;
     item.keyEquivalentModifierMask = ztrayModifierFlags(modifiers);
+    item.representedObject = suppress_next_window_close ? @YES : @NO;
     return true;
 }
 

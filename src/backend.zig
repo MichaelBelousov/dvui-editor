@@ -3,7 +3,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const dvui = @import("dvui");
-const sdl3 = @import("backend").c;
+const sdl3 = @import("sdl-backend").c;
 const win32 = @import("win32");
 
 const dvui_editor = @import("root.zig");
@@ -40,26 +40,9 @@ const ACCENT_POLICY = struct {
     animation_id: u32,
 };
 
-// macOS native menu bar (top bar): action ids match PixiMenuTarget.m
-pub const NativeMenuAction = enum(c_int) {
-    open_folder = 0,
-    open_files = 1,
-    save = 2,
-    copy = 3,
-    paste = 4,
-    close_tab = 5,
-    // undo = 6,
-    // redo = 6,
-    toggle_explorer = 8,
-    show_dvui_demo = 9,
-};
-
 const pixi_macos = if (builtin.os.tag == .macos) struct {
     extern fn PixiMacOSSetWindowStyle(window: *anyopaque) void;
     extern fn PixiMacOSSetTitlebarColor(window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool) void;
-    extern fn PixiMacOSSetupMenuBar() bool;
-    extern fn PixiMacOSPollPendingNativeMenuAction() c_int;
-    extern fn PixiMacOSConsumeCloseTabSuppression() bool;
 } else struct {};
 
 // Window button action for custom-drawn title bar (app gets HTCLIENT there and calls this on click).
@@ -116,6 +99,11 @@ fn getWin32Hwnd(win: *dvui.Window) ?*anyopaque {
         null,
     );
     return if (raw != null) @ptrCast(raw) else null;
+}
+
+/// Native Win32 HWND for the DVUI SDL window (other platforms return null).
+pub fn win32Hwnd(win: *dvui.Window) ?*anyopaque {
+    return getWin32Hwnd(win);
 }
 
 // Full-window Mica margins for DwmExtendFrameIntoClientArea (-1 = "sheet of glass").
@@ -403,25 +391,6 @@ pub fn setTitlebarColor(win: *dvui.Window, color: dvui.Color) void {
             win32.ui.windows_and_messaging.LWA_ALPHA,
         );
     }
-}
-
-/// Inserts a "File" menu into the macOS app menu bar (between Apple and Window). Safe to call multiple times; runs once.
-pub fn setupMacOSMenuBar() void {
-    if (builtin.os.tag != .macos) return;
-    _ = pixi_macos.PixiMacOSSetupMenuBar();
-}
-
-/// Returns and clears a pending native menu action (macOS menu bar). Call once per frame; on non-macOS always returns null.
-pub fn pollPendingNativeMenuAction() ?NativeMenuAction {
-    if (builtin.os.tag != .macos) return null;
-    const id = pixi_macos.PixiMacOSPollPendingNativeMenuAction();
-    if (id < 0 or id > 9) return null;
-    return @enumFromInt(id);
-}
-
-pub fn consumeMacOSCloseTabSuppression() bool {
-    if (builtin.os.tag != .macos) return false;
-    return pixi_macos.PixiMacOSConsumeCloseTabSuppression();
 }
 
 pub fn showSimpleMessage(title: [:0]const u8, message: [:0]const u8) void {

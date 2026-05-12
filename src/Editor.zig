@@ -9,6 +9,9 @@ const nightwatch = @import("nightwatch");
 pub const Dialogs = @import("dialogs/Dialogs.zig");
 const dvui_editor = @import("root.zig");
 const App = dvui_editor.App;
+const ztray = @import("ztray");
+const native_menu = @import("native_menu.zig");
+const backend = @import("backend.zig");
 pub const Explorer = @import("explorer/Explorer.zig");
 pub const Keybinds = @import("Keybinds.zig");
 pub const Menu = @import("Menu.zig");
@@ -96,7 +99,7 @@ window_opacity: f32 = 1.0,
 project_folder_watch: ProjectFolderWatchState = .{},
 project_folder_watcher: ?ProjectFolderWatcher = null,
 
-pending_native_menu_actions: [16]dvui_editor.ztray.Action = undefined,
+pending_native_menu_actions: [16]native_menu.NativeMenuAction = undefined,
 pending_native_menu_actions_len: u8 = 0,
 
 pub fn init(
@@ -266,7 +269,8 @@ pub fn init(
     // };
 
     // dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
-    dvui_editor.ztray.installDefaultMainMenu(app.gpa, dvui.currentWindow()) catch |err| {
+    const hwnd = if (builtin.os.tag == .windows) backend.win32Hwnd(dvui.currentWindow()) else null;
+    ztray.installMainMenu(app.gpa, native_menu.main_menu_bar, hwnd) catch |err| {
         dvui.log.err("Failed to install native menu: {any}", .{err});
     };
 
@@ -310,7 +314,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
     if (builtin.os.tag == .macos) {
-        const suppress_close = dvui_editor.ztray.consumeCloseTabSuppression();
+        const suppress_close = ztray.consumeCloseTabSuppression();
         const wd = dvui.currentWindow().data();
         for (dvui.events()) |*e| {
             if (!dvui.eventMatchSimple(e, wd)) continue;
@@ -320,8 +324,10 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
         }
     }
 
-    if (dvui_editor.ztray.pollAction()) |action| {
-        editor.queueNativeMenuAction(action);
+    if (ztray.pollActionId()) |raw| {
+        if (nativeMenuActionFromPoll(raw)) |action| {
+            editor.queueNativeMenuAction(action);
+        }
     }
 
     if (editor.project_folder_watch.refresh_pending.swap(false, .acq_rel)) {
@@ -626,7 +632,11 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     return .ok;
 }
 
-fn queueNativeMenuAction(editor: *Editor, action: dvui_editor.ztray.Action) void {
+fn nativeMenuActionFromPoll(raw: ztray.ActionId) ?native_menu.NativeMenuAction {
+    return std.enums.fromInt(native_menu.NativeMenuAction, raw);
+}
+
+fn queueNativeMenuAction(editor: *Editor, action: native_menu.NativeMenuAction) void {
     if (editor.pending_native_menu_actions_len >= editor.pending_native_menu_actions.len) {
         // If we ever overflow, drop the action rather than crashing.
         return;
@@ -648,7 +658,7 @@ fn flushQueuedNativeMenuActions(editor: *Editor) void {
     }
 }
 
-pub fn handleNativeMenuAction(editor: *Editor, action: dvui_editor.ztray.Action) !void {
+pub fn handleNativeMenuAction(editor: *Editor, action: native_menu.NativeMenuAction) !void {
     switch (action) {
         .open_folder => {
             if (try dvui.dialogNativeFolderSelect(dvui.currentWindow().arena(), .{ .title = "Open Project Folder" })) |folder| {

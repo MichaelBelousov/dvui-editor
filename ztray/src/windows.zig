@@ -1,9 +1,6 @@
 const std = @import("std");
 
-const dvui = @import("dvui");
-const sdl3 = @import("sdl-backend").c;
-
-const ztray = @import("main.zig");
+const types = @import("types.zig");
 
 const HWND = ?*anyopaque;
 const HMENU = ?*anyopaque;
@@ -41,10 +38,10 @@ extern "comctl32" fn SetWindowSubclass(
 ) callconv(.winapi) BOOL;
 extern "comctl32" fn DefSubclassProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT;
 
-pub fn installMainMenu(allocator: std.mem.Allocator, window: *dvui.Window, menu_bar: ztray.MenuBar) !void {
+pub fn installMainMenu(allocator: std.mem.Allocator, hwnd: HWND, menu_bar: types.MenuBar) !void {
     if (menu_installed.swap(true, .acq_rel)) return;
+    if (hwnd == null) return error.MenuInstallFailed;
 
-    const hwnd = getHwnd(window) orelse return error.MenuInstallFailed;
     const main_menu = CreateMenu() orelse return error.MenuInstallFailed;
 
     for (menu_bar.menus) |menu| {
@@ -56,11 +53,15 @@ pub fn installMainMenu(allocator: std.mem.Allocator, window: *dvui.Window, menu_
                     if (AppendMenuW(submenu, MF_SEPARATOR, 0, null) == 0) return error.MenuInstallFailed;
                 },
                 .action => |action| {
+                    if (action.action_id < 0) return error.ActionIdOutOfRange;
+                    const offset: u32 = @intCast(action.action_id);
+                    if (offset > 0xFFFF - command_base) return error.ActionIdOutOfRange;
+
                     const title = try windowsItemTitle(allocator, action);
                     defer allocator.free(title);
 
                     const flags: UINT = if (action.enabled) MF_STRING else MF_STRING | MF_GRAYED;
-                    if (AppendMenuW(submenu, flags, commandId(action.action), title.ptr) == 0) return error.MenuInstallFailed;
+                    if (AppendMenuW(submenu, flags, commandId(action.action_id), title.ptr) == 0) return error.MenuInstallFailed;
                 },
             }
         }
@@ -79,24 +80,13 @@ pub fn pollActionId() c_int {
     return pending_action_id.swap(-1, .acq_rel);
 }
 
-fn getHwnd(win: *dvui.Window) HWND {
-    const raw = sdl3.SDL_GetPointerProperty(
-        sdl3.SDL_GetWindowProperties(win.backend.impl.window),
-        sdl3.SDL_PROP_WINDOW_WIN32_HWND_POINTER,
-        null,
-    );
-    return if (raw != null) @ptrCast(raw) else null;
+fn commandId(action_id: types.ActionId) UINT_PTR {
+    return command_base + @as(u16, @intCast(action_id));
 }
 
-fn commandId(action: ztray.Action) UINT_PTR {
-    return command_base + @as(u16, @intCast(@intFromEnum(action)));
-}
-
-fn actionFromCommand(command: u16) ?ztray.Action {
+fn actionFromCommand(command: u16) ?types.ActionId {
     if (command < command_base) return null;
-    const action_id = command - command_base;
-    if (action_id > @intFromEnum(ztray.Action.show_dvui_demo)) return null;
-    return @enumFromInt(action_id);
+    return @intCast(command - command_base);
 }
 
 fn ztraySubclassProc(
@@ -112,8 +102,8 @@ fn ztraySubclassProc(
 
     if (uMsg == WM_COMMAND) {
         const command: u16 = @truncate(wParam);
-        if (actionFromCommand(command)) |action| {
-            pending_action_id.store(@intFromEnum(action), .release);
+        if (actionFromCommand(command)) |id| {
+            pending_action_id.store(id, .release);
             return 0;
         }
     }
@@ -121,37 +111,20 @@ fn ztraySubclassProc(
     return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
 
-fn windowsItemTitle(allocator: std.mem.Allocator, action: ztray.Item.ActionItem) ![:0]u16 {
-    const title = if (action.shortcut) |shortcut|
-        try std.fmt.allocPrint(allocator, "{s}\t{s}", .{ action.title, windowsShortcutLabel(shortcut) })
-    else
-        try allocator.dupe(u8, action.title);
-    defer allocator.free(title);
+fn windowsItemTitle(allocator: std.mem.Allocator, action: types.Item.ActionItem) ![:0]u16 {
+    const label: []const u8 = blk: {
+        if (action.shortcut) |shortcut| {
+            if (action.shortcut_display) |d| {
+                break :blk try std.fmt.allocPrint(allocator, "{s}\t{s}", .{ action.title, d });
+            }
+            const fmt = try types.formatWindowsShortcut(allocator, shortcut);
+            defer allocator.free(fmt);
+            break :blk try std.fmt.allocPrint(allocator, "{s}\t{s}", .{ action.title, fmt });
+        } else {
+            break :blk try allocator.dupe(u8, action.title);
+        }
+    };
+    defer allocator.free(label);
 
-    return std.unicode.wtf8ToWtf16LeAllocZ(allocator, title);
-}
-
-fn windowsShortcutLabel(shortcut: ztray.Shortcut) []const u8 {
-    const command = hasModifier(shortcut, .command);
-    const shift = hasModifier(shortcut, .shift);
-    const control = hasModifier(shortcut, .control);
-
-    if (command and shift and std.ascii.eqlIgnoreCase(shortcut.key, "z")) return "Ctrl+Shift+Z";
-    if (command and std.ascii.eqlIgnoreCase(shortcut.key, "f")) return "Ctrl+F";
-    if (command and std.ascii.eqlIgnoreCase(shortcut.key, "o")) return "Ctrl+O";
-    if (command and std.ascii.eqlIgnoreCase(shortcut.key, "s")) return "Ctrl+S";
-    if (command and std.ascii.eqlIgnoreCase(shortcut.key, "w")) return "Ctrl+W";
-    if (command and std.ascii.eqlIgnoreCase(shortcut.key, "c")) return "Ctrl+C";
-    if (command and std.ascii.eqlIgnoreCase(shortcut.key, "v")) return "Ctrl+V";
-    if (command and std.ascii.eqlIgnoreCase(shortcut.key, "e")) return "Ctrl+E";
-    if (control and shift and std.ascii.eqlIgnoreCase(shortcut.key, "z")) return "Ctrl+Shift+Z";
-    if (control and std.ascii.eqlIgnoreCase(shortcut.key, "z")) return "Ctrl+Z";
-    return shortcut.key;
-}
-
-fn hasModifier(shortcut: ztray.Shortcut, modifier: ztray.Modifier) bool {
-    for (shortcut.modifiers) |existing| {
-        if (existing == modifier) return true;
-    }
-    return false;
+    return std.unicode.wtf8ToWtf16LeAllocZ(allocator, label);
 }
