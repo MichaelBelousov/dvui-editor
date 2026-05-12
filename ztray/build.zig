@@ -5,9 +5,11 @@ fn linkNativeMenu(ztray_mod: *std.Build.Module, b: *std.Build, target: std.Build
     switch (target.result.os.tag) {
         .macos => {
             ztray_mod.addCSourceFile(.{ .file = b.path("src/macos_menu.m") });
+            ztray_mod.addCSourceFile(.{ .file = b.path("src/macos_tray.m") });
         },
         .windows => {
             ztray_mod.linkSystemLibrary("comctl32", .{});
+            ztray_mod.linkSystemLibrary("shell32", .{});
         },
         .linux => {
             const native_linux = b.graph.host.result.os.tag == .linux;
@@ -127,6 +129,40 @@ pub fn build(b: *std.Build) void {
         run_wio_native_step.dependOn(&run_wio_cmd.step);
         if (b.args) |args| {
             run_wio_cmd.addArgs(args);
+        }
+    }
+
+    {
+        const example_mod = b.createModule(.{
+            .root_source_file = b.path("examples/tray_minimal/App.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        example_mod.addImport("ztray", ztray_mod);
+
+        const example_exe = b.addExecutable(.{
+            .name = "ztray-tray-minimal",
+            .root_module = example_mod,
+        });
+        if (target.result.os.tag == .macos) {
+            example_exe.root_module.linkFramework("AppKit", .{});
+        }
+        if (target.result.os.tag == .linux) {
+            example_exe.linkage = .dynamic;
+        }
+
+        b.installArtifact(example_exe);
+
+        const run_tray_cmd = b.addRunArtifact(example_exe);
+        run_tray_cmd.step.dependOn(b.getInstallStep());
+
+        const run_tray_step = b.step(
+            "run-tray",
+            "Run the tray-only ztray sample (message-only HWND on Windows)",
+        );
+        run_tray_step.dependOn(&run_tray_cmd.step);
+        if (b.args) |args| {
+            run_tray_cmd.addArgs(args);
         }
     }
 }

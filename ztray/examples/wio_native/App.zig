@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 
 const wio = @import("wio");
 const ztray = @import("ztray");
+
 const menu_def = @import("menu_def.zig");
 
 pub const std_options = std.Options{
@@ -15,12 +16,6 @@ comptime {
     _ = wio;
 }
 
-var debug_allocator = std.heap.DebugAllocator(.{}).init;
-var allocator: std.mem.Allocator = undefined;
-
-var threaded: std.Io.Threaded = undefined;
-var io: std.Io = undefined;
-
 var window: wio.Window = undefined;
 
 fn menuHostHandle(win: *wio.Window) ?*anyopaque {
@@ -30,12 +25,11 @@ fn menuHostHandle(win: *wio.Window) ?*anyopaque {
     };
 }
 
-pub fn main() !void {
-    allocator = debug_allocator.allocator();
-    threaded = std.Io.Threaded.init(allocator, .{});
-    io = threaded.io();
+pub fn main(init: std.process.Init) !void {
+    const gpa = init.gpa;
+    const io = init.io;
 
-    try wio.init(allocator, io, .{});
+    try wio.init(gpa, io, .{});
 
     window = try wio.createWindow(.{
         .title = "ztray + wio (native menus)",
@@ -43,7 +37,7 @@ pub fn main() !void {
         .size = .{ .width = 560, .height = 360 },
     });
 
-    ztray.installMainMenu(allocator, menu_def.menu_bar, menuHostHandle(&window)) catch |err| {
+    ztray.installMainMenu(gpa, menu_def.menu_bar, menuHostHandle(&window)) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
     };
 
@@ -56,8 +50,6 @@ fn loop() !bool {
             .close => {
                 window.destroy();
                 wio.deinit();
-                threaded.deinit();
-                _ = debug_allocator.deinit();
                 return false;
             },
             else => {},

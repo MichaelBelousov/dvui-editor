@@ -1,8 +1,8 @@
 # ztray
 
-Cross-platform **application menu bar** for Zig: native shell menus on macOS (AppKit `NSMenu`), Windows (Win32 `HMENU` + `comctl32` subclassing), and Linux ([DBusMenu](https://github.com/canonical/dbusmenu) over D-Bus). Optional **in-app** menu bar using [DVUI](https://github.com/david-vanderson/dvui) when you compile with `force_dvui_menu` enabled (see below).
+Cross-platform **application menu bar** and optional **system tray** for Zig: native shell menus on macOS (AppKit `NSMenu`), Windows (Win32 `HMENU` + `comctl32` subclassing), and Linux ([DBusMenu](https://github.com/canonical/dbusmenu) over D-Bus, plus [StatusNotifierItem](https://www.freedesktop.org/wiki/Specifications/StatusNotifierItem/) for tray icons). Optional **in-app** menu bar using [DVUI](https://github.com/david-vanderson/dvui) when you compile with `force_dvui_menu` enabled (see below). Tray remains **native** even when the DVUI menu bar is forced.
 
-There is no runtime dependency on SDL or a window toolkit inside the core `ztray` sources; your app supplies a window handle on Windows when using native menus.
+There is no runtime dependency on SDL or a window toolkit inside the core `ztray` sources; your app supplies a window handle on Windows when using native **menubar** integration. For **tray-only** apps on Windows, `installTrayIcon` can use an internal message-only `HWND` when `windows_hwnd` is null.
 
 ## Requirements
 
@@ -18,11 +18,22 @@ On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to `installMainMe
 
 ## API (summary)
 
+### Menu bar
+
 - **`installMainMenu(allocator, menu_bar, hwnd)`** — Install menus. `hwnd` is required on Windows for native menus; ignored on macOS; unused on Linux for D-Bus registration.
-- **`pollActionId()`** — Returns the last menu action id, or `null` (cleared on read).
+- **`pollActionId()`** — Returns the last **menubar** menu action id, or `null` (cleared on read).
 - **`drawMenuBar()`** — Only when compile-time **`force_dvui_menu`** is set: call each frame from your DVUI tick to draw the in-app menu bar.
 - **`shutdownDvuiMenu()`** — Release DVUI fallback menu storage when applicable.
 - **`consumeCloseTabSuppression()`** — macOS helper for “close tab” style items that suppress the next window close.
+
+### System tray (orthogonal to the menu bar)
+
+- **`TrayMenu`** — Alias of [`Menu`](src/types.zig); same `Item` / `ActionId` model as submenus. Root `title` is mainly relevant on Linux (DBus layout).
+- **`installTrayIcon(allocator, options: TrayIconOptions)`** — Native tray icon. On Windows, `options.windows_hwnd == null` uses a message-only window so tray-only binaries work without a UI toolkit.
+- **`setTrayMenu(allocator, menu: TrayMenu)`** — Attach or replace the tray context menu (independent of `installMainMenu`).
+- **`pollTrayActionId()`** — Like `pollActionId`, but only for tray menu actions (separate queue from the menubar).
+- **`pumpTrayEvents()`** — Linux: D-Bus dispatch. macOS: short `NSApplication` event slice. Windows: `PeekMessage` / `DispatchMessage` for the tray HWND (call regularly from your loop).
+- **`shutdownTray()`** — Remove the tray icon and release tray resources (independent of `shutdownDvuiMenu`).
 
 Compile-time options are supplied through the generated module **`ztray_build_options`** (see this package’s `build.zig`).
 
@@ -49,13 +60,16 @@ Option names use **underscores** (Zig’s `zig build -D` convention), e.g. `-Dfo
 |----------|------|--------|
 | `ztray-dvui` | `zig build run-dvui` | DVUI window + ztray; native menu unless `-Dforce_dvui_menu=true`. |
 | `ztray-wio` | `zig build run-wio` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
+| `ztray-tray-minimal` | `zig build run-tray` | Tray icon + context menu only (message-only HWND on Windows). |
 
-On **Linux**, the wio example is linked **dynamically** (wio’s default Unix path expects dynamic linking when system integration is off).
+On **Linux**, the wio and tray examples are linked **dynamically** where applicable (wio’s default Unix path expects dynamic linking when system integration is off).
 
 ## Layout
 
-- `src/root.zig` — Public API and OS dispatch.
+- `src/root.zig` — Public API and OS dispatch (menubar + tray).
 - `src/types.zig` — Menu types and shortcuts.
+- `src/macos_menu.m` / `src/macos_tray.m` — AppKit menubar and status item tray.
+- `src/linux_dbus_menu.c` — Session D-Bus menubar + tray (DBusMenu + StatusNotifierItem when built on Linux).
 - `src/dvui_fallback.zig` — DVUI menu implementation (compiled when `ztray_build_options.dvui_fallback` is true; this package’s `build.zig` keeps it enabled so examples and the forced menu path can share one module graph).
 - `examples/` — Sample apps.
 

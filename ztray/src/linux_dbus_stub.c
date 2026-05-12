@@ -18,3 +18,16 @@ int ztray_linux_dbus_set_items(const ZTrayLinuxItem *items, int n) {
 }
 void ztray_linux_dbus_dispatch(void) {}
 int ztray_linux_dbus_take_pending(void) { return -1; }
+
+int ztray_linux_tray_install(const char *tooltip_utf8, const char *icon_name_or_null) {
+    (void)tooltip_utf8;
+    (void)icon_name_or_null;
+    return 1;
+}
+void ztray_linux_tray_shutdown(void) {}
+int ztray_linux_tray_set_items(const ZTrayLinuxItem *items, int n) {
+    (void)items;
+    (void)n;
+    return 1;
+}
+int ztray_linux_tray_take_pending(void) { return -1; }
