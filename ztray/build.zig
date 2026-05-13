@@ -38,12 +38,7 @@ const DvuiImports = struct {
     sdl: *std.Build.Module,
 };
 
-fn dvuiDependencyModules(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) DvuiImports {
-    const dep = b.dependency("dvui", .{
-        .target = target,
-        .optimize = optimize,
-        .backend = .sdl3,
-    });
+fn dvuiImportsFromDep(dep: *std.Build.Dependency) DvuiImports {
     return .{
         .dvui = dep.module("dvui_sdl3"),
         .sdl = dep.module("sdl3"),
@@ -60,6 +55,7 @@ fn createZtrayModule(
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = if (target.result.os.tag == .windows) true else null,
     });
     linkNativeMenu(ztray_mod, b, target);
     return ztray_mod;
@@ -182,8 +178,9 @@ fn addTrayMinimalExe(
     return exe;
 }
 
-fn linkLinuxDynamic(exe: *std.Build.Step.Compile, os_tag: std.Target.Os.Tag) void {
-    if (os_tag == .linux) exe.linkage = .dynamic;
+/// D-Bus is linked as a shared library only when building on Linux *for* Linux; cross builds use the stub without `-dynamic`.
+fn linkLinuxDynamic(exe: *std.Build.Step.Compile, host_os: std.Target.Os.Tag, target_os: std.Target.Os.Tag) void {
+    if (target_os == .linux and host_os == .linux) exe.linkage = .dynamic;
 }
 
 pub fn build(b: *std.Build) void {
@@ -193,11 +190,16 @@ pub fn build(b: *std.Build) void {
     const force_dvui_menu = b.option(bool, "force_dvui_menu", "DVUI sample only: use in-app menu bar instead of native shell menus") orelse false;
 
     const ztray_mod = createZtrayModule(b, target, optimize);
-    const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
-    const d = dvuiDependencyModules(b, target, optimize);
-    const ztray_dvui_mod = createZtrayDvuiModule(b, target, optimize, ztray_mod, d.dvui);
 
-    {
+    if (b.lazyDependency("dvui", .{
+        .target = target,
+        .optimize = optimize,
+        .backend = .sdl3,
+    })) |dvui_dep| {
+        const d = dvuiImportsFromDep(dvui_dep);
+        const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
+        const ztray_dvui_mod = createZtrayDvuiModule(b, target, optimize, ztray_mod, d.dvui);
+
         const example_exe = addDvuiExampleExe(b, ztray_mod, ztray_dvui_mod, example_opts_mod, d, target, optimize, "ztray-dvui");
 
         b.installArtifact(example_exe);
@@ -223,7 +225,7 @@ pub fn build(b: *std.Build) void {
 
         {
             const example_exe = addWioNativeExe(b, ztray_mod, wio_mod, target, optimize, "ztray-wio-native");
-            linkLinuxDynamic(example_exe, target.result.os.tag);
+            linkLinuxDynamic(example_exe, b.graph.host.result.os.tag, target.result.os.tag);
 
             b.installArtifact(example_exe);
 
@@ -242,7 +244,7 @@ pub fn build(b: *std.Build) void {
 
         {
             const example_exe = addWioTrayExe(b, ztray_mod, wio_mod, target, optimize, "ztray-wio-tray");
-            linkLinuxDynamic(example_exe, target.result.os.tag);
+            linkLinuxDynamic(example_exe, b.graph.host.result.os.tag, target.result.os.tag);
 
             b.installArtifact(example_exe);
 
@@ -262,7 +264,7 @@ pub fn build(b: *std.Build) void {
 
     {
         const example_exe = addTrayMinimalExe(b, ztray_mod, target, optimize, "ztray-tray-minimal");
-        linkLinuxDynamic(example_exe, target.result.os.tag);
+        linkLinuxDynamic(example_exe, b.graph.host.result.os.tag, target.result.os.tag);
 
         b.installArtifact(example_exe);
 
@@ -326,18 +328,26 @@ fn addZtrayCiExamplesForTarget(
     optimize: std.builtin.OptimizeMode,
     force_dvui_menu: bool,
 ) void {
+    const dvui_dep_opt = b.lazyDependency("dvui", .{
+        .target = resolved,
+        .optimize = optimize,
+        .backend = .sdl3,
+    });
+    const wio_dep_opt = b.lazyDependency("wio", .{
+        .target = resolved,
+        .optimize = optimize,
+    });
+    const dvui_dep = dvui_dep_opt orelse return;
+    const wio_dep = wio_dep_opt orelse return;
+
     const ztray_mod = createZtrayModule(b, resolved, optimize);
     const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
-    const d = dvuiDependencyModules(b, resolved, optimize);
+    const d = dvuiImportsFromDep(dvui_dep);
     const ztray_dvui_mod = createZtrayDvuiModule(b, resolved, optimize, ztray_mod, d.dvui);
 
     const os_tag = @tagName(resolved.result.os.tag);
     const arch_tag = @tagName(resolved.result.cpu.arch);
 
-    const wio_dep = b.dependency("wio", .{
-        .target = resolved,
-        .optimize = optimize,
-    });
     const wio_mod = wio_dep.module("wio");
 
     ci_step.dependOn(&addDvuiExampleExe(
@@ -360,7 +370,7 @@ fn addZtrayCiExamplesForTarget(
             optimize,
             b.fmt("ztray-wio-native-{s}-{s}", .{ arch_tag, os_tag }),
         );
-        linkLinuxDynamic(exe, resolved.result.os.tag);
+        linkLinuxDynamic(exe, b.graph.host.result.os.tag, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);
     }
 
@@ -373,7 +383,7 @@ fn addZtrayCiExamplesForTarget(
             optimize,
             b.fmt("ztray-wio-tray-{s}-{s}", .{ arch_tag, os_tag }),
         );
-        linkLinuxDynamic(exe, resolved.result.os.tag);
+        linkLinuxDynamic(exe, b.graph.host.result.os.tag, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);
     }
 
@@ -385,7 +395,7 @@ fn addZtrayCiExamplesForTarget(
             optimize,
             b.fmt("ztray-tray-minimal-{s}-{s}", .{ arch_tag, os_tag }),
         );
-        linkLinuxDynamic(exe, resolved.result.os.tag);
+        linkLinuxDynamic(exe, b.graph.host.result.os.tag, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);
     }
 }

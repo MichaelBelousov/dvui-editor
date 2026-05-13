@@ -7,10 +7,12 @@
         .dvui = .{
             .url = "git+https://github.com/david-vanderson/dvui.git#14703fa6d6fea0c608886b5ce2071ef49323c8c0",
             .hash = "dvui-0.5.0-dev-AQFJmbHY9QA1qvhf_l3RPazRT7QOF0pGjLtU4amMq2F-",
+            .lazy = true,
         },
         .wio = .{
             .url = "git+https://github.com/ypsvlq/wio.git#d4f6edda8d1b96d373f82f4fc3f3bc9e17bf0973",
             .hash = "wio-0.0.0-8xHrr2NUBwDbiM9tD7NkxgYJQjsTIUofdra3bfhjSGVH",
+            .lazy = true,
         },
     },
     .paths = .{
