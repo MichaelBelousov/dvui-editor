@@ -195,7 +195,7 @@ fn addDvuiExampleExe(
     example_mod.addImport("dvui", d.dvui);
     example_mod.addImport("sdl-backend", d.sdl);
     example_mod.addImport("zmenu", zmenu_dvui_mod);
-    example_mod.addImport("ztray_dvui_opts", example_opts_mod);
+    example_mod.addImport("zmenu_dvui_opts", example_opts_mod);
     return b.addExecutable(.{ .name = exe_name, .root_module = example_mod });
 }
 

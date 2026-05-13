@@ -7,7 +7,7 @@ const dvui = @import("dvui");
 pub const main = dvui.App.main;
 pub const panic = dvui.App.panic;
 const sdl3 = @import("sdl-backend").c;
-const zopts = @import("ztray_dvui_opts");
+const zopts = @import("zmenu_dvui_opts");
 const zmenu = @import("zmenu");
 
 const menu_def = @import("menu_def.zig");

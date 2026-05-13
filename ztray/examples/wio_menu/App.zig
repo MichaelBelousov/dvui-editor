@@ -25,7 +25,7 @@ pub fn main(init: std.process.Init) !void {
     try wio.init(gpa, io, .{});
 
     window = try wio.createWindow(.{
-        .title = "ztray + wio (native menus)",
+        .title = "zmenu + wio (native menus)",
         .scale = 1,
         .size = .{ .width = 560, .height = 360 },
     });
