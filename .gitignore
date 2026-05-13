@@ -5,3 +5,4 @@ sample
 zig-pkg
 .zig-cache
 zig-out
+.zig_build.txt

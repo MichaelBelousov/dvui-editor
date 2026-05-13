@@ -159,7 +159,7 @@ pub fn pollActionId() c_int {
 }
 
 pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_name: ?[]const u8, icon_png: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory }!void {
-    _ = icon_png;
+    if (icon_png != null) std.log.warn("ztray: icon_png ignored on Linux; use linux_icon_name for StatusNotifierItem", .{});
     if (tray_session_active.swap(true, .acq_rel)) return error.TrayAlreadyInstalled;
     errdefer _ = tray_session_active.store(false, .release);
 

@@ -137,10 +137,6 @@ const LR_DEFAULTSIZE: UINT = 0x0040;
 const LR_LOADFROMFILE: UINT = 0x0010;
 const IDI_APPLICATION: UINT_PTR = 32512;
 
-fn trayCommandId(action_id: types.ActionId) UINT_PTR {
-    return @as(UINT_PTR, tray_command_base) + @as(u16, @intCast(action_id));
-}
-
 fn trayActionFromCommand(command: u16) ?types.ActionId {
     if (command < tray_command_base) return null;
     return @intCast(command - tray_command_base);
@@ -169,7 +165,8 @@ fn appendItemsToPopupMenu(allocator: std.mem.Allocator, popup: HMENU, menu: type
 }
 
 pub fn installMainMenu(allocator: std.mem.Allocator, hwnd: HWND, menu_bar: types.MenuBar) !void {
-    if (menu_installed.swap(true, .acq_rel)) return;
+    if (menu_installed.swap(true, .acq_rel)) return error.MenuInstallFailed;
+    errdefer _ = menu_installed.store(false, .release);
     if (hwnd == null) return error.MenuInstallFailed;
 
     const main_menu = CreateMenu() orelse return error.MenuInstallFailed;
@@ -448,10 +445,6 @@ fn traySubclassProc(
     }
 
     return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-}
-
-fn commandId(action_id: types.ActionId) UINT_PTR {
-    return command_base + @as(u16, @intCast(action_id));
 }
 
 fn actionFromCommand(command: u16) ?types.ActionId {

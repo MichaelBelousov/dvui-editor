@@ -92,15 +92,14 @@ pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_f
     const icon_z: ?[:0]u8 = if (icon_file_utf8) |p| try allocator.dupeZ(u8, p) else null;
     defer if (icon_z) |z| allocator.free(z);
 
-    const png = icon_png orelse &[0]u8{};
+    const png = icon_png orelse "";
     const png_ptr: ?[*]const u8 = if (png.len > 0) png.ptr else null;
-    const png_len: usize = if (png.len > 0) png.len else 0;
 
     if (!ZTrayMacOSTrayInstall(
         tip_z.ptr,
         if (icon_z) |z| z.ptr else null,
         png_ptr,
-        png_len,
+        png.len,
     )) {
         _ = macos_tray_active.store(false, .release);
         return error.TrayInstallFailed;

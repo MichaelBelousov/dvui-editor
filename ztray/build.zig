@@ -31,11 +31,10 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const force_dvui_menu = b.option(bool, "force_dvui_menu", "Use in-app DVUI menu bar instead of native shell menus") orelse false;
-
-    const ztray_dvui_fallback = true;
+    const dvui_fallback = b.option(bool, "dvui_fallback", "Compile DVUI immediate-mode menu fallback (requires the dvui dependency)") orelse false;
 
     const zopts = b.addOptions();
-    zopts.addOption(bool, "dvui_fallback", ztray_dvui_fallback);
+    zopts.addOption(bool, "dvui_fallback", dvui_fallback);
     zopts.addOption(bool, "force_dvui_menu", force_dvui_menu);
     const zopts_mod = zopts.createModule();
 
@@ -48,22 +47,14 @@ pub fn build(b: *std.Build) void {
 
     linkNativeMenu(ztray_mod, b, target);
 
-    {
-        const dvui_dep = b.lazyDependency("dvui", .{
-            .target = target,
-            .optimize = optimize,
-            .backend = .sdl3,
-        }) orelse @panic("ztray requires dependency 'dvui' (run: zig build --fetch)");
-        ztray_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-        ztray_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
-    }
-
-    {
+    if (dvui_fallback) {
         const dvui_dep = b.dependency("dvui", .{
             .target = target,
             .optimize = optimize,
             .backend = .sdl3,
         });
+        ztray_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+        ztray_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
 
         const example_mod = b.createModule(.{
             .root_source_file = b.path("examples/dvui_fallback/App.zig"),
@@ -87,7 +78,7 @@ pub fn build(b: *std.Build) void {
 
         const run_dvui_step = b.step(
             "run-dvui",
-            "Run the DVUI + ztray sample (see README; use -Dforce_dvui_menu=true on the same zig build for in-app menu)",
+            "Run the DVUI + ztray sample (see README; requires -Ddvui_fallback=true; add -Dforce_dvui_menu=true for in-app menu)",
         );
         run_dvui_step.dependOn(&run_dvui_cmd.step);
         if (b.args) |args| {
@@ -95,84 +86,77 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    {
-        const wio_dep = b.lazyDependency("wio", .{
-            .target = target,
-            .optimize = optimize,
-        }) orelse @panic("ztray wio example requires dependency 'wio' (run: zig build --fetch)");
-
+    if (b.lazyDependency("wio", .{
+        .target = target,
+        .optimize = optimize,
+    })) |wio_dep| {
         const wio_mod = wio_dep.module("wio");
 
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/wio_native/App.zig"),
-            .target = target,
-            .optimize = optimize,
-        });
-        example_mod.addImport("wio", wio_mod);
-        example_mod.addImport("ztray", ztray_mod);
+        {
+            const example_mod = b.createModule(.{
+                .root_source_file = b.path("examples/wio_native/App.zig"),
+                .target = target,
+                .optimize = optimize,
+            });
+            example_mod.addImport("wio", wio_mod);
+            example_mod.addImport("ztray", ztray_mod);
 
-        const example_exe = b.addExecutable(.{
-            .name = "ztray-wio-native",
-            .root_module = example_mod,
-        });
-        if (target.result.os.tag == .linux) {
-            example_exe.linkage = .dynamic;
+            const example_exe = b.addExecutable(.{
+                .name = "ztray-wio-native",
+                .root_module = example_mod,
+            });
+            if (target.result.os.tag == .linux) {
+                example_exe.linkage = .dynamic;
+            }
+
+            b.installArtifact(example_exe);
+
+            const run_wio_cmd = b.addRunArtifact(example_exe);
+            run_wio_cmd.step.dependOn(b.getInstallStep());
+
+            const run_wio_native_step = b.step(
+                "run-wio",
+                "Run the ztray + wio native menu sample",
+            );
+            run_wio_native_step.dependOn(&run_wio_cmd.step);
+            if (b.args) |args| {
+                run_wio_cmd.addArgs(args);
+            }
         }
 
-        b.installArtifact(example_exe);
+        {
+            const example_mod = b.createModule(.{
+                .root_source_file = b.path("examples/wio_tray/App.zig"),
+                .target = target,
+                .optimize = optimize,
+            });
+            example_mod.addImport("wio", wio_mod);
+            example_mod.addImport("ztray", ztray_mod);
 
-        const run_wio_cmd = b.addRunArtifact(example_exe);
-        run_wio_cmd.step.dependOn(b.getInstallStep());
+            const example_exe = b.addExecutable(.{
+                .name = "ztray-wio-tray",
+                .root_module = example_mod,
+            });
+            if (target.result.os.tag == .linux) {
+                example_exe.linkage = .dynamic;
+            }
+            if (target.result.os.tag == .macos) {
+                example_exe.root_module.linkFramework("AppKit", .{});
+            }
 
-        const run_wio_native_step = b.step(
-            "run-wio",
-            "Run the ztray + wio native menu sample",
-        );
-        run_wio_native_step.dependOn(&run_wio_cmd.step);
-        if (b.args) |args| {
-            run_wio_cmd.addArgs(args);
-        }
-    }
+            b.installArtifact(example_exe);
 
-    {
-        const wio_dep = b.lazyDependency("wio", .{
-            .target = target,
-            .optimize = optimize,
-        }) orelse @panic("ztray wio example requires dependency 'wio' (run: zig build --fetch)");
+            const run_wio_tray_cmd = b.addRunArtifact(example_exe);
+            run_wio_tray_cmd.step.dependOn(b.getInstallStep());
 
-        const wio_mod = wio_dep.module("wio");
-
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/wio_tray/App.zig"),
-            .target = target,
-            .optimize = optimize,
-        });
-        example_mod.addImport("wio", wio_mod);
-        example_mod.addImport("ztray", ztray_mod);
-
-        const example_exe = b.addExecutable(.{
-            .name = "ztray-wio-tray",
-            .root_module = example_mod,
-        });
-        if (target.result.os.tag == .linux) {
-            example_exe.linkage = .dynamic;
-        }
-        if (target.result.os.tag == .macos) {
-            example_exe.root_module.linkFramework("AppKit", .{});
-        }
-
-        b.installArtifact(example_exe);
-
-        const run_wio_tray_cmd = b.addRunArtifact(example_exe);
-        run_wio_tray_cmd.step.dependOn(b.getInstallStep());
-
-        const run_wio_tray_step = b.step(
-            "run-wio-tray",
-            "Run the ztray + wio sample with native menubar and system tray",
-        );
-        run_wio_tray_step.dependOn(&run_wio_tray_cmd.step);
-        if (b.args) |args| {
-            run_wio_tray_cmd.addArgs(args);
+            const run_wio_tray_step = b.step(
+                "run-wio-tray",
+                "Run the ztray + wio sample with native menubar and system tray",
+            );
+            run_wio_tray_step.dependOn(&run_wio_tray_cmd.step);
+            if (b.args) |args| {
+                run_wio_tray_cmd.addArgs(args);
+            }
         }
     }
 
@@ -217,7 +201,7 @@ pub fn build(b: *std.Build) void {
     setupZtrayCi(b, ci_step, force_dvui_menu);
 }
 
-/// Cross-compiles every example executable for the same targets as the parent repo’s `setupCi` (see root `build.zig`).
+/// Cross-compiles every example executable for the same targets as the parent repo's `setupCi` (see root `build.zig`).
 /// macOS is built only when the build graph host is macOS (Apple SDK; no Linux→macOS cross here).
 fn setupZtrayCi(b: *std.Build, ci_step: *std.Build.Step, force_dvui_menu: bool) void {
     const optimize: std.builtin.OptimizeMode = .Debug;

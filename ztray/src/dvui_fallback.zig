@@ -10,11 +10,7 @@ var menu_arena: std.heap.ArenaAllocator = undefined;
 var menu_arena_init: bool = false;
 var stored_bar: ?types.MenuBar = null;
 
-fn dupMenuBar(parent: std.mem.Allocator, menu_bar: types.MenuBar) !types.MenuBar {
-    var arena = std.heap.ArenaAllocator.init(parent);
-    errdefer arena.deinit();
-    const a = arena.allocator();
-
+fn dupMenuBar(a: std.mem.Allocator, menu_bar: types.MenuBar) !types.MenuBar {
     var menus = try a.alloc(types.Menu, menu_bar.menus.len);
     for (menu_bar.menus, 0..) |src_menu, mi| {
         const title = try a.dupe(u8, src_menu.title);
@@ -25,7 +21,10 @@ fn dupMenuBar(parent: std.mem.Allocator, menu_bar: types.MenuBar) !types.MenuBar
                 .action => |act| .{ .action = .{
                     .title = try a.dupe(u8, act.title),
                     .action_id = act.action_id,
-                    .shortcut = act.shortcut,
+                    .shortcut = if (act.shortcut) |sc| types.Shortcut{
+                        .key = try a.dupe(u8, sc.key),
+                        .modifiers = try a.dupe(types.Modifier, sc.modifiers),
+                    } else null,
                     .shortcut_display = if (act.shortcut_display) |sd| try a.dupe(u8, sd) else null,
                     .enabled = act.enabled,
                     .suppress_next_window_close = act.suppress_next_window_close,
@@ -46,6 +45,10 @@ pub fn installMainMenu(parent_allocator: std.mem.Allocator, menu_bar: types.Menu
     }
     menu_arena = std.heap.ArenaAllocator.init(parent_allocator);
     menu_arena_init = true;
+    errdefer {
+        menu_arena.deinit();
+        menu_arena_init = false;
+    }
     stored_bar = try dupMenuBar(menu_arena.allocator(), menu_bar);
 }
 

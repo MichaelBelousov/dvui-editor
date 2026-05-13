@@ -4,15 +4,16 @@
  */
 #include <dbus/dbus.h>
 #include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 void ztray_linux_tray_shutdown(void);
 
-#define ZTRAY_MENU_PATH "/org/ztray/DvuiEditor/Menu"
-#define ZTRAY_TRAY_MENU_PATH "/org/ztray/DvuiEditor/TrayMenu"
-#define ZTRAY_SNI_PATH "/org/ztray/DvuiEditor/SNI"
-#define ZTRAY_BUS_NAME "org.ztray.DvuiEditor"
+#define ZTRAY_MENU_PATH "/org/ztray/app/Menu"
+#define ZTRAY_TRAY_MENU_PATH "/org/ztray/app/TrayMenu"
+#define ZTRAY_SNI_PATH "/org/ztray/app/SNI"
 #define ZTRAY_MAX_ITEMS 512
 
 typedef struct {
@@ -509,9 +510,11 @@ int ztray_linux_dbus_init(void) {
         return 0;
     }
     dbus_connection_add_filter(g_conn, filter_message, NULL, NULL);
-    dbus_uint32_t flags = DBUS_NAME_FLAG_REPLACE_EXISTING;
+    char bus_name[64];
+    snprintf(bus_name, sizeof(bus_name), "org.ztray.app%d", (int)getpid());
+    dbus_uint32_t flags = DBUS_NAME_FLAG_DO_NOT_QUEUE;
     dbus_uint32_t reply = 0;
-    (void)dbus_bus_request_name(g_conn, ZTRAY_BUS_NAME, flags, &reply);
+    (void)dbus_bus_request_name(g_conn, bus_name, flags, &reply);
     return 1;
 }
 
