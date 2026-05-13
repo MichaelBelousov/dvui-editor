@@ -1,9 +1,9 @@
-//! In-app menu bar using DVUI. **Separate module** from `ztray`: add this module only to apps that depend on DVUI.
-//! Import `ztray` for [`ztray.MenuBar`] / action ids; import `dvui` from your DVUI backend module.
+//! In-app menu bar using DVUI. Included as [`ztray.dvui_menu`] when using `createZtrayDvuiModule` (single `ztray` import).
+//! This file expects build imports `ztray_core` (same API as core `ztray`) and `dvui`.
 const std = @import("std");
 const builtin = @import("builtin");
 const dvui = @import("dvui");
-const ztray = @import("ztray");
+const ztray = @import("ztray_core");
 
 var pending_action: std.atomic.Value(ztray.ActionId) = .init(-1);
 

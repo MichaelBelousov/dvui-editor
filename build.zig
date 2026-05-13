@@ -48,8 +48,7 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         ztray_mod,
         dvui_dep.module("dvui_sdl3"),
     );
-    mod.addImport("ztray", ztray_mod);
-    mod.addImport("ztray_dvui", ztray_dvui_mod);
+    mod.addImport("ztray", ztray_dvui_mod);
 
     const cmark_gfm = b.dependency("cmark_gfm", .{
         .target = opts.target,

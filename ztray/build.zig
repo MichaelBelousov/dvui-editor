@@ -61,7 +61,7 @@ pub fn createZtrayModule(
     return ztray_mod;
 }
 
-/// Optional DVUI menubar helper; depends on `ztray` + `dvui` only on modules that import it.
+/// Unified `ztray` module: same public API as `createZtrayModule` plus `ztray.dvui_menu` (DVUI in-app menubar). Pass as `addImport("ztray", ...)`.
 pub fn createZtrayDvuiModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
@@ -69,20 +69,19 @@ pub fn createZtrayDvuiModule(
     ztray_mod: *std.Build.Module,
     dvui_mod: *std.Build.Module,
 ) *std.Build.Module {
-    const m = b.addModule("ztray_dvui", .{
-        .root_source_file = b.path("src/ztray_dvui.zig"),
+    const m = b.createModule(.{
+        .root_source_file = b.path("src/ztray_with_dvui.zig"),
         .target = target,
         .optimize = optimize,
     });
-    m.addImport("ztray", ztray_mod);
+    m.addImport("ztray_core", ztray_mod);
     m.addImport("dvui", dvui_mod);
     return m;
 }
 
 fn addDvuiExampleExe(
     b: *std.Build,
-    ztray_mod: *std.Build.Module,
-    ztray_dvui_mod: *std.Build.Module,
+    ztray_unified_mod: *std.Build.Module,
     example_opts_mod: *std.Build.Module,
     d: DvuiImports,
     target: std.Build.ResolvedTarget,
@@ -96,8 +95,7 @@ fn addDvuiExampleExe(
     });
     example_mod.addImport("dvui", d.dvui);
     example_mod.addImport("sdl-backend", d.sdl);
-    example_mod.addImport("ztray", ztray_mod);
-    example_mod.addImport("ztray_dvui", ztray_dvui_mod);
+    example_mod.addImport("ztray", ztray_unified_mod);
     example_mod.addImport("ztray_dvui_opts", example_opts_mod);
 
     return b.addExecutable(.{
@@ -198,9 +196,9 @@ pub fn build(b: *std.Build) void {
     })) |dvui_dep| {
         const d = dvuiImportsFromDep(dvui_dep);
         const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
-        const ztray_dvui_mod = createZtrayDvuiModule(b, target, optimize, ztray_mod, d.dvui);
+        const ztray_unified_mod = createZtrayDvuiModule(b, target, optimize, ztray_mod, d.dvui);
 
-        const example_exe = addDvuiExampleExe(b, ztray_mod, ztray_dvui_mod, example_opts_mod, d, target, optimize, "ztray-dvui");
+        const example_exe = addDvuiExampleExe(b, ztray_unified_mod, example_opts_mod, d, target, optimize, "ztray-dvui");
 
         b.installArtifact(example_exe);
 
@@ -343,7 +341,7 @@ fn addZtrayCiExamplesForTarget(
     const ztray_mod = createZtrayModule(b, resolved, optimize);
     const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
     const d = dvuiImportsFromDep(dvui_dep);
-    const ztray_dvui_mod = createZtrayDvuiModule(b, resolved, optimize, ztray_mod, d.dvui);
+    const ztray_unified_mod = createZtrayDvuiModule(b, resolved, optimize, ztray_mod, d.dvui);
 
     const os_tag = @tagName(resolved.result.os.tag);
     const arch_tag = @tagName(resolved.result.cpu.arch);
@@ -352,8 +350,7 @@ fn addZtrayCiExamplesForTarget(
 
     ci_step.dependOn(&addDvuiExampleExe(
         b,
-        ztray_mod,
-        ztray_dvui_mod,
+        ztray_unified_mod,
         example_opts_mod,
         d,
         resolved,
