@@ -10,6 +10,30 @@ static const void *ZWindowDelegateProxyAssociationKey = &ZWindowDelegateProxyAss
 @end
 
 @implementation ZWindowVisualEffectView
+
+/// Real client view (e.g. wio `WioView`) after vibrancy wrap; `NSWindow` APIs still expose this wrapper as `contentView`.
+- (NSView *)zwindowInnerClientView {
+    return self.subviews.firstObject;
+}
+
+- (BOOL)respondsToSelector:(SEL)aSelector {
+    NSView *inner = [self zwindowInnerClientView];
+    if (inner != nil && [inner respondsToSelector:aSelector]) return YES;
+    return [super respondsToSelector:aSelector];
+}
+
+- (id)forwardingTargetForSelector:(SEL)aSelector {
+    NSView *inner = [self zwindowInnerClientView];
+    if (inner != nil && [inner respondsToSelector:aSelector]) return inner;
+    return [super forwardingTargetForSelector:aSelector];
+}
+
+- (void)updateTrackingAreas {
+    NSView *inner = [self zwindowInnerClientView];
+    if (inner != nil) [inner updateTrackingAreas];
+    [super updateTrackingAreas];
+}
+
 - (void)rightMouseDown:(NSEvent *)event {
     NSView *contentView = self.subviews.firstObject;
     if (contentView != nil) {
@@ -59,6 +83,19 @@ static const void *ZWindowDelegateProxyAssociationKey = &ZWindowDelegateProxyAss
 }
 @end
 
+/// `NSWindow.delegate` is often `ZWindowDelegateProxy` (NSObject), which must not be passed to `-[NSView setNextResponder:]`.
+static void zwindowSetInnerContentNextResponder(NSWindow *window, NSView *innerContent) {
+    id del = window.delegate;
+    if (del == nil) return;
+    NSResponder *target = nil;
+    if ([del isKindOfClass:[NSResponder class]]) {
+        target = (NSResponder *)del;
+    } else {
+        target = window;
+    }
+    innerContent.nextResponder = target;
+}
+
 static void zwindowWrapContentViewWithVibrancy(NSWindow *window) {
     NSView *contentView = window.contentView;
     if (contentView == nil) return;
@@ -70,7 +107,7 @@ static void zwindowWrapContentViewWithVibrancy(NSWindow *window) {
         effectView.menu = nil;
         NSView *subview = effectView.subviews.firstObject;
         if (subview != nil && window.delegate != nil) {
-            subview.nextResponder = (NSResponder *)window.delegate;
+            zwindowSetInnerContentNextResponder(window, subview);
         }
         return;
     }
@@ -87,10 +124,11 @@ static void zwindowWrapContentViewWithVibrancy(NSWindow *window) {
     [effectView addSubview:contentView];
     contentView.menu = nil;
     if (window.delegate != nil) {
-        contentView.nextResponder = (NSResponder *)window.delegate;
+        zwindowSetInnerContentNextResponder(window, contentView);
     }
     contentView.frame = effectView.bounds;
     contentView.autoresizingMask = fillMask;
+    [window makeFirstResponder:contentView];
 }
 
 static ZWindowDelegateProxy *zwindowInstallWindowDelegateProxy(NSWindow *window) {

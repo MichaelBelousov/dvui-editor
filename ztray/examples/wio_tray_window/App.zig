@@ -1,6 +1,6 @@
 //! [wio](https://github.com/ypsvlq/wio) window with ztray **native** menubar and **system tray** (icon + menu).
 //! On Windows the same top-level `HWND` is used for the menubar and tray callbacks (`windows_hwnd`).
-//! **Windows / macOS:** after menus + tray, `zwindow.setFrameChrome` styles the wio window (`.tray_compatible` on macOS avoids `NSVisualEffectView`, which can abort with tray on recent macOS).
+//! **Windows / macOS:** after menus + tray, `zwindow.setFrameChrome` styles the wio window (`.tray_compatible` on macOS avoids `NSVisualEffectView`, which can abort with tray on recent macOS). **Linux:** skipped — zwindow frame APIs are no-ops and wio’s Unix backend has no `HWND`/`NSWindow` handle field.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -39,7 +39,7 @@ pub fn main(init: std.process.Init) !void {
     if (builtin.os.tag == .macos) NSApplicationLoad();
 
     window = try wio.createWindow(.{
-        .title = "ztray + wio (menus + tray)",
+        .title = "ztray + wio (menus + tray + window chrome)",
         .scale = 1,
         .size = .{ .width = 560, .height = 360 },
     });
@@ -68,16 +68,21 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    const hwnd: *anyopaque = @ptrCast(window.backend.window);
-    zwindow.setFrameChrome(
-        hwnd,
-        0.12,
-        0.13,
-        0.17,
-        1.0,
-        true,
-        .tray_compatible,
-    );
+    switch (builtin.os.tag) {
+        .windows, .macos => {
+            const native: *anyopaque = @ptrCast(window.backend.window);
+            zwindow.setFrameChrome(
+                native,
+                0.12,
+                0.13,
+                0.17,
+                1.0,
+                true,
+                .tray_compatible,
+            );
+        },
+        else => {},
+    }
 
     try wio.run(loop);
 }
