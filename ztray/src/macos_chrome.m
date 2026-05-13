@@ -2,14 +2,14 @@
 #include <stdbool.h>
 #import <objc/runtime.h>
 
-static const NSUInteger PixiFullSizeContentViewMask = 1u << 15;
-static const NSVisualEffectMaterial PixiVisualEffectMaterial = 15;
-static const void *PixiWindowDelegateProxyAssociationKey = &PixiWindowDelegateProxyAssociationKey;
+static const NSUInteger ZChromeFullSizeContentViewMask = 1u << 15;
+static const NSVisualEffectMaterial ZChromeVisualEffectMaterial = 15;
+static const void *ZChromeWindowDelegateProxyAssociationKey = &ZChromeWindowDelegateProxyAssociationKey;
 
-@interface PixiVisualEffectView : NSVisualEffectView
+@interface ZChromeVisualEffectView : NSVisualEffectView
 @end
 
-@implementation PixiVisualEffectView
+@implementation ZChromeVisualEffectView
 - (void)rightMouseDown:(NSEvent *)event {
     NSView *contentView = self.subviews.firstObject;
     if (contentView != nil) {
@@ -20,13 +20,13 @@ static const void *PixiWindowDelegateProxyAssociationKey = &PixiWindowDelegatePr
 }
 @end
 
-@interface PixiWindowDelegateProxy : NSObject <NSWindowDelegate>
+@interface ZChromeWindowDelegateProxy : NSObject <NSWindowDelegate>
 @property (nonatomic, assign) id<NSWindowDelegate> originalDelegate;
 @property (nonatomic, assign) BOOL suppressNextWindowClose;
 - (instancetype)initWithOriginalDelegate:(id<NSWindowDelegate>)originalDelegate;
 @end
 
-@implementation PixiWindowDelegateProxy
+@implementation ZChromeWindowDelegateProxy
 - (instancetype)initWithOriginalDelegate:(id<NSWindowDelegate>)originalDelegate {
     self = [super init];
     if (self != nil) {
@@ -59,14 +59,14 @@ static const void *PixiWindowDelegateProxyAssociationKey = &PixiWindowDelegatePr
 }
 @end
 
-static void pixiWrapContentViewWithVibrancy(NSWindow *window) {
+static void zchromeWrapContentViewWithVibrancy(NSWindow *window) {
     NSView *contentView = window.contentView;
     if (contentView == nil) return;
 
     const NSUInteger fillMask = NSViewWidthSizable | NSViewHeightSizable;
     if ([contentView isKindOfClass:[NSVisualEffectView class]]) {
         NSVisualEffectView *effectView = (NSVisualEffectView *)contentView;
-        effectView.material = PixiVisualEffectMaterial;
+        effectView.material = ZChromeVisualEffectMaterial;
         effectView.menu = nil;
         NSView *subview = effectView.subviews.firstObject;
         if (subview != nil && window.delegate != nil) {
@@ -75,12 +75,12 @@ static void pixiWrapContentViewWithVibrancy(NSWindow *window) {
         return;
     }
 
-    PixiVisualEffectView *effectView = [[PixiVisualEffectView alloc] init];
+    ZChromeVisualEffectView *effectView = [[ZChromeVisualEffectView alloc] init];
     if (effectView == nil) return;
 
     effectView.blendingMode = NSVisualEffectBlendingModeBehindWindow;
     effectView.state = NSVisualEffectStateActive;
-    effectView.material = PixiVisualEffectMaterial;
+    effectView.material = ZChromeVisualEffectMaterial;
     effectView.menu = nil;
 
     [window setContentView:effectView];
@@ -93,40 +93,40 @@ static void pixiWrapContentViewWithVibrancy(NSWindow *window) {
     contentView.autoresizingMask = fillMask;
 }
 
-static PixiWindowDelegateProxy *pixiInstallWindowDelegateProxy(NSWindow *window) {
+static ZChromeWindowDelegateProxy *zchromeInstallWindowDelegateProxy(NSWindow *window) {
     if (window == nil) return nil;
 
-    PixiWindowDelegateProxy *proxy = objc_getAssociatedObject(window, PixiWindowDelegateProxyAssociationKey);
+    ZChromeWindowDelegateProxy *proxy = objc_getAssociatedObject(window, ZChromeWindowDelegateProxyAssociationKey);
     if (proxy != nil) return proxy;
 
     id<NSWindowDelegate> originalDelegate = window.delegate;
-    if ([originalDelegate isKindOfClass:[PixiWindowDelegateProxy class]]) {
-        return (PixiWindowDelegateProxy *)originalDelegate;
+    if ([originalDelegate isKindOfClass:[ZChromeWindowDelegateProxy class]]) {
+        return (ZChromeWindowDelegateProxy *)originalDelegate;
     }
 
-    proxy = [[PixiWindowDelegateProxy alloc] initWithOriginalDelegate:originalDelegate];
+    proxy = [[ZChromeWindowDelegateProxy alloc] initWithOriginalDelegate:originalDelegate];
     if (proxy == nil) return nil;
 
-    objc_setAssociatedObject(window, PixiWindowDelegateProxyAssociationKey, proxy, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(window, ZChromeWindowDelegateProxyAssociationKey, proxy, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     window.delegate = proxy;
     return proxy;
 }
 
-void PixiMacOSSetWindowStyle(void *window_ptr) {
+void ZChromeApplyTransparentTitlebar(void *window_ptr) {
     NSWindow *window = (__bridge NSWindow *)window_ptr;
     if (window == nil) return;
 
-    pixiInstallWindowDelegateProxy(window);
-    window.styleMask |= PixiFullSizeContentViewMask;
+    zchromeInstallWindowDelegateProxy(window);
+    window.styleMask |= ZChromeFullSizeContentViewMask;
     window.titlebarAppearsTransparent = YES;
 }
 
-void PixiMacOSSetTitlebarColor(void *window_ptr, double red, double green, double blue, double alpha, bool dark) {
+void ZChromeSetVibrantChrome(void *window_ptr, double red, double green, double blue, double alpha, bool dark) {
     NSWindow *window = (__bridge NSWindow *)window_ptr;
     if (window == nil) return;
 
-    PixiMacOSSetWindowStyle(window_ptr);
-    pixiWrapContentViewWithVibrancy(window);
+    ZChromeApplyTransparentTitlebar(window_ptr);
+    zchromeWrapContentViewWithVibrancy(window);
 
     window.backgroundColor = [NSColor colorWithRed:red green:green blue:blue alpha:alpha];
     window.appearance = [NSAppearance appearanceNamed:(dark ? NSAppearanceNameVibrantDark : NSAppearanceNameVibrantLight)];

@@ -11,7 +11,6 @@ const dvui_editor = @import("root.zig");
 const App = dvui_editor.App;
 const ztray = @import("ztray");
 const native_menu = @import("native_menu.zig");
-const backend = @import("backend.zig");
 pub const Explorer = @import("explorer/Explorer.zig");
 pub const Keybinds = @import("Keybinds.zig");
 pub const Menu = @import("Menu.zig");
@@ -269,8 +268,7 @@ pub fn init(
     // };
 
     // dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
-    const hwnd = if (builtin.os.tag == .windows) backend.win32Hwnd(dvui.currentWindow()) else null;
-    ztray.installMainMenu(app.gpa, native_menu.main_menu_bar, hwnd) catch |err| {
+    ztray.installMainMenuForSdlDvuiWindow(app.gpa, native_menu.main_menu_bar, dvui.currentWindow()) catch |err| {
         dvui.log.err("Failed to install native menu: {any}", .{err});
     };
 

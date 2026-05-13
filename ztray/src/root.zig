@@ -1,6 +1,6 @@
 //! Host-agnostic native menu bar (macOS NSMenu, Win32 HMENU, Linux DBusMenu). No SDL or window toolkit dependency.
 //!
-//! For an **in-app** menu bar with [DVUI](https://github.com/david-vanderson/dvui), depend on this package with DVUI and use **`createZtrayDvuiModule`** from `build.zig`: a single `addImport("ztray", ...)` exposes the same API as this file plus **`ztray.dvui_menu`** (see [`ztray_with_dvui.zig`](ztray_with_dvui.zig) and [`ztray_dvui.zig`](ztray_dvui.zig)). The core module rooted here does not import DVUI.
+//! For an **in-app** menu bar with [DVUI](https://github.com/david-vanderson/dvui), depend on this package with DVUI and use **`createZtrayDvuiModule`** from `build.zig`: a single `addImport("ztray", ...)` exposes the same API as this file plus **`ztray.dvui_menu`** and **`installMainMenuForSdlDvuiWindow`** (see [`ztray_with_dvui.zig`](ztray_with_dvui.zig) and [`ztray_dvui.zig`](ztray_dvui.zig)). Pass the SDL module into **`createZtrayDvuiModule`** alongside DVUI. Optional **window chrome** (macOS vibrancy) is a separate module: **`createZchromeModule`** + `addImport("zchrome", ...)`. The core module rooted here does not import DVUI.
 //! On Linux, [`appMenuRegistrarHasOwner`] reports whether a global AppMenu host is present (`false` → typical DVUI menubar fallback).
 //!
 //! **System tray** (`installTrayIcon`, `setTrayMenu`, `pollTrayActionId`, `shutdownTray`) is independent of the

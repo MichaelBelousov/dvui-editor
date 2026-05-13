@@ -384,3 +384,17 @@ fn menuLeafAction(src: std.builtin.SourceLocation, title: []const u8, shortcut_b
 
     return ret;
 }
+
+/// Installs the native shell menu for an SDL-backed DVUI window (resolves `HWND` on Windows from SDL window properties).
+pub fn installMainMenuForSdlDvuiWindow(allocator: std.mem.Allocator, menu_bar: ztray.MenuBar, win: *dvui.Window) ztray.InstallMainMenuError!void {
+    const hwnd = if (builtin.os.tag == .windows) blk: {
+        const sdl3 = @import("sdl-backend").c;
+        const raw = sdl3.SDL_GetPointerProperty(
+            sdl3.SDL_GetWindowProperties(win.backend.impl.window),
+            sdl3.SDL_PROP_WINDOW_WIN32_HWND_POINTER,
+            null,
+        );
+        break :blk if (raw != null) @as(?*anyopaque, @ptrCast(raw)) else null;
+    } else null;
+    return ztray.installMainMenu(allocator, menu_bar, hwnd);
+}

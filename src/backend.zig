@@ -7,6 +7,7 @@ const sdl3 = @import("sdl-backend").c;
 const win32 = @import("win32");
 
 const dvui_editor = @import("root.zig");
+const zchrome = @import("zchrome");
 
 const DWMWA_SYSTEM_BACKDROP_TYPE: c_ulong = 20;
 const DWMWA_SYSTEM_BACKDROP_TYPE_DEFAULT: c_ulong = 0;
@@ -39,11 +40,6 @@ const ACCENT_POLICY = struct {
     gradient_color: u32, // ABGR
     animation_id: u32,
 };
-
-const pixi_macos = if (builtin.os.tag == .macos) struct {
-    extern fn PixiMacOSSetWindowStyle(window: *anyopaque) void;
-    extern fn PixiMacOSSetTitlebarColor(window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool) void;
-} else struct {};
 
 // Window button action for custom-drawn title bar (app gets HTCLIENT there and calls this on click).
 pub const TitleBarButton = enum { minimize, maximize, close };
@@ -307,7 +303,7 @@ pub fn setWindowStyle(win: *dvui.Window) void {
             null,
         );
         if (raw_ptr != null) {
-            pixi_macos.PixiMacOSSetWindowStyle(@ptrCast(raw_ptr));
+            zchrome.applyTransparentTitlebar(@ptrCast(raw_ptr));
         }
     } else if (builtin.os.tag == .windows) {
         const hwnd = getWin32Hwnd(win) orelse return;
@@ -362,7 +358,7 @@ pub fn setTitlebarColor(win: *dvui.Window, color: dvui.Color) void {
             null,
         );
         if (raw_ptr != null) {
-            pixi_macos.PixiMacOSSetTitlebarColor(
+            zchrome.setVibrantChrome(
                 @ptrCast(raw_ptr),
                 @as(f64, @floatFromInt(color.r)) / 255.0,
                 @as(f64, @floatFromInt(color.g)) / 255.0,

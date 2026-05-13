@@ -61,6 +61,24 @@ pub fn createZtrayModule(
     return ztray_mod;
 }
 
+/// Optional macOS window chrome (transparent title bar + vibrancy). **Not** re-exported from the core `ztray` module; add as `addImport("zchrome", …)` separately from menu/tray.
+pub fn createZchromeModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Module {
+    const chrome_mod = b.addModule("zchrome", .{
+        .root_source_file = b.path("src/chrome_root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    if (target.result.os.tag == .macos) {
+        chrome_mod.addCSourceFile(.{ .file = b.path("src/macos_chrome.m") });
+        chrome_mod.linkFramework("AppKit", .{});
+    }
+    return chrome_mod;
+}
+
 /// Unified `ztray` module: same public API as `createZtrayModule` plus `ztray.dvui_menu` (DVUI in-app menubar). Pass as `addImport("ztray", ...)`.
 pub fn createZtrayDvuiModule(
     b: *std.Build,
@@ -68,6 +86,7 @@ pub fn createZtrayDvuiModule(
     optimize: std.builtin.OptimizeMode,
     ztray_mod: *std.Build.Module,
     dvui_mod: *std.Build.Module,
+    sdl_mod: *std.Build.Module,
 ) *std.Build.Module {
     const m = b.createModule(.{
         .root_source_file = b.path("src/ztray_with_dvui.zig"),
@@ -76,6 +95,7 @@ pub fn createZtrayDvuiModule(
     });
     m.addImport("ztray_core", ztray_mod);
     m.addImport("dvui", dvui_mod);
+    m.addImport("sdl-backend", sdl_mod);
     return m;
 }
 
@@ -129,6 +149,7 @@ fn addWioNativeExe(
 fn addWioTrayExe(
     b: *std.Build,
     ztray_mod: *std.Build.Module,
+    chrome_mod: *std.Build.Module,
     wio_mod: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -141,6 +162,33 @@ fn addWioTrayExe(
     });
     example_mod.addImport("wio", wio_mod);
     example_mod.addImport("ztray", ztray_mod);
+    example_mod.addImport("zchrome", chrome_mod);
+
+    const exe = b.addExecutable(.{
+        .name = exe_name,
+        .root_module = example_mod,
+    });
+    if (target.result.os.tag == .macos) {
+        exe.root_module.linkFramework("AppKit", .{});
+    }
+    return exe;
+}
+
+fn addWioMacosChromeExe(
+    b: *std.Build,
+    chrome_mod: *std.Build.Module,
+    wio_mod: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    exe_name: []const u8,
+) *std.Build.Step.Compile {
+    const example_mod = b.createModule(.{
+        .root_source_file = b.path("examples/wio_macos_chrome/App.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    example_mod.addImport("wio", wio_mod);
+    example_mod.addImport("zchrome", chrome_mod);
 
     const exe = b.addExecutable(.{
         .name = exe_name,
@@ -188,6 +236,7 @@ pub fn build(b: *std.Build) void {
     const force_dvui_menu = b.option(bool, "force_dvui_menu", "DVUI sample only: use in-app menu bar instead of native shell menus") orelse false;
 
     const ztray_mod = createZtrayModule(b, target, optimize);
+    const chrome_mod = createZchromeModule(b, target, optimize);
 
     if (b.lazyDependency("dvui", .{
         .target = target,
@@ -196,7 +245,7 @@ pub fn build(b: *std.Build) void {
     })) |dvui_dep| {
         const d = dvuiImportsFromDep(dvui_dep);
         const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
-        const ztray_unified_mod = createZtrayDvuiModule(b, target, optimize, ztray_mod, d.dvui);
+        const ztray_unified_mod = createZtrayDvuiModule(b, target, optimize, ztray_mod, d.dvui, d.sdl);
 
         const example_exe = addDvuiExampleExe(b, ztray_unified_mod, example_opts_mod, d, target, optimize, "ztray-dvui");
 
@@ -241,7 +290,7 @@ pub fn build(b: *std.Build) void {
         }
 
         {
-            const example_exe = addWioTrayExe(b, ztray_mod, wio_mod, target, optimize, "ztray-wio-tray");
+            const example_exe = addWioTrayExe(b, ztray_mod, chrome_mod, wio_mod, target, optimize, "ztray-wio-tray");
             linkLinuxDynamic(example_exe, b.graph.host.result.os.tag, target.result.os.tag);
 
             b.installArtifact(example_exe);
@@ -256,6 +305,25 @@ pub fn build(b: *std.Build) void {
             run_wio_tray_step.dependOn(&run_wio_tray_cmd.step);
             if (b.args) |args| {
                 run_wio_tray_cmd.addArgs(args);
+            }
+        }
+
+        if (target.result.os.tag == .macos) {
+            const example_exe = addWioMacosChromeExe(b, chrome_mod, wio_mod, target, optimize, "ztray-wio-chrome");
+            linkLinuxDynamic(example_exe, b.graph.host.result.os.tag, target.result.os.tag);
+
+            b.installArtifact(example_exe);
+
+            const run_wio_chrome_cmd = b.addRunArtifact(example_exe);
+            run_wio_chrome_cmd.step.dependOn(b.getInstallStep());
+
+            const run_wio_chrome_step = b.step(
+                "run-wio-chrome",
+                "Run wio + zchrome only (transparent title bar + vibrancy on macOS)",
+            );
+            run_wio_chrome_step.dependOn(&run_wio_chrome_cmd.step);
+            if (b.args) |args| {
+                run_wio_chrome_cmd.addArgs(args);
             }
         }
     }
@@ -339,9 +407,10 @@ fn addZtrayCiExamplesForTarget(
     const wio_dep = wio_dep_opt orelse return;
 
     const ztray_mod = createZtrayModule(b, resolved, optimize);
+    const chrome_mod = createZchromeModule(b, resolved, optimize);
     const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
     const d = dvuiImportsFromDep(dvui_dep);
-    const ztray_unified_mod = createZtrayDvuiModule(b, resolved, optimize, ztray_mod, d.dvui);
+    const ztray_unified_mod = createZtrayDvuiModule(b, resolved, optimize, ztray_mod, d.dvui, d.sdl);
 
     const os_tag = @tagName(resolved.result.os.tag);
     const arch_tag = @tagName(resolved.result.cpu.arch);
@@ -375,10 +444,24 @@ fn addZtrayCiExamplesForTarget(
         const exe = addWioTrayExe(
             b,
             ztray_mod,
+            chrome_mod,
             wio_mod,
             resolved,
             optimize,
             b.fmt("ztray-wio-tray-{s}-{s}", .{ arch_tag, os_tag }),
+        );
+        linkLinuxDynamic(exe, b.graph.host.result.os.tag, resolved.result.os.tag);
+        ci_step.dependOn(&exe.step);
+    }
+
+    if (resolved.result.os.tag == .macos) {
+        const exe = addWioMacosChromeExe(
+            b,
+            chrome_mod,
+            wio_mod,
+            resolved,
+            optimize,
+            b.fmt("ztray-wio-chrome-{s}-{s}", .{ arch_tag, os_tag }),
         );
         linkLinuxDynamic(exe, b.graph.host.result.os.tag, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);

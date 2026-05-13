@@ -4,6 +4,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const wio = @import("wio");
+const zchrome = @import("zchrome");
 const ztray = @import("ztray");
 
 const menu_def = @import("menu_def.zig");
@@ -41,6 +42,12 @@ pub fn main(init: std.process.Init) !void {
         .scale = 1,
         .size = .{ .width = 560, .height = 360 },
     });
+
+    if (builtin.os.tag == .macos) {
+        const ns: *anyopaque = @ptrCast(window.backend.window);
+        zchrome.applyTransparentTitlebar(ns);
+        zchrome.setVibrantChrome(ns, 0.12, 0.13, 0.17, 1.0, true);
+    }
 
     ztray.installMainMenu(gpa, menu_def.menu_bar, menuHostHandle(&window)) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});

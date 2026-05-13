@@ -1,6 +1,6 @@
 //! Combined **ztray** + optional DVUI in-app menubar. Same public surface as [`root.zig`](root.zig); DVUI helpers live under [`dvui_menu`].
 //!
-//! Wire with `createZtrayDvuiModule` from this package’s `build.zig`: one `addImport("ztray", …)` for your app root. Use [`dvui_menu`] for `installMainMenu` / `drawMenuBar` / `pollActionId` / etc. that target DVUI (signatures differ from native [`installMainMenu`] / [`pollActionId`] on the core re-exports).
+//! Wire with `createZtrayDvuiModule` from this package’s `build.zig`: one `addImport("ztray", …)` for your app root (pass SDL module as in `build.zig`). Use [`dvui_menu`] for `installMainMenu` / `drawMenuBar` / `pollActionId` / etc. that target DVUI (signatures differ from native [`installMainMenu`] / [`pollActionId`] on the core re-exports).
 
 const zc = @import("ztray_core");
 
@@ -40,3 +40,5 @@ pub const windows_tray_action_id_max = zc.windows_tray_action_id_max;
 
 /// In-app menu bar using DVUI (`installMainMenu` without `hwnd`, `drawMenuBar`, …).
 pub const dvui_menu = @import("ztray_dvui.zig");
+
+pub const installMainMenuForSdlDvuiWindow = @import("ztray_dvui.zig").installMainMenuForSdlDvuiWindow;
