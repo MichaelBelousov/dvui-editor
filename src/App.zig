@@ -37,7 +37,7 @@ window: *dvui.Window = undefined,
 pub const dvui_app: dvui.App = .{ .config = .{ .options = .{
     .size = .{ .w = 1200.0, .h = 800.0 },
     .min_size = .{ .w = 640.0, .h = 480.0 },
-    .title = "Inkz Editor",
+    .title = "DVUI Editor",
     .icon = icon,
     .transparent = if (builtin.os.tag == .macos or builtin.os.tag == .windows) true else false,
 } }, .frameFn = AppFrame, .initFn = AppInit, .deinitFn = AppDeinit };

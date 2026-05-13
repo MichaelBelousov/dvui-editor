@@ -5,15 +5,16 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 const known_folders = @import("known-folders");
 const nightwatch = @import("nightwatch");
+const ProjectFolderWatcher = nightwatch.Default;
+const ztray = @import("ztray");
 
 pub const Dialogs = @import("dialogs/Dialogs.zig");
 const dvui_editor = @import("root.zig");
 const App = dvui_editor.App;
-const ztray = @import("ztray");
-const native_menu = @import("native_menu.zig");
 pub const Explorer = @import("explorer/Explorer.zig");
 pub const Keybinds = @import("Keybinds.zig");
 pub const Menu = @import("Menu.zig");
+const native_menu = @import("native_menu.zig");
 pub const Panel = @import("Panel.zig");
 pub const Project = @import("Project.zig");
 pub const Recents = @import("Recents.zig");
@@ -28,8 +29,6 @@ pub const Workspace = @import("Workspace.zig");
 // const sdl3 = @import("backend").c;
 
 const Editor = @This();
-const ProjectFolderWatcher = nightwatch.Default;
-
 const ProjectFolderWatchState = struct {
     handler: ProjectFolderWatcher.Handler = .{ .vtable = &vtable },
     refresh_pending: std.atomic.Value(bool) = .init(false),
@@ -78,7 +77,7 @@ workspaces: std.array_hash_map.Auto(u64, Workspace) = .empty,
 sidebar: Sidebar,
 // infobar: Infobar,
 
-/// The root folder that will be searched for files and a .inkz project file
+/// The root folder that will be searched for files and a project file
 folder: ?[]const u8 = null,
 project: ?Project = null,
 
