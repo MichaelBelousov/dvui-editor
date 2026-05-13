@@ -37,7 +37,6 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
     const ztray_dep = b.dependency("ztray", .{
         .target = opts.target,
         .optimize = opts.optimize,
-        .force_dvui_menu = false,
     });
     mod.addImport("ztray", ztray_dep.module("ztray"));
 

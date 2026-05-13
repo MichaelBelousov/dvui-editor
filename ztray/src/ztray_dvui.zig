@@ -1,29 +1,29 @@
-//! Immediate-mode menu bar using DVUI. Requires `dvui` + `sdl-backend` imports on the ztray module.
+//! In-app menu bar using DVUI. **Separate module** from `ztray`: add this module only to apps that depend on DVUI.
+//! Import `ztray` for [`ztray.MenuBar`] / action ids; import `dvui` from your DVUI backend module.
 const std = @import("std");
 const dvui = @import("dvui");
+const ztray = @import("ztray");
 
-const types = @import("types.zig");
-
-var pending_action: std.atomic.Value(types.ActionId) = .init(-1);
+var pending_action: std.atomic.Value(ztray.ActionId) = .init(-1);
 
 var menu_arena: std.heap.ArenaAllocator = undefined;
 var menu_arena_init: bool = false;
-var stored_bar: ?types.MenuBar = null;
+var stored_bar: ?ztray.MenuBar = null;
 
-fn dupMenuBar(a: std.mem.Allocator, menu_bar: types.MenuBar) !types.MenuBar {
-    var menus = try a.alloc(types.Menu, menu_bar.menus.len);
+fn dupMenuBar(a: std.mem.Allocator, menu_bar: ztray.MenuBar) !ztray.MenuBar {
+    var menus = try a.alloc(ztray.Menu, menu_bar.menus.len);
     for (menu_bar.menus, 0..) |src_menu, mi| {
         const title = try a.dupe(u8, src_menu.title);
-        var items = try a.alloc(types.Item, src_menu.items.len);
+        var items = try a.alloc(ztray.Item, src_menu.items.len);
         for (src_menu.items, 0..) |src_item, ii| {
             items[ii] = switch (src_item) {
                 .separator => .separator,
                 .action => |act| .{ .action = .{
                     .title = try a.dupe(u8, act.title),
                     .action_id = act.action_id,
-                    .shortcut = if (act.shortcut) |sc| types.Shortcut{
+                    .shortcut = if (act.shortcut) |sc| ztray.Shortcut{
                         .key = try a.dupe(u8, sc.key),
-                        .modifiers = try a.dupe(types.Modifier, sc.modifiers),
+                        .modifiers = try a.dupe(ztray.Modifier, sc.modifiers),
                     } else null,
                     .shortcut_display = if (act.shortcut_display) |sd| try a.dupe(u8, sd) else null,
                     .enabled = act.enabled,
@@ -37,7 +37,7 @@ fn dupMenuBar(a: std.mem.Allocator, menu_bar: types.MenuBar) !types.MenuBar {
     return .{ .menus = menus };
 }
 
-pub fn installMainMenu(parent_allocator: std.mem.Allocator, menu_bar: types.MenuBar) error{OutOfMemory}!void {
+pub fn installMainMenu(parent_allocator: std.mem.Allocator, menu_bar: ztray.MenuBar) error{OutOfMemory}!void {
     if (menu_arena_init) {
         menu_arena.deinit();
         menu_arena_init = false;
@@ -60,44 +60,41 @@ pub fn shutdownMenu() void {
     }
 }
 
-fn actionLabel(allocator: std.mem.Allocator, item: types.Item.ActionItem) ![]const u8 {
+fn actionLabel(allocator: std.mem.Allocator, item: ztray.Item.ActionItem) ![]const u8 {
     if (item.shortcut) |sc| {
         const shortcut_txt = if (item.shortcut_display) |d|
             try allocator.dupe(u8, d)
         else
-            try types.formatWindowsShortcut(allocator, sc);
+            try ztray.formatWindowsShortcut(allocator, sc);
         defer if (item.shortcut_display == null) allocator.free(shortcut_txt);
         return try std.fmt.allocPrint(allocator, "{s}\t{s}", .{ item.title, shortcut_txt });
     }
     return try allocator.dupe(u8, item.title);
 }
 
-fn queueAction(id: types.ActionId) void {
+fn queueAction(id: ztray.ActionId) void {
     pending_action.store(id, .release);
 }
 
-pub fn pollActionId() ?types.ActionId {
+pub fn pollActionId() ?ztray.ActionId {
     const v = pending_action.swap(-1, .acq_rel);
     if (v < 0) return null;
     return v;
 }
 
-/// Top bar titles: small positive ids (disjoint from [`submenuRowId`] and [`submenuPopupId`]).
 fn topMenuBarItemId(menu_index: usize) usize {
     return 1 + menu_index;
 }
 
-/// Stable unique id for a row inside a top-level menu (actions and separators).
 fn submenuRowId(menu_index: usize, item_index: usize) usize {
     return 0x10_0000 + menu_index * 4096 + item_index;
 }
 
-/// Per top-level menu: animate + floatingMenu share the same @src().
 fn submenuPopupId(menu_index: usize, slot: u2) usize {
     return 0x20_0000 + menu_index * 8 + @as(usize, @intCast(slot));
 }
 
-/// Call every frame after [`installMainMenu`] when using forced DVUI menu mode.
+/// Call every frame after [`installMainMenu`] while using the DVUI menu bar.
 pub fn drawMenuBar() !void {
     const menu_bar = stored_bar orelse return;
 

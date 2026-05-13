@@ -26,9 +26,9 @@ fn linkNativeMenu(ztray_mod: *std.Build.Module, b: *std.Build, target: std.Build
     }
 }
 
-fn ztrayOptionsModule(b: *std.Build, dvui_fallback: bool, force_dvui_menu: bool) *std.Build.Module {
+/// Options for the DVUI **sample** only (`force_dvui_menu` toggles native vs in-app menubar in that exe).
+fn dvuiExampleOptsModule(b: *std.Build, force_dvui_menu: bool) *std.Build.Module {
     const zopts = b.addOptions();
-    zopts.addOption(bool, "dvui_fallback", dvui_fallback);
     zopts.addOption(bool, "force_dvui_menu", force_dvui_menu);
     return zopts.createModule();
 }
@@ -50,31 +50,44 @@ fn dvuiDependencyModules(b: *std.Build, target: std.Build.ResolvedTarget, optimi
     };
 }
 
+/// Core `ztray` module: no DVUI (or other UI toolkit) imports.
 fn createZtrayModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    zopts_mod: *std.Build.Module,
-    dvui_imports: ?DvuiImports,
 ) *std.Build.Module {
     const ztray_mod = b.addModule("ztray", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
-    ztray_mod.addImport("ztray_build_options", zopts_mod);
     linkNativeMenu(ztray_mod, b, target);
-    if (dvui_imports) |d| {
-        ztray_mod.addImport("dvui", d.dvui);
-        ztray_mod.addImport("sdl-backend", d.sdl);
-    }
     return ztray_mod;
 }
 
-fn addDvuiFallbackExe(
+/// Optional DVUI menubar helper; depends on `ztray` + `dvui` only on modules that import it.
+fn createZtrayDvuiModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    ztray_mod: *std.Build.Module,
+    dvui_mod: *std.Build.Module,
+) *std.Build.Module {
+    const m = b.addModule("ztray_dvui", .{
+        .root_source_file = b.path("src/ztray_dvui.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    m.addImport("ztray", ztray_mod);
+    m.addImport("dvui", dvui_mod);
+    return m;
+}
+
+fn addDvuiExampleExe(
     b: *std.Build,
     ztray_mod: *std.Build.Module,
-    zopts_mod: *std.Build.Module,
+    ztray_dvui_mod: *std.Build.Module,
+    example_opts_mod: *std.Build.Module,
     d: DvuiImports,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -88,7 +101,8 @@ fn addDvuiFallbackExe(
     example_mod.addImport("dvui", d.dvui);
     example_mod.addImport("sdl-backend", d.sdl);
     example_mod.addImport("ztray", ztray_mod);
-    example_mod.addImport("ztray_build_options", zopts_mod);
+    example_mod.addImport("ztray_dvui", ztray_dvui_mod);
+    example_mod.addImport("ztray_dvui_opts", example_opts_mod);
 
     return b.addExecutable(.{
         .name = exe_name,
@@ -176,16 +190,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const force_dvui_menu = b.option(bool, "force_dvui_menu", "Use in-app DVUI menu bar instead of native shell menus") orelse false;
-    const dvui_fallback = b.option(bool, "dvui_fallback", "Compile DVUI immediate-mode menu fallback (requires the dvui dependency)") orelse false;
+    const force_dvui_menu = b.option(bool, "force_dvui_menu", "DVUI sample only: use in-app menu bar instead of native shell menus") orelse false;
 
-    const zopts_mod = ztrayOptionsModule(b, dvui_fallback, force_dvui_menu);
-    const dvui_imports: ?DvuiImports = if (dvui_fallback) dvuiDependencyModules(b, target, optimize) else null;
-    const ztray_mod = createZtrayModule(b, target, optimize, zopts_mod, dvui_imports);
+    const ztray_mod = createZtrayModule(b, target, optimize);
+    const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
+    const d = dvuiDependencyModules(b, target, optimize);
+    const ztray_dvui_mod = createZtrayDvuiModule(b, target, optimize, ztray_mod, d.dvui);
 
-    if (dvui_fallback) {
-        const d = dvui_imports.?;
-        const example_exe = addDvuiFallbackExe(b, ztray_mod, zopts_mod, d, target, optimize, "ztray-dvui");
+    {
+        const example_exe = addDvuiExampleExe(b, ztray_mod, ztray_dvui_mod, example_opts_mod, d, target, optimize, "ztray-dvui");
 
         b.installArtifact(example_exe);
 
@@ -194,7 +207,7 @@ pub fn build(b: *std.Build) void {
 
         const run_dvui_step = b.step(
             "run-dvui",
-            "Run the DVUI + ztray sample (see README; requires -Ddvui_fallback=true; add -Dforce_dvui_menu=true for in-app menu)",
+            "Run the DVUI + ztray sample (add -Dforce_dvui_menu=true for in-app DVUI menubar)",
         );
         run_dvui_step.dependOn(&run_dvui_cmd.step);
         if (b.args) |args| {
@@ -313,9 +326,10 @@ fn addZtrayCiExamplesForTarget(
     optimize: std.builtin.OptimizeMode,
     force_dvui_menu: bool,
 ) void {
-    const zopts_mod = ztrayOptionsModule(b, true, force_dvui_menu);
+    const ztray_mod = createZtrayModule(b, resolved, optimize);
+    const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
     const d = dvuiDependencyModules(b, resolved, optimize);
-    const ztray_mod = createZtrayModule(b, resolved, optimize, zopts_mod, d);
+    const ztray_dvui_mod = createZtrayDvuiModule(b, resolved, optimize, ztray_mod, d.dvui);
 
     const os_tag = @tagName(resolved.result.os.tag);
     const arch_tag = @tagName(resolved.result.cpu.arch);
@@ -326,10 +340,11 @@ fn addZtrayCiExamplesForTarget(
     });
     const wio_mod = wio_dep.module("wio");
 
-    ci_step.dependOn(&addDvuiFallbackExe(
+    ci_step.dependOn(&addDvuiExampleExe(
         b,
         ztray_mod,
-        zopts_mod,
+        ztray_dvui_mod,
+        example_opts_mod,
         d,
         resolved,
         optimize,

@@ -1,8 +1,10 @@
 //! Host-agnostic native menu bar (macOS NSMenu, Win32 HMENU, Linux DBusMenu). No SDL or window toolkit dependency.
-//! Optional compile-time DVUI immediate-mode menu via `ztray_build_options` + `drawMenuBar`.
+//!
+//! For an **in-app** menu bar with [DVUI](https://github.com/david-vanderson/dvui), use the separate **`ztray_dvui`** module
+//! (see this package’s `build.zig` and [`ztray_dvui.zig`](ztray_dvui.zig)); the core `ztray` module does not import DVUI.
 //!
 //! **System tray** (`installTrayIcon`, `setTrayMenu`, `pollTrayActionId`, `shutdownTray`) is independent of the
-//! menu bar API: use either, both, or neither. Tray uses native code even when `force_dvui_menu` is enabled.
+//! menu bar API: use either, both, or neither.
 //!
 //! ## Threading and event loops
 //!
@@ -24,7 +26,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const types = @import("types.zig");
-const build_opts = @import("ztray_build_options");
 
 pub const ActionId = types.ActionId;
 pub const Modifier = types.Modifier;
@@ -57,7 +58,7 @@ pub const TrayIconOptions = struct {
 pub const InstallTrayIconError = error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory, InvalidWtf8 };
 pub const SetTrayMenuError = error{ OutOfMemory, MenuInstallFailed, ActionIdOutOfRange, DBusUnavailable, InvalidWtf8 };
 
-/// Every error [`installMainMenu`] can return (native paths per OS, DVUI path when `force_dvui_menu`, or missing `hwnd` on Windows).
+/// Every error [`installMainMenu`] can return on supported platforms (or missing `hwnd` on Windows).
 pub const InstallMainMenuError = error{
     OutOfMemory,
     MenuInstallFailed,
@@ -78,37 +79,8 @@ pub fn pumpTrayEvents() void {
     }
 }
 
-const dvui_fb = if (build_opts.dvui_fallback)
-    @import("dvui_fallback.zig")
-else
-    struct {
-        pub fn installMainMenu(_: std.mem.Allocator, _: MenuBar) error{OutOfMemory}!void {}
-        pub fn drawMenuBar() !void {}
-        pub fn pollActionId() ?ActionId {
-            return null;
-        }
-        pub fn shutdownMenu() void {}
-    };
-
-/// When compile-time DVUI fallback is enabled, draws the menu bar for this frame (immediate mode). No-op otherwise.
-pub fn drawMenuBar() !void {
-    if (!build_opts.dvui_fallback) return;
-    try dvui_fb.drawMenuBar();
-}
-
-/// Release menu storage from [`installMainMenu`] when using DVUI fallback (optional).
-pub fn shutdownDvuiMenu() void {
-    if (!build_opts.dvui_fallback) return;
-    dvui_fb.shutdownMenu();
-}
-
-/// Installs the menu bar. On Windows `hwnd` must be the top-level window handle; on macOS it is ignored.
-/// When `force_dvui_menu` is set at compile time, registers an in-app DVUI menu only (call [`drawMenuBar`] each frame).
+/// Installs the **native** menu bar. On Windows `hwnd` must be the top-level window handle; on macOS it is ignored.
 pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, hwnd: ?*anyopaque) InstallMainMenuError!void {
-    if (build_opts.dvui_fallback and build_opts.force_dvui_menu) {
-        return dvui_fb.installMainMenu(allocator, menu_bar);
-    }
-
     switch (builtin.os.tag) {
         .macos => return macos.installMainMenu(allocator, menu_bar),
         .windows => {
@@ -120,12 +92,8 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, hwnd: ?*
     }
 }
 
-/// Returns and clears the last menu action id, or null if none.
+/// Returns and clears the last **native** menubar action id, or null if none.
 pub fn pollActionId() ?ActionId {
-    if (build_opts.dvui_fallback and build_opts.force_dvui_menu) {
-        return dvui_fb.pollActionId();
-    }
-
     const id = switch (builtin.os.tag) {
         .macos => macos.pollActionId(),
         .windows => windows.pollActionId(),
@@ -138,7 +106,6 @@ pub fn pollActionId() ?ActionId {
 
 /// macOS only: whether the last "close tab" style action requested consuming the next window close / quit.
 pub fn consumeCloseTabSuppression() bool {
-    if (build_opts.force_dvui_menu) return false;
     return switch (builtin.os.tag) {
         .macos => macos.consumeCloseTabSuppression(),
         else => false,

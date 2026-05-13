@@ -1,4 +1,4 @@
-//! DVUI app + ztray: **native** shell menu by default; in-app DVUI menu bar only with `-Dforce_dvui_menu=true` in this package’s `zig build`.
+//! DVUI app + ztray: **native** shell menu by default; in-app DVUI menu bar with `-Dforce_dvui_menu=true` in this package’s `zig build`.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -6,8 +6,9 @@ const dvui = @import("dvui");
 pub const main = dvui.App.main;
 pub const panic = dvui.App.panic;
 const sdl3 = @import("sdl-backend").c;
-const zbo = @import("ztray_build_options");
+const zopts = @import("ztray_dvui_opts");
 const ztray = @import("ztray");
+const ztray_dvui = @import("ztray_dvui");
 
 const menu_def = @import("menu_def.zig");
 
@@ -26,7 +27,7 @@ fn menuHostHwnd(win: *dvui.Window) ?*anyopaque {
 pub const dvui_app: dvui.App = .{ .config = .{ .options = .{
     .size = .{ .w = 720.0, .h = 480.0 },
     .min_size = .{ .w = 400.0, .h = 300.0 },
-    .title = if (zbo.force_dvui_menu)
+    .title = if (zopts.force_dvui_menu)
         "ztray + DVUI (in-app menu)"
     else
         "ztray + DVUI (native menu)",
@@ -38,21 +39,29 @@ pub const std_options: std.Options = .{
 };
 
 pub fn AppInit(win: *dvui.Window) !void {
-    ztray.installMainMenu(win.gpa, menu_def.menu_bar, menuHostHwnd(win)) catch |err| {
-        std.log.err("ztray installMainMenu: {s}", .{@errorName(err)});
-    };
+    if (zopts.force_dvui_menu) {
+        ztray_dvui.installMainMenu(win.gpa, menu_def.menu_bar) catch |err| {
+            std.log.err("ztray_dvui installMainMenu: {s}", .{@errorName(err)});
+        };
+    } else {
+        ztray.installMainMenu(win.gpa, menu_def.menu_bar, menuHostHwnd(win)) catch |err| {
+            std.log.err("ztray installMainMenu: {s}", .{@errorName(err)});
+        };
+    }
 }
 
 pub fn AppDeinit() void {
-    ztray.shutdownDvuiMenu();
+    if (zopts.force_dvui_menu) {
+        ztray_dvui.shutdownMenu();
+    }
 }
 
 pub fn AppFrame() !dvui.App.Result {
-    if (zbo.force_dvui_menu) {
-        try ztray.drawMenuBar();
+    if (zopts.force_dvui_menu) {
+        try ztray_dvui.drawMenuBar();
     }
 
-    if (builtin.os.tag == .macos) {
+    if (builtin.os.tag == .macos and !zopts.force_dvui_menu) {
         const suppress_close = ztray.consumeCloseTabSuppression();
         const wd = dvui.currentWindow().data();
         for (dvui.events()) |*e| {
@@ -63,12 +72,17 @@ pub fn AppFrame() !dvui.App.Result {
         }
     }
 
-    if (ztray.pollActionId()) |raw| {
+    const menu_action = if (zopts.force_dvui_menu)
+        ztray_dvui.pollActionId()
+    else
+        ztray.pollActionId();
+
+    if (menu_action) |raw| {
         if (std.enums.fromInt(menu_def.DemoAction, raw)) |action| {
             switch (action) {
                 .say_hello => {
                     hello_count += 1;
-                    const src: []const u8 = if (zbo.force_dvui_menu) "DVUI menu" else "native menu";
+                    const src: []const u8 = if (zopts.force_dvui_menu) "DVUI menu" else "native menu";
                     std.log.info("Hello from ztray ({s}) (#{d})", .{ src, hello_count });
                 },
                 .toggle_demo => {
@@ -86,9 +100,9 @@ pub fn AppFrame() !dvui.App.Result {
 
     const hint =
         \\Default: native shell menu (Windows HMENU / macOS NSMenu / Linux D-Bus).
-        \\In-app DVUI menu bar: zig build -Dforce_dvui_menu=true then zig build run-dvui
+        \\In-app DVUI menu bar: zig build run-dvui -Dforce_dvui_menu=true
         \\
-        \\From ztray/: zig build run-dvui (native menu).
+        \\From ztray/: zig build run-dvui
     ;
     dvui.labelNoFmt(@src(), hint, .{}, .{ .expand = .horizontal });
 
