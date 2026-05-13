@@ -130,7 +130,7 @@ pub fn createZwindowModule(
         zwindow_opts.addOption(bool, "wayland", unix_backends.waylandEnabled());
         zwindow_mod.addOptions("zwindow_build_options", zwindow_opts);
         if (unix_backends.x11Enabled()) zwindow_mod.linkSystemLibrary("X11", .{});
-        // Wayland stub has no native calls yet; omit libwayland-client so cross-CI from macOS works.
+        // Wayland uses `dlopen` at runtime (via `std.DynLib`) so cross-CI from macOS still works without `libwayland-client`.
         zwindow_mod.link_libc = true;
     }
     return zwindow_mod;

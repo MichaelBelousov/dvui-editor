@@ -64,7 +64,8 @@ fn applyZwindowFrameChrome() void {
                 },
                 .wayland => {
                     var frame = zwindow.LinuxFrameTarget{ .wayland = .{
-                        .surface = @ptrCast(window.backend.wayland),
+                        .display = @ptrCast(wio.backend.wayland.display),
+                        .surface = @ptrCast(window.backend.wayland.surface),
                     } };
                     zwindow.setFrameChrome(
                         @ptrCast(&frame),

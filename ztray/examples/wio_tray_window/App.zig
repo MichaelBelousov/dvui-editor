@@ -32,19 +32,7 @@ fn menuHostHandle(win: *wio.Window) ?*anyopaque {
 
 fn applyZwindowFrameChrome() void {
     switch (builtin.os.tag) {
-        .windows => {
-            const native: *anyopaque = @ptrCast(window.backend.window);
-            zwindow.setFrameChrome(
-                native,
-                0.12,
-                0.13,
-                0.17,
-                1.0,
-                true,
-                .tray_compatible,
-            );
-        },
-        .macos => {
+        .windows, .macos => {
             const native: *anyopaque = @ptrCast(window.backend.window);
             zwindow.setFrameChrome(
                 native,
@@ -75,7 +63,8 @@ fn applyZwindowFrameChrome() void {
                 },
                 .wayland => {
                     var frame = zwindow.LinuxFrameTarget{ .wayland = .{
-                        .surface = @ptrCast(window.backend.wayland),
+                        .display = @ptrCast(wio.backend.wayland.display),
+                        .surface = @ptrCast(window.backend.wayland.surface),
                     } };
                     zwindow.setFrameChrome(
                         @ptrCast(&frame),

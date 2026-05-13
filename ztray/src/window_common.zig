@@ -6,8 +6,9 @@ pub const LinuxX11WindowRef = extern struct {
     window: c_ulong,
 };
 
-/// Wayland: reserved for future use (e.g. `wl_surface *`). Stub implementation ignores fields.
+/// Wayland: `display` is the `wl_display *` (e.g. `wio.backend.wayland.display`); `surface` is the `wl_surface *` (e.g. `window.backend.wayland.surface`). zwindow `dlopen`s `libwayland-client.so.0` at runtime, so consumers do not need to link Wayland.
 pub const LinuxWaylandWindowRef = extern struct {
+    display: *anyopaque,
     surface: *anyopaque,
 };
 

@@ -1,11 +1,17 @@
-//! X11 frame chrome: GTK titlebar theme hint, optional KDE blur region.
+//! X11 frame chrome: GTK titlebar theme variant hint, `_NET_WM_WINDOW_OPACITY` from `alpha`, optional KDE blur region.
+//!
+//! X11 windows here use server-side decorations from the window manager (wio's path), so there is no real "transparent title bar" toggle to flip; the GTK theme variant hint nudges GNOME/Mutter (and a few others) to pick the dark caption, and `_NET_WM_WINDOW_OPACITY` lets a compositing WM (picom / Mutter / KWin / etc.) draw the entire window translucently. `red` / `green` / `blue` are accepted for API parity with macOS / Windows but X11 has no portable tint hook beyond CSD (`_GTK_FRAME_EXTENTS`), which is out of scope here.
 
 const std = @import("std");
 const common = @import("window_common.zig");
 
+const log = std.log.scoped(.zwindow);
+
 const Display = opaque {};
 const Window = c_ulong;
 const Atom = c_ulong;
+
+const XA_CARDINAL: Atom = 6;
 
 extern fn XInternAtom(?*Display, [*:0]const u8, c_int) callconv(.c) Atom;
 extern fn XChangeProperty(?*Display, Window, Atom, Atom, c_int, c_int, ?*const anyopaque, c_int) callconv(.c) c_int;
@@ -27,14 +33,20 @@ fn displayPtr(ref: *const common.LinuxX11WindowRef) *Display {
     return @ptrCast(@alignCast(ref.display));
 }
 
-fn intern(dpy: *Display, name: [*:0]const u8) Atom {
+/// Always creates the atom if it does not exist (Xlib `only_if_exists=False`); never returns `None`.
+fn internCreate(dpy: *Display, name: [*:0]const u8) Atom {
     return XInternAtom(dpy, name, 0);
 }
 
+/// Returns `null` when the atom does not exist on the server (Xlib `only_if_exists=True` returning `None`). Use for compositor-specific atoms like `_KDE_NET_WM_BLUR_BEHIND_REGION` so the call is a no-op on non-supporting WMs.
+fn internExisting(dpy: *Display, name: [*:0]const u8) ?Atom {
+    const a = XInternAtom(dpy, name, 1);
+    return if (a == 0) null else a;
+}
+
 fn setUtf8Property(dpy: *Display, win: Window, prop_name: [*:0]const u8, value: []const u8) void {
-    const prop = intern(dpy, prop_name);
-    const utf8 = intern(dpy, "UTF8_STRING");
-    if (prop == 0 or utf8 == 0) return;
+    const prop = internCreate(dpy, prop_name);
+    const utf8 = internCreate(dpy, "UTF8_STRING");
     _ = XChangeProperty(
         dpy,
         win,
@@ -47,16 +59,12 @@ fn setUtf8Property(dpy: *Display, win: Window, prop_name: [*:0]const u8, value: 
     );
 }
 
-fn setCardinalArrayProperty(dpy: *Display, win: Window, prop_name: [*:0]const u8, items: []const u32) void {
-    const prop = intern(dpy, prop_name);
-    if (prop == 0) return;
-    const xa_cardinal = intern(dpy, "CARDINAL");
-    if (xa_cardinal == 0) return;
+fn setCardinalArrayProperty(dpy: *Display, win: Window, prop: Atom, items: []const u32) void {
     _ = XChangeProperty(
         dpy,
         win,
         prop,
-        xa_cardinal,
+        XA_CARDINAL,
         32,
         0, // PropModeReplace
         items.ptr,
@@ -71,11 +79,28 @@ fn applyGtkThemeVariant(ref: *const common.LinuxX11WindowRef, dark: bool) void {
     setUtf8Property(dpy, win, "_GTK_THEME_VARIANT", variant);
 }
 
+/// Translates `alpha` (0.0 – 1.0) to `_NET_WM_WINDOW_OPACITY` (`CARDINAL`, full range `0..0xFFFF_FFFF`). When `alpha >= 1.0` the property is deleted so the WM treats the window as fully opaque again.
+fn applyWindowOpacity(ref: *const common.LinuxX11WindowRef, alpha: f64) void {
+    const dpy = displayPtr(ref);
+    const win = ref.window;
+    const prop = internCreate(dpy, "_NET_WM_WINDOW_OPACITY");
+    if (alpha >= 1.0) {
+        _ = XDeleteProperty(dpy, win, prop);
+        return;
+    }
+    const clamped: f64 = if (alpha < 0.0) 0.0 else alpha;
+    const opacity: u32 = @intFromFloat(clamped * @as(f64, 0xFFFF_FFFF));
+    const items = [_]u32{opacity};
+    setCardinalArrayProperty(dpy, win, prop, &items);
+}
+
 fn applyKdeBlurIfPresent(ref: *const common.LinuxX11WindowRef) void {
     const dpy = displayPtr(ref);
     const win = ref.window;
-    const blur_atom = intern(dpy, "_KDE_NET_WM_BLUR_BEHIND_REGION");
-    if (blur_atom == 0) return;
+    const blur_atom = internExisting(dpy, "_KDE_NET_WM_BLUR_BEHIND_REGION") orelse {
+        log.debug("zwindow: _KDE_NET_WM_BLUR_BEHIND_REGION not present (compositor is not KWin)", .{});
+        return;
+    };
 
     var root: Window = undefined;
     var x: c_int = undefined;
@@ -87,14 +112,13 @@ fn applyKdeBlurIfPresent(ref: *const common.LinuxX11WindowRef) void {
     if (XGetGeometry(dpy, win, &root, &x, &y, &w, &h, &border, &depth) == 0) return;
 
     const rect = [_]u32{ 0, 0, w, h };
-    setCardinalArrayProperty(dpy, win, "_KDE_NET_WM_BLUR_BEHIND_REGION", &rect);
+    setCardinalArrayProperty(dpy, win, blur_atom, &rect);
 }
 
 fn clearKdeBlur(ref: *const common.LinuxX11WindowRef) void {
     const dpy = displayPtr(ref);
     const win = ref.window;
-    const blur_atom = intern(dpy, "_KDE_NET_WM_BLUR_BEHIND_REGION");
-    if (blur_atom == 0) return;
+    const blur_atom = internExisting(dpy, "_KDE_NET_WM_BLUR_BEHIND_REGION") orelse return;
     _ = XDeleteProperty(dpy, win, blur_atom);
 }
 
@@ -105,14 +129,18 @@ pub fn applyTransparentTitlebar(ref: *const common.LinuxX11WindowRef) void {
 
 pub fn setFrameChrome(
     ref: *const common.LinuxX11WindowRef,
-    _: f64,
-    _: f64,
-    _: f64,
-    _: f64,
+    red: f64,
+    green: f64,
+    blue: f64,
+    alpha: f64,
     dark: bool,
     policy: common.FrameChromePolicy,
 ) void {
+    _ = red;
+    _ = green;
+    _ = blue;
     applyGtkThemeVariant(ref, dark);
+    applyWindowOpacity(ref, alpha);
     switch (policy) {
         .full_vibrancy => applyKdeBlurIfPresent(ref),
         .tray_compatible => clearKdeBlur(ref),
