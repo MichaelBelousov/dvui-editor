@@ -15,8 +15,6 @@ comptime {
     _ = wio;
 }
 
-extern fn NSApplicationLoad() void;
-
 var window: wio.Window = undefined;
 
 fn applyZwindowFrameChrome() void {
@@ -47,8 +45,6 @@ pub fn main(init: std.process.Init) !void {
     const io = init.io;
 
     try wio.init(gpa, io, .{});
-
-    if (builtin.os.tag == .macos) NSApplicationLoad();
 
     window = try wio.createWindow(.{
         .title = "zwindow + wio",

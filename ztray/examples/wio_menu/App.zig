@@ -1,22 +1,32 @@
-//! Minimal [wio](https://github.com/ypsvlq/wio) window using ztray **native** menus (no DVUI fallback).
+//! Minimal wio window using zmenu native menus.
 const std = @import("std");
 const builtin = @import("builtin");
 
 const wio = @import("wio");
 const zmenu = @import("zmenu");
 
-const menu_def = @import("menu_def.zig");
+pub const std_options = std.Options{ .log_level = .info, .logFn = wio.logFn };
 
-pub const std_options = std.Options{
-    .log_level = .info,
-    .logFn = wio.logFn,
-};
-
-comptime {
-    _ = wio;
-}
+comptime { _ = wio; }
 
 var window: wio.Window = undefined;
+
+const DemoAction = enum(zmenu.ActionId) {
+    say_hello = 0,
+    about = 1,
+};
+
+const file_items = [_]zmenu.Item{
+    .{ .action = .{ .title = "Say Hello", .action_id = @intFromEnum(DemoAction.say_hello), .shortcut = .{ .key = .h, .primary = true } } },
+};
+const help_items = [_]zmenu.Item{
+    .{ .action = .{ .title = "About", .action_id = @intFromEnum(DemoAction.about) } },
+};
+const menus = [_]zmenu.Menu{
+    .{ .title = "File", .items = &file_items },
+    .{ .title = "Help", .items = &help_items },
+};
+const menu_bar: zmenu.MenuBar = .{ .menus = &menus };
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
@@ -30,7 +40,7 @@ pub fn main(init: std.process.Init) !void {
         .size = .{ .width = 560, .height = 360 },
     });
 
-    zmenu.installMainMenu(gpa, menu_def.menu_bar, .{
+    zmenu.installMainMenu(gpa, menu_bar, .{
         .windows_hwnd = if (builtin.os.tag == .windows) @ptrCast(window.backend.window) else null,
     }) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
@@ -42,19 +52,15 @@ pub fn main(init: std.process.Init) !void {
 fn loop() !bool {
     while (window.getEvent()) |event| {
         switch (event) {
-            .close => {
-                window.destroy();
-                wio.deinit();
-                return false;
-            },
+            .close => { window.destroy(); wio.deinit(); return false; },
             else => {},
         }
     }
 
-    if (zmenu.pollAction(menu_def.DemoAction)) |action| {
+    if (zmenu.pollAction(DemoAction)) |action| {
         switch (action) {
             .say_hello => std.log.info("Hello from native menu", .{}),
-            .about => std.log.info("ztray native menu example using wio.", .{}),
+            .about => std.log.info("zmenu wio example.", .{}),
         }
     }
 

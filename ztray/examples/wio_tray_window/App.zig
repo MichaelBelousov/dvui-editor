@@ -7,8 +7,6 @@ const zmenu = @import("zmenu");
 const ztray = @import("ztray");
 const zwindow = @import("zwindow");
 
-const menu_def = @import("menu_def.zig");
-
 pub const std_options = std.Options{ .log_level = .info, .logFn = wio.logFn };
 
 comptime { _ = wio; }
@@ -17,7 +15,36 @@ extern fn NSApplicationLoad() void;
 
 var window: wio.Window = undefined;
 
-fn applyZwindowFrameChrome() void {
+const MenuBarAction = enum(zmenu.ActionId) {
+    say_hello = 0,
+    about = 1,
+};
+
+const TrayAction = enum(c_int) {
+    hello = 1,
+    quit = 2,
+};
+
+const file_items = [_]zmenu.Item{
+    .{ .action = .{ .title = "Say Hello", .action_id = @intFromEnum(MenuBarAction.say_hello), .shortcut = .{ .key = .h, .primary = true } } },
+};
+const help_items = [_]zmenu.Item{
+    .{ .action = .{ .title = "About", .action_id = @intFromEnum(MenuBarAction.about) } },
+};
+const menus = [_]zmenu.Menu{
+    .{ .title = "File", .items = &file_items },
+    .{ .title = "Help", .items = &help_items },
+};
+const menu_bar: zmenu.MenuBar = .{ .menus = &menus };
+
+const tray_items = [_]zmenu.Item{
+    .{ .action = .{ .title = "Say hello (tray)", .action_id = @intFromEnum(TrayAction.hello) } },
+    .separator,
+    .{ .action = .{ .title = "Quit", .action_id = @intFromEnum(TrayAction.quit) } },
+};
+const tray_menu: ztray.TrayMenu = .{ .title = "Tray", .items = &tray_items };
+
+fn applyFrameChrome() void {
     switch (builtin.os.tag) {
         .windows, .macos => zwindow.setFrameChrome(
             @ptrCast(window.backend.window),
@@ -25,14 +52,8 @@ fn applyZwindowFrameChrome() void {
         ),
         .linux => {
             var frame = switch (wio.backend.active) {
-                .x11 => zwindow.LinuxFrameTarget.fromX11(
-                    @ptrCast(wio.backend.x11.display),
-                    window.backend.x11.window,
-                ),
-                .wayland => zwindow.LinuxFrameTarget.fromWayland(
-                    @ptrCast(wio.backend.wayland.display),
-                    @ptrCast(window.backend.wayland.surface),
-                ),
+                .x11 => zwindow.LinuxFrameTarget.fromX11(@ptrCast(wio.backend.x11.display), window.backend.x11.window),
+                .wayland => zwindow.LinuxFrameTarget.fromWayland(@ptrCast(wio.backend.wayland.display), @ptrCast(window.backend.wayland.surface)),
             };
             zwindow.setFrameChrome(@ptrCast(&frame), .{ .r = 0.12, .g = 0.13, .b = 0.17, .dark = true });
         },
@@ -55,7 +76,7 @@ pub fn main(init: std.process.Init) !void {
 
     const win_hwnd: ?*anyopaque = if (builtin.os.tag == .windows) @ptrCast(window.backend.window) else null;
 
-    zmenu.installMainMenu(gpa, menu_def.menu_bar, .{ .windows_hwnd = win_hwnd }) catch |err| {
+    zmenu.installMainMenu(gpa, menu_bar, .{ .windows_hwnd = win_hwnd }) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
     };
 
@@ -71,7 +92,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    ztray.setTrayMenu(gpa, menu_def.tray_menu) catch |err| {
+    ztray.setTrayMenu(gpa, tray_menu) catch |err| {
         std.log.err("setTrayMenu: {s}", .{@errorName(err)});
         ztray.shutdownTray();
         window.destroy();
@@ -79,38 +100,28 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    applyZwindowFrameChrome();
+    applyFrameChrome();
     try wio.run(loop);
 }
 
 fn loop() !bool {
     while (window.getEvent()) |event| {
         switch (event) {
-            .close => {
-                ztray.shutdownTray();
-                window.destroy();
-                wio.deinit();
-                return false;
-            },
+            .close => { ztray.shutdownTray(); window.destroy(); wio.deinit(); return false; },
             else => {},
         }
     }
 
     ztray.pumpEvents();
 
-    if (ztray.pollTrayAction(menu_def.TrayAction)) |action| {
+    if (ztray.pollTrayAction(TrayAction)) |action| {
         switch (action) {
             .hello => std.log.info("Hello from tray", .{}),
-            .quit => {
-                ztray.shutdownTray();
-                window.destroy();
-                wio.deinit();
-                return false;
-            },
+            .quit => { ztray.shutdownTray(); window.destroy(); wio.deinit(); return false; },
         }
     }
 
-    if (zmenu.pollAction(menu_def.MenuBarAction)) |action| {
+    if (zmenu.pollAction(MenuBarAction)) |action| {
         switch (action) {
             .say_hello => std.log.info("Hello from native menu", .{}),
             .about => std.log.info("zmenu + ztray wio example.", .{}),
