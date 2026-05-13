@@ -26,9 +26,59 @@ const IdGen = struct {
     }
 };
 
+/// Plain UTF-8 for `TextLayoutWidget.addLink`; nested emph/strong in the label lose per-span styling.
+fn appendInlinePlainText(arena: std.mem.Allocator, n: md.Node, out: *std.ArrayList(u8)) std.mem.Allocator.Error!void {
+    var cur: ?md.Node = n.firstChild();
+    while (cur) |x| : (cur = x.nextSibling()) {
+        switch (x.nodeType()) {
+            md.c.CMARK_NODE_TEXT => {
+                if (x.literal()) |t| try out.appendSlice(arena, t);
+            },
+            md.c.CMARK_NODE_SOFTBREAK => {
+                try out.append(arena, ' ');
+            },
+            md.c.CMARK_NODE_LINEBREAK => {
+                try out.append(arena, '\n');
+            },
+            md.c.CMARK_NODE_CODE => {
+                if (x.literal()) |t| try out.appendSlice(arena, t);
+            },
+            md.c.CMARK_NODE_LINK => {
+                try appendInlinePlainText(arena, x, out);
+            },
+            md.c.CMARK_NODE_IMAGE => {
+                try out.appendSlice(arena, "![");
+                try appendInlinePlainText(arena, x, out);
+                try out.append(arena, ']');
+                if (x.linkUrl()) |u| {
+                    try out.append(arena, '(');
+                    try out.appendSlice(arena, u);
+                    try out.append(arena, ')');
+                }
+            },
+            else => {
+                if (isStrikethrough(x)) {
+                    try appendInlinePlainText(arena, x, out);
+                } else if (x.firstChild()) |_| {
+                    try appendInlinePlainText(arena, x, out);
+                } else if (x.literal()) |t| {
+                    try out.appendSlice(arena, t);
+                }
+            },
+        }
+    }
+}
+
+fn linkLabelPlainText(link: md.Node, arena: std.mem.Allocator) std.mem.Allocator.Error![]const u8 {
+    var list: std.ArrayList(u8) = .empty;
+    errdefer list.deinit(arena);
+    try appendInlinePlainText(arena, link, &list);
+    return try list.toOwnedSlice(arena);
+}
+
 /// `span` carries inherited font/color down into inline content.
 /// Only `.font` and `.color_text` are meaningful here.
-fn renderInlines(tl: anytype, n: md.Node, span: dvui.Options) void {
+fn renderInlines(tl: *dvui.TextLayoutWidget, n: md.Node, span: dvui.Options) void {
     var cur: ?md.Node = n.firstChild();
     while (cur) |x| : (cur = x.nextSibling()) {
         switch (x.nodeType()) {
@@ -62,10 +112,23 @@ fn renderInlines(tl: anytype, n: md.Node, span: dvui.Options) void {
                 }
             },
             md.c.CMARK_NODE_LINK => {
-                const link_color = dvui.themeGet().focus;
                 const link_font = span.fontGet().withUnderline(.{});
-                const link_span = span.override(.{ .font = link_font, .color_text = link_color });
-                if (x.firstChild()) |_| renderInlines(tl, x, link_span);
+                const link_color = dvui.themeGet().focus;
+                const link_opts = span.override(.{ .font = link_font, .color_text = link_color });
+                const url = x.linkUrl() orelse "";
+                if (url.len == 0) {
+                    if (x.firstChild()) |_| renderInlines(tl, x, link_opts);
+                } else {
+                    const arena = dvui.currentWindow().arena();
+                    if (linkLabelPlainText(x, arena)) |display| {
+                        tl.addLink(.{
+                            .url = url,
+                            .text = if (display.len == 0) null else display,
+                        }, link_opts);
+                    } else |_| {
+                        if (x.firstChild()) |_| renderInlines(tl, x, link_opts);
+                    }
+                }
             },
             md.c.CMARK_NODE_IMAGE => {
                 tl.addText("![", .{ .color_text = dvui.themeGet().color(.control, .text).opacity(0.6) });
