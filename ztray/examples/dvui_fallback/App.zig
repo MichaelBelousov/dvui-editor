@@ -41,9 +41,15 @@ pub fn AppInit(win: *dvui.Window) !void {
     use_dvui_menu = zopts.force_dvui_menu or (builtin.os.tag == .linux and ztray.appMenuRegistrarHasOwner() == false);
 
     if (use_dvui_menu) {
-        ztray_dvui.installMainMenu(win.gpa, menu_def.menu_bar) catch |err| {
-            std.log.err("ztray_dvui installMainMenu: {s}", .{@errorName(err)});
-        };
+        ztray_dvui_install_and_sync: {
+            ztray_dvui.installMainMenu(win.gpa, menu_def.menu_bar) catch |err| {
+                std.log.err("ztray_dvui installMainMenu: {s}", .{@errorName(err)});
+                break :ztray_dvui_install_and_sync;
+            };
+            ztray_dvui.syncMenuShortcuts(win) catch |err| {
+                std.log.err("ztray_dvui syncMenuShortcuts: {s}", .{@errorName(err)});
+            };
+        }
     } else {
         ztray.installMainMenu(win.gpa, menu_def.menu_bar, menuHostHwnd(win)) catch |err| {
             std.log.err("ztray installMainMenu: {s}", .{@errorName(err)});

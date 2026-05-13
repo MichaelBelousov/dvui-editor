@@ -16,11 +16,13 @@ This package’s **`build.zig`** attaches the native implementation (Objective-C
 
 ### DVUI in-app menu (optional)
 
-The core module does **not** import DVUI. To draw a menubar inside a DVUI app, add a second module whose root is `ztray/src/ztray_dvui.zig`, import **`ztray`** and **`dvui`** into it, then call `ztray_dvui.installMainMenu`, `ztray_dvui.drawMenuBar` each frame, `ztray_dvui.pollActionId`, and `ztray_dvui.shutdownMenu` as needed. See this repo’s `build.zig` (`createZtrayDvuiModule` + `examples/dvui_fallback/App.zig`).
+The core module does **not** import DVUI. To draw a menubar inside a DVUI app, add a second module whose root is `ztray/src/ztray_dvui.zig`, import **`ztray`** and **`dvui`** into it, then call `ztray_dvui.installMainMenu`, **`ztray_dvui.syncMenuShortcuts`** (once per install, with your [`dvui.Window`](https://github.com/david-vanderson/dvui)), `ztray_dvui.drawMenuBar` each frame, `ztray_dvui.pollActionId`, and `ztray_dvui.shutdownMenu` as needed. See this repo’s `build.zig` (`createZtrayDvuiModule` + `examples/dvui_fallback/App.zig`).
 
 On **Linux**, call **`ztray.appMenuRegistrarHasOwner()`** (session D-Bus `NameHasOwner` on `com.canonical.AppMenu.Registrar`). When it is **`false`**, there is no global AppMenu host, so native DBusMenu menubars usually do not appear in the shell—use **`ztray_dvui`** for an in-app bar instead. When the result is **`null`** (D-Bus error or cross-build stub), keep your previous behavior (typically still try native). The sample enables DVUI automatically in the `false` case; **`-Dforce_dvui_menu=true`** still forces the in-app bar on every platform.
 
 On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to **`ztray.installMainMenu`** for native menus (for example from SDL’s `SDL_PROP_WINDOW_WIN32_HWND_POINTER`).
+
+**Shortcuts in the in-app bar:** `ztray_dvui` registers each item’s `shortcut` on the current [`dvui.Window.keybinds`](https://github.com/david-vanderson/dvui) map (names like `ztray_menu_{action_id}`) and dispatches key events from [`drawMenuBar`](src/ztray_dvui.zig). Call [`syncMenuShortcuts`](src/ztray_dvui.zig) once after [`installMainMenu`](src/ztray_dvui.zig) with your [`dvui.Window`](https://github.com/david-vanderson/dvui) so shortcuts work on the first frame (the sample does this). Only single-character `shortcut.key` values that map to [`dvui`](https://github.com/david-vanderson/dvui) key codes (letters `a`–`z`, digits `0`–`9`, etc.) are registered; other strings are skipped. On macOS, avoid shortcuts that match system bindings (for example **⌘H** is usually “Hide”; use ⇧⌘H or another combo). On macOS, `Modifier.command` uses the Command key; on other platforms it uses Control, matching the usual “primary” accelerator. Call [`shutdownMenu`](src/ztray_dvui.zig) so those entries are removed from the window.
 
 ## API (summary)
 
@@ -38,7 +40,7 @@ On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to **`ztray.insta
 
 ### DVUI in-app menu (`ztray_dvui` module, optional)
 
-- **`ztray_dvui.installMainMenu`**, **`drawMenuBar`**, **`pollActionId`**, **`shutdownMenu`** — Same menu model as `ztray.MenuBar` / `ztray.ActionId`, rendered inside DVUI. Does not replace native `installMainMenu` unless you choose not to call the latter.
+- **`ztray_dvui.installMainMenu`**, **`syncMenuShortcuts`**, **`drawMenuBar`**, **`pollActionId`**, **`shutdownMenu`** — Same menu model as `ztray.MenuBar` / `ztray.ActionId`, rendered inside DVUI. Does not replace native `installMainMenu` unless you choose not to call the latter. Menu shortcuts are registered on [`dvui.Window.keybinds`](https://github.com/david-vanderson/dvui) and handled while `drawMenuBar` runs; call `syncMenuShortcuts` after `installMainMenu` so keys work on the first frame; call `shutdownMenu` to remove them.
 
 ### System tray (orthogonal to the menu bar)
 
@@ -115,7 +117,3 @@ On **Linux**, the wio and tray examples are linked **dynamically** where applica
 - `src/linux_dbus_menu.c` — Session D-Bus menubar + tray (DBusMenu + StatusNotifierItem when built on Linux).
 - `src/ztray_dvui.zig` — Optional DVUI menubar helper (separate module; import only with DVUI).
 - `examples/` — Sample apps.
-
-## License
-
-Follow the license of the repository that contains this package (or add a dedicated license file here if you publish `ztray` standalone).

@@ -11,7 +11,7 @@ const file_items = [_]ztray.Item{
     .{ .action = .{
         .title = "Say Hello",
         .action_id = @intFromEnum(DemoAction.say_hello),
-        .shortcut = .{ .key = "h", .modifiers = &.{.command} },
+        .shortcut = .{ .key = "a", .modifiers = &.{.command} },
     } },
     .separator,
     .{ .action = .{
