@@ -14,7 +14,7 @@ Add a path (or fetched) dependency on this package, then **`addImport("ztray", �
 
 - **Native menus / tray only:** call **`createZtrayModule`** from this package’s `build.zig` and pass the returned module as `ztray`.
 - **Same API plus DVUI in-app menubar:** create the core module with **`createZtrayModule`**, then **`createZtrayDvuiModule(builder, target, optimize, ztray_mod, dvui_mod, sdl_mod)`** and pass that return value as your single **`addImport("ztray", …)`**. Your app uses **`ztray.dvui_menu`** for DVUI-only calls (`installMainMenu` without `hwnd`, `drawMenuBar`, …). Use **`ztray.installMainMenuForSdlDvuiWindow`** when you want native shell menus with an SDL-backed DVUI window without resolving `HWND` yourself.
-- **macOS window chrome (optional, separate import):** call **`createZchromeModule`** and **`addImport("zchrome", …)`** on your app module. Use **`zchrome.applyTransparentTitlebar`** / **`zchrome.setVibrantChrome`** with an `NSWindow *` as `*anyopaque`. Not re-exported from the core `ztray` module. See **`zig build run-wio-chrome`** (macOS host target) and **`examples/wio_macos_chrome`**.
+- **macOS native window frame (optional, separate import):** call **`createZwindowModule`** and **`addImport("zwindow", …)`** on your app module. Use **`zwindow.applyTransparentTitlebar`** / **`zwindow.setVibrantChrome`** with an `NSWindow *` as `*anyopaque`. Not re-exported from the core `ztray` module. See **`zig build run-wio-window`** (macOS host target) and **`examples/wio_window`**.
 
 This package’s **`build.zig`** attaches the native implementation (Objective-C on macOS, `comctl32` on Windows, D-Bus menu C or stub on Linux) to the **core** `ztray` module from **`createZtrayModule`**, which **`createZtrayDvuiModule`** reuses via a `ztray_core` import—so you still do **not** list `ztray`’s `.m` / `.c` files or `dbus-1` / `comctl32` in your own `build.zig` unless you have other reasons to.
 
@@ -108,7 +108,8 @@ Option names use **underscores** (Zig’s `zig build -D` convention), e.g. `-Dfo
 |----------|------|--------|
 | `ztray-dvui` | `zig build run-dvui` | DVUI window + ztray; native menubar by default, or `-Dforce_dvui_menu=true` for in-app bar (`ztray.dvui_menu`). |
 | `ztray-wio-native` | `zig build run-wio` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
-| `ztray-wio-tray` | `zig build run-wio-tray` | wio window + native menubar + system tray (`windows_hwnd` = main window on Windows). |
+| `ztray-wio-tray` | `zig build run-wio-tray` | wio window + native menubar + system tray (`windows_hwnd` = main window on Windows). Source: `examples/wio_tray_window`. |
+| `ztray-wio-window` | `zig build run-wio-window` | wio + `zwindow` only (macOS title bar + vibrancy; no-op elsewhere). Source: `examples/wio_window`. |
 | `ztray-tray-minimal` | `zig build run-tray` | Tray icon + context menu only (message-only HWND on Windows). |
 
 On **Linux**, the wio and tray examples are linked **dynamically** where applicable (wio’s default Unix path expects dynamic linking when system integration is off).

@@ -55,10 +55,6 @@
             .url = "git+https://github.com/ziglibs/known-folders.git#b242672a6e94982aadb00c1f8ef9c9e9a8abcc3f",
             .hash = "known_folders-0.0.0-Fy-PJqXKAAAbtJ18aGk-fkcZ4dFp_VFXgPENA6ZcLukl",
         },
-        .win32 = .{
-            .url = "git+https://github.com/marlersoft/zigwin32.git#ec98bb4d9eea532320a8551720a9e3ec6de64994",
-            .hash = "win32-25.0.28-preview-mX5pFWMt5QPTVIGh3r2-OpPunpcCCjApyRbA6Zn6WALH",
-        },
         .cmark_gfm = .{
             .url = "git+https://github.com/kristoff-it/cmark-gfm#cd0aba87cc89f0c8aa9393e59505db271ea30239",
             .hash = "cmark_gfm-0.1.0-uQgTKymaFwDK0jVZszXfDtQtW6BnS44Bp0GS55TVBD4p",

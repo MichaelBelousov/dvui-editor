@@ -41,7 +41,7 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         .optimize = opts.optimize,
     });
     const ztray_mod = ztray.createZtrayModule(ztray_dep.builder, opts.target, opts.optimize);
-    const zchrome_mod = ztray.createZchromeModule(ztray_dep.builder, opts.target, opts.optimize);
+    const zwindow_mod = ztray.createZwindowModule(ztray_dep.builder, opts.target, opts.optimize);
     const ztray_dvui_mod = ztray.createZtrayDvuiModule(
         ztray_dep.builder,
         opts.target,
@@ -51,7 +51,7 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         dvui_dep.module("sdl3"),
     );
     mod.addImport("ztray", ztray_dvui_mod);
-    mod.addImport("zchrome", zchrome_mod);
+    mod.addImport("zwindow", zwindow_mod);
 
     const cmark_gfm = b.dependency("cmark_gfm", .{
         .target = opts.target,
@@ -63,9 +63,6 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
     mod.addIncludePath(cmark_gfm.path("extensions"));
     mod.addIncludePath(b.path("src/md"));
 
-    if (b.lazyDependency("win32", .{})) |dep| {
-        mod.addImport("win32", dep.module("win32"));
-    }
     // const assetpack = @import("assetpack");
     // const assets_module = assetpack.pack(b, b.path("assets"), .{});
     // exe.root_module.addImport("assets", assets_module);
