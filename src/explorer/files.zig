@@ -27,6 +27,7 @@ pub const Extension = enum {
     ink,
     txt,
     md,
+    source,
 };
 
 pub fn draw(io: Io, environ: *const std.process.Environ.Map) !void {
@@ -630,7 +631,7 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
                         if (branch.button.clicked()) {
                             selected_id = inner_id_extra.*;
                             switch (ext) {
-                                .txt, .md, .ink => {
+                                .txt, .md, .ink, .source => {
                                     _ = dvui_editor.editor.openFilePath(abs_path, dvui_editor.editor.currentGroupingID()) catch |err| {
                                         dvui.log.err("{any}: {s}", .{ err, abs_path });
                                     };
@@ -742,5 +743,6 @@ pub fn extension(file: []const u8) Extension {
     if (std.mem.eql(u8, ext, ".ink")) return .ink;
     if (std.mem.eql(u8, ext, ".md")) return .md;
     if (std.mem.eql(u8, ext, ".txt")) return .txt;
+    if (dvui_editor.dvui.CodeEditorWidget.supportsExtension(ext)) return .source;
     return .unsupported;
 }

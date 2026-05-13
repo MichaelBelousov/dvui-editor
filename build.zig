@@ -16,7 +16,12 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         .optimize = opts.optimize,
     });
 
-    const dvui_dep = b.dependency("dvui", .{ .target = opts.target, .optimize = opts.optimize, .backend = .sdl3 });
+    const dvui_dep = b.dependency("dvui", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+        .backend = .sdl3,
+        .@"tree-sitter" = true,
+    });
 
     // Or use a prelinked one:
     mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));

@@ -529,6 +529,10 @@ pub fn drawEditor(self: *Workspace) !void {
             var md_widget = dvui_editor.dvui.MarkDownWidget.init(@src(), file);
             defer md_widget.deinit();
             md_widget.processEvents();
+        } else if (dvui_editor.dvui.CodeEditorWidget.supportsPath(file.path)) {
+            var code_widget = dvui_editor.dvui.CodeEditorWidget.init(@src(), file);
+            defer code_widget.deinit();
+            code_widget.processEvents();
         } else {
             var file_widget = dvui_editor.dvui.TextEditWidget.init(@src(), file);
             defer file_widget.deinit();

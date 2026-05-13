@@ -7,6 +7,7 @@ const icons = @import("icons");
 const dvui_editor = @import("root.zig");
 const Widgets = @import("widgets/Widgets.zig");
 pub const TextEditWidget = Widgets.TextEditWidget;
+pub const CodeEditorWidget = Widgets.CodeEditorWidget;
 pub const MarkDownWidget = Widgets.MarkDownWidget;
 pub const MarkDownPreviewWidget = Widgets.MarkDownPreviewWidget;
 pub const TabsWidget = Widgets.TabsWidget;
