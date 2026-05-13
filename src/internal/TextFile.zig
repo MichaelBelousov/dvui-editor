@@ -30,6 +30,8 @@ pub const EditorData = struct {
     ink_preview_story: ?*inkz.Story = null,
     ink_preview_transcript: std.ArrayList(u8) = .empty,
     ink_preview_err: ?[]u8 = null,
+    /// When true, the ink runtime has reached a terminal state; do not call `Story` methods again until rebuild.
+    ink_preview_done: bool = false,
 };
 
 pub const InitOptions = struct {};

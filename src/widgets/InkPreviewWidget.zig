@@ -15,6 +15,17 @@ pub fn init(src: std.builtin.SourceLocation, file: *dvui_editor.Internal.TextFil
 
 pub fn deinit(_: InkPreviewWidget) void {}
 
+fn refreshTerminalState(file: *dvui_editor.Internal.TextFile) void {
+    const story = file.editor.ink_preview_story orelse {
+        file.editor.ink_preview_done = false;
+        return;
+    };
+    // Only safe to call while the story is still advancing; once `done`, we stop touching `Story`
+    // (avoids querying the runtime every frame after the story has ended).
+    file.editor.ink_preview_done =
+        story.currentChoices().len == 0 and !story.canContinue();
+}
+
 fn appendContOutput(gpa: std.mem.Allocator, file: *dvui_editor.Internal.TextFile) void {
     const story = file.editor.ink_preview_story orelse return;
     const chunk = story.cont() catch |err| {
@@ -23,16 +34,19 @@ fn appendContOutput(gpa: std.mem.Allocator, file: *dvui_editor.Internal.TextFile
         return;
     };
     defer gpa.free(chunk);
-    if (chunk.len == 0) return;
-    const tr = &file.editor.ink_preview_transcript;
-    if (tr.items.len > 0) {
-        tr.appendSlice(gpa, "\n\n") catch return;
+    if (chunk.len > 0) {
+        const tr = &file.editor.ink_preview_transcript;
+        if (tr.items.len > 0) {
+            tr.appendSlice(gpa, "\n\n") catch return;
+        }
+        tr.appendSlice(gpa, chunk) catch return;
     }
-    tr.appendSlice(gpa, chunk) catch return;
+    refreshTerminalState(file);
 }
 
 fn rebuildStory(self: *InkPreviewWidget, gpa: std.mem.Allocator, content: []const u8) void {
     const file = self.file;
+    file.editor.ink_preview_done = false;
 
     if (file.editor.ink_preview_story) |story| {
         story.deinit();
@@ -149,6 +163,10 @@ pub fn processEvents(self: *InkPreviewWidget) void {
         );
     }
 
+    if (file.editor.ink_preview_done) {
+        return;
+    }
+
     const story = file.editor.ink_preview_story orelse {
         if (file.editor.ink_preview_err == null and content.len == 0) {
             dvui.labelNoFmt(@src(), "Empty document.", .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x454d5054 });
@@ -158,8 +176,17 @@ pub fn processEvents(self: *InkPreviewWidget) void {
 
     const choices = story.currentChoices();
     if (choices.len > 0) {
-        for (choices, 0..) |choice, i| {
-            const label: []const u8 = if (choice.text.len > 0) choice.text else "(choice)";
+        // Snapshot labels before any button runs: chooseChoiceIndex + cont() frees the
+        // runtime's choice list, so later `choice.text` slices would be dangling in the same loop.
+        const aa = dvui_editor.editor.arena.allocator();
+        const labels = aa.alloc([]const u8, choices.len) catch return;
+        for (choices, 0..) |c, i| {
+            labels[i] = if (c.text.len > 0)
+                (aa.dupe(u8, c.text) catch return)
+            else
+                "(choice)";
+        }
+        for (labels, 0..) |label, i| {
             if (dvui.button(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x43484345 ^ @as(u64, @intCast(i)) })) {
                 self.onChoice(gpa, i);
             }
@@ -168,12 +195,5 @@ pub fn processEvents(self: *InkPreviewWidget) void {
         if (dvui.button(@src(), "Continue", .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x434f4e54 })) {
             self.onContinue(gpa);
         }
-    } else if (file.editor.ink_preview_transcript.items.len > 0 and file.editor.ink_preview_err == null) {
-        dvui.labelNoFmt(
-            @src(),
-            "— End —",
-            .{},
-            .{ .expand = .horizontal, .gravity_x = 0.5, .id_extra = file.id ^ 0x454e4420 },
-        );
     }
 }
