@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 
 const dvui = @import("dvui");
 
@@ -25,6 +26,36 @@ const IdGen = struct {
         return g.n;
     }
 };
+
+pub const RenderContext = struct {
+    /// Directory of the markdown file (for resolving relative `![alt](path)`).
+    image_base_dir: ?[]const u8 = null,
+    io: Io,
+};
+
+const max_image_bytes: usize = 16 * 1024 * 1024;
+const max_image_display_width: f32 = 720;
+const max_image_display_height: f32 = 540;
+
+fn inlineSubtreeContainsImage(n: md.Node) bool {
+    if (n.nodeType() == md.c.CMARK_NODE_IMAGE) return true;
+    var c = n.firstChild();
+    while (c) |ch| : (c = ch.nextSibling()) {
+        if (inlineSubtreeContainsImage(ch)) return true;
+    }
+    return false;
+}
+
+fn resolvedLocalImagePath(ctx: RenderContext, arena: std.mem.Allocator, src: []const u8) ?[]const u8 {
+    const t = std.mem.trim(u8, src, " \t\r\n");
+    if (t.len == 0) return null;
+    if (std.ascii.startsWithIgnoreCase(t, "http://")) return null;
+    if (std.ascii.startsWithIgnoreCase(t, "https://")) return null;
+    if (std.fs.path.isAbsolute(t))
+        return std.fs.path.resolve(arena, &.{t}) catch null;
+    const base = ctx.image_base_dir orelse return null;
+    return std.fs.path.resolve(arena, &.{ base, t }) catch null;
+}
 
 /// Plain UTF-8 for `TextLayoutWidget.addLink`; nested emph/strong in the label lose per-span styling.
 fn appendInlinePlainText(arena: std.mem.Allocator, n: md.Node, out: *std.ArrayList(u8)) std.mem.Allocator.Error!void {
@@ -76,106 +107,285 @@ fn linkLabelPlainText(link: md.Node, arena: std.mem.Allocator) std.mem.Allocator
     return try list.toOwnedSlice(arena);
 }
 
-/// `span` carries inherited font/color down into inline content.
-/// Only `.font` and `.color_text` are meaningful here.
-fn renderInlines(tl: *dvui.TextLayoutWidget, n: md.Node, span: dvui.Options) void {
-    var cur: ?md.Node = n.firstChild();
-    while (cur) |x| : (cur = x.nextSibling()) {
-        switch (x.nodeType()) {
-            md.c.CMARK_NODE_TEXT => {
-                if (x.literal()) |t| tl.addText(t, .{ .font = span.font, .color_text = span.color_text });
-            },
-            md.c.CMARK_NODE_SOFTBREAK => {
-                tl.addText(" ", .{});
-            },
-            md.c.CMARK_NODE_LINEBREAK => {
-                tl.addText("\n", .{});
-            },
-            md.c.CMARK_NODE_CODE => {
-                if (x.literal()) |t| {
-                    tl.addText(t, .{
-                        .font = dvui.Font.theme(.mono).larger(-1),
-                        .color_text = dvui.themeGet().color(.control, .text).opacity(0.9),
-                    });
-                }
-            },
-            md.c.CMARK_NODE_EMPH => {
-                if (x.firstChild()) |_| {
-                    const f = span.fontGet().withStyle(.italic);
-                    renderInlines(tl, x, span.override(.{ .font = f }));
-                }
-            },
-            md.c.CMARK_NODE_STRONG => {
-                if (x.firstChild()) |_| {
-                    const f = span.fontGet().withWeight(.bold);
-                    renderInlines(tl, x, span.override(.{ .font = f }));
-                }
-            },
-            md.c.CMARK_NODE_LINK => {
-                const link_font = span.fontGet().withUnderline(.{});
-                const link_color = dvui.themeGet().focus;
-                const link_opts = span.override(.{ .font = link_font, .color_text = link_color });
-                const url = x.linkUrl() orelse "";
-                if (url.len == 0) {
-                    if (x.firstChild()) |_| renderInlines(tl, x, link_opts);
-                } else {
-                    const arena = dvui.currentWindow().arena();
-                    if (linkLabelPlainText(x, arena)) |display| {
-                        tl.addLink(.{
-                            .url = url,
-                            .text = if (display.len == 0) null else display,
-                        }, link_opts);
-                    } else |_| {
-                        if (x.firstChild()) |_| renderInlines(tl, x, link_opts);
-                    }
-                }
-            },
-            md.c.CMARK_NODE_IMAGE => {
-                tl.addText("![", .{ .color_text = dvui.themeGet().color(.control, .text).opacity(0.6) });
-                if (x.firstChild()) |_| renderInlines(tl, x, span);
-                tl.addText("]", .{ .color_text = dvui.themeGet().color(.control, .text).opacity(0.6) });
-                if (x.linkUrl()) |u| {
-                    tl.addText("(", .{ .color_text = dvui.themeGet().color(.control, .text).opacity(0.4) });
-                    tl.addText(u, .{ .font = dvui.Font.theme(.mono).larger(-2), .color_text = dvui.themeGet().color(.control, .text).opacity(0.55) });
-                    tl.addText(")", .{ .color_text = dvui.themeGet().color(.control, .text).opacity(0.4) });
-                }
-            },
-            md.c.CMARK_NODE_HTML_INLINE => {
-                if (x.literal()) |t| tl.addText(t, .{
-                    .font = dvui.Font.theme(.mono).larger(-2),
-                    .color_text = dvui.themeGet().color(.err, .text),
-                });
-            },
-            md.c.CMARK_NODE_FOOTNOTE_REFERENCE => {
-                if (x.literal()) |t| {
-                    const fn_font = dvui.Font.theme(.mono).larger(-2);
-                    const fn_color = dvui.themeGet().focus.opacity(0.8);
-                    tl.addText("[^", .{ .font = fn_font, .color_text = fn_color });
-                    tl.addText(t, .{ .font = fn_font, .color_text = fn_color });
-                    tl.addText("]", .{ .font = fn_font, .color_text = fn_color });
-                }
-            },
-            else => {
-                if (isStrikethrough(x)) {
-                    const strike_font = span.fontGet().withStrike(.{});
-                    const strike_color = dvui.themeGet().color(.control, .text).opacity(0.5);
-                    renderInlines(tl, x, .{ .font = strike_font, .color_text = strike_color });
-                } else if (x.firstChild()) |_| {
-                    renderInlines(tl, x, span);
-                } else if (x.literal()) |t| {
-                    tl.addText(t, .{ .font = span.font, .color_text = span.color_text });
-                }
-            },
+fn renderMarkdownImagePlaceholder(msg: []const u8, ids: *IdGen) void {
+    dvui.labelNoFmt(@src(), msg, .{}, .{
+        .expand = .horizontal,
+        .margin = .{ .y = 2, .h = 2 },
+        .color_text = dvui.themeGet().color(.control, .text).opacity(0.55),
+        .font = dvui.Font.theme(.mono).larger(-2),
+        .id_extra = ids.next(),
+    });
+}
+
+fn renderMarkdownImage(img: md.Node, span: dvui.Options, ctx: RenderContext, ids: *IdGen) void {
+    _ = span;
+    var outer = dvui.box(@src(), .{ .dir = .vertical }, .{
+        .expand = .horizontal,
+        .margin = .{ .y = 4, .h = 4 },
+        .id_extra = ids.next(),
+    });
+    defer outer.deinit();
+
+    const arena = dvui.currentWindow().arena();
+    const raw_url = img.linkUrl() orelse {
+        renderMarkdownImagePlaceholder("(missing image src)", ids);
+        return;
+    };
+    const url_trim = std.mem.trim(u8, raw_url, " \t\r\n");
+    if (url_trim.len == 0) {
+        renderMarkdownImagePlaceholder("(empty image src)", ids);
+        return;
+    }
+
+    const alt_owned = linkLabelPlainText(img, arena) catch "";
+    const alt: []const u8 = alt_owned;
+
+    if (std.ascii.startsWithIgnoreCase(url_trim, "http://") or std.ascii.startsWithIgnoreCase(url_trim, "https://")) {
+        var tl = dvui.textLayout(@src(), .{}, .{
+            .expand = .horizontal,
+            .id_extra = ids.next(),
+        });
+        defer tl.deinit();
+        if (alt.len > 0) {
+            tl.addText(alt, .{ .color_text = dvui.themeGet().color(.control, .text).opacity(0.85) });
+            tl.addText(" ", .{});
         }
+        tl.addLink(.{ .url = url_trim, .text = "open" }, .{
+            .font = dvui.Font.theme(.mono).larger(-2),
+        });
+        return;
+    }
+
+    const abs_path = resolvedLocalImagePath(ctx, arena, url_trim) orelse {
+        renderMarkdownImagePlaceholder("cannot resolve image path (save file or use absolute path)", ids);
+        return;
+    };
+
+    const bytes = Io.Dir.cwd().readFileAlloc(ctx.io, abs_path, arena, .limited(max_image_bytes)) catch {
+        renderMarkdownImagePlaceholder("could not read image", ids);
+        return;
+    };
+
+    const source: dvui.ImageSource = .{ .imageFile = .{
+        .bytes = bytes,
+        .name = abs_path,
+        .invalidation = .bytes,
+    } };
+    const nat = dvui.imageSize(source) catch {
+        renderMarkdownImagePlaceholder("unsupported or corrupt image", ids);
+        return;
+    };
+    if (nat.w <= 0 or nat.h <= 0) {
+        renderMarkdownImagePlaceholder("invalid image size", ids);
+        return;
+    }
+
+    const r = nat.w / nat.h;
+    // Largest rectangle inside the display cap that keeps the image aspect ratio.
+    const max_fit_w = @min(max_image_display_width, max_image_display_height * r);
+    const max_fit_h = @min(max_image_display_height, max_image_display_width / r);
+
+    // Preferred size at natural resolution, or scaled down if it exceeds `max_fit_*`.
+    const scale = @min(1.0, @min(max_fit_w / nat.w, max_fit_h / nat.h));
+    const dw = nat.w * scale;
+    const dh = nat.h * scale;
+
+    // `.expand = .ratio` lets `dvui.placeIn` grow or shrink width and height together when the
+    // preview pane size changes. `max_size_content` must stay larger than `min` for small images
+    // so height can track width; locking max == min prevented that.
+    _ = dvui.image(@src(), .{ .source = source, .shrink = .ratio }, .{
+        .min_size_content = .{ .w = dw, .h = dh },
+        .max_size_content = dvui.Options.MaxSize.size(.{ .w = max_fit_w, .h = max_fit_h }),
+        .expand = .ratio,
+        .label = .{ .text = if (alt.len > 0) alt else "markdown image" },
+        .id_extra = ids.next(),
+    });
+
+    if (alt.len > 0) {
+        var cap = dvui.textLayout(@src(), .{}, .{
+            .expand = .horizontal,
+            .margin = .{ .y = 2, .h = 0 },
+            .id_extra = ids.next(),
+        });
+        defer cap.deinit();
+        cap.addText(alt, .{
+            .font = dvui.Font.theme(.body).larger(-1),
+            .color_text = dvui.themeGet().color(.control, .text).opacity(0.65),
+        });
     }
 }
 
-fn renderBlock(n: md.Node, ids: *IdGen) void {
+fn renderInlineFlowContainer(container: md.Node, span: dvui.Options, ctx: RenderContext, ids: *IdGen) void {
+    var cur: ?md.Node = container.firstChild();
+    while (cur) |node| {
+        if (node.nodeType() == md.c.CMARK_NODE_IMAGE) {
+            renderMarkdownImage(node, span, ctx, ids);
+            cur = node.nextSibling();
+            continue;
+        }
+        if (inlineSubtreeContainsImage(node)) {
+            switch (node.nodeType()) {
+                md.c.CMARK_NODE_EMPH => {
+                    if (node.firstChild()) |_| {
+                        const f = span.fontGet().withStyle(.italic);
+                        renderInlineFlowContainer(node, span.override(.{ .font = f }), ctx, ids);
+                    }
+                },
+                md.c.CMARK_NODE_STRONG => {
+                    if (node.firstChild()) |_| {
+                        const f = span.fontGet().withWeight(.bold);
+                        renderInlineFlowContainer(node, span.override(.{ .font = f }), ctx, ids);
+                    }
+                },
+                md.c.CMARK_NODE_LINK => {
+                    const link_font = span.fontGet().withUnderline(.{});
+                    const link_color = dvui.themeGet().focus;
+                    renderInlineFlowContainer(node, span.override(.{ .font = link_font, .color_text = link_color }), ctx, ids);
+                },
+                else => {
+                    if (isStrikethrough(node)) {
+                        const strike_font = span.fontGet().withStrike(.{});
+                        const strike_color = dvui.themeGet().color(.control, .text).opacity(0.5);
+                        renderInlineFlowContainer(node, .{ .font = strike_font, .color_text = strike_color }, ctx, ids);
+                    } else if (node.firstChild()) |_| {
+                        renderInlineFlowContainer(node, span, ctx, ids);
+                    } else if (node.literal()) |t| {
+                        var tl = dvui.textLayout(@src(), .{}, .{
+                            .expand = .horizontal,
+                            .id_extra = ids.next(),
+                        });
+                        defer tl.deinit();
+                        tl.addText(t, .{ .font = span.font, .color_text = span.color_text });
+                    }
+                },
+            }
+            cur = node.nextSibling();
+            continue;
+        }
+
+        const run_first = node;
+        var run_last = node;
+        var scan: ?md.Node = node;
+        while (scan) |s| {
+            if (s.nodeType() == md.c.CMARK_NODE_IMAGE) break;
+            if (inlineSubtreeContainsImage(s)) break;
+            run_last = s;
+            scan = s.nextSibling();
+        }
+
+        var tl = dvui.textLayout(@src(), .{}, .{
+            .expand = .horizontal,
+            .margin = .{ .y = 2, .h = 2 },
+            .id_extra = ids.next(),
+        });
+        defer tl.deinit();
+        var z: ?md.Node = run_first;
+        while (z) |w| {
+            renderInlineNodeToTl(tl, w, span, ctx, ids);
+            if (w.n == run_last.n) break;
+            z = w.nextSibling();
+        }
+        cur = run_last.nextSibling();
+    }
+}
+
+/// `span` carries inherited font/color down into inline content.
+/// Only `.font` and `.color_text` are meaningful here.
+/// Caller must ensure `n` has no `CMARK_NODE_IMAGE` in any descendant.
+fn renderInlines(tl: *dvui.TextLayoutWidget, n: md.Node, span: dvui.Options, ctx: RenderContext, ids: *IdGen) void {
+    std.debug.assert(!inlineSubtreeContainsImage(n));
+    var cur: ?md.Node = n.firstChild();
+    while (cur) |x| : (cur = x.nextSibling()) {
+        renderInlineNodeToTl(tl, x, span, ctx, ids);
+    }
+}
+
+fn renderInlineNodeToTl(tl: *dvui.TextLayoutWidget, x: md.Node, span: dvui.Options, ctx: RenderContext, ids: *IdGen) void {
+    switch (x.nodeType()) {
+        md.c.CMARK_NODE_TEXT => {
+            if (x.literal()) |t| tl.addText(t, .{ .font = span.font, .color_text = span.color_text });
+        },
+        md.c.CMARK_NODE_SOFTBREAK => {
+            tl.addText(" ", .{});
+        },
+        md.c.CMARK_NODE_LINEBREAK => {
+            tl.addText("\n", .{});
+        },
+        md.c.CMARK_NODE_CODE => {
+            if (x.literal()) |t| {
+                tl.addText(t, .{
+                    .font = dvui.Font.theme(.mono).larger(-1),
+                    .color_text = dvui.themeGet().color(.control, .text).opacity(0.9),
+                });
+            }
+        },
+        md.c.CMARK_NODE_EMPH => {
+            if (x.firstChild()) |_| {
+                const f = span.fontGet().withStyle(.italic);
+                renderInlines(tl, x, span.override(.{ .font = f }), ctx, ids);
+            }
+        },
+        md.c.CMARK_NODE_STRONG => {
+            if (x.firstChild()) |_| {
+                const f = span.fontGet().withWeight(.bold);
+                renderInlines(tl, x, span.override(.{ .font = f }), ctx, ids);
+            }
+        },
+        md.c.CMARK_NODE_LINK => {
+            const link_font = span.fontGet().withUnderline(.{});
+            const link_color = dvui.themeGet().focus;
+            const link_opts = span.override(.{ .font = link_font, .color_text = link_color });
+            const url = x.linkUrl() orelse "";
+            if (url.len == 0) {
+                if (x.firstChild()) |_| renderInlines(tl, x, link_opts, ctx, ids);
+            } else {
+                const arena = dvui.currentWindow().arena();
+                if (linkLabelPlainText(x, arena)) |display| {
+                    tl.addLink(.{
+                        .url = url,
+                        .text = if (display.len == 0) null else display,
+                    }, link_opts);
+                } else |_| {
+                    if (x.firstChild()) |_| renderInlines(tl, x, link_opts, ctx, ids);
+                }
+            }
+        },
+        md.c.CMARK_NODE_IMAGE => unreachable,
+        md.c.CMARK_NODE_HTML_INLINE => {
+            if (x.literal()) |t| tl.addText(t, .{
+                .font = dvui.Font.theme(.mono).larger(-2),
+                .color_text = dvui.themeGet().color(.err, .text),
+            });
+        },
+        md.c.CMARK_NODE_FOOTNOTE_REFERENCE => {
+            if (x.literal()) |t| {
+                const fn_font = dvui.Font.theme(.mono).larger(-2);
+                const fn_color = dvui.themeGet().focus.opacity(0.8);
+                tl.addText("[^", .{ .font = fn_font, .color_text = fn_color });
+                tl.addText(t, .{ .font = fn_font, .color_text = fn_color });
+                tl.addText("]", .{ .font = fn_font, .color_text = fn_color });
+            }
+        },
+        else => {
+            if (isStrikethrough(x)) {
+                const strike_font = span.fontGet().withStrike(.{});
+                const strike_color = dvui.themeGet().color(.control, .text).opacity(0.5);
+                renderInlines(tl, x, span.override(.{ .font = strike_font, .color_text = strike_color }), ctx, ids);
+            } else if (x.firstChild()) |_| {
+                renderInlines(tl, x, span, ctx, ids);
+            } else if (x.literal()) |t| {
+                tl.addText(t, .{ .font = span.font, .color_text = span.color_text });
+            }
+        },
+    }
+}
+
+fn renderBlock(n: md.Node, ids: *IdGen, ctx: RenderContext) void {
     const t = n.nodeType();
     switch (t) {
         md.c.CMARK_NODE_DOCUMENT => {
             var c = n.firstChild();
-            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids);
+            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids, ctx);
         },
         md.c.CMARK_NODE_BLOCK_QUOTE => {
             var outer = dvui.box(@src(), .{ .dir = .horizontal }, .{
@@ -203,7 +413,7 @@ fn renderBlock(n: md.Node, ids: *IdGen) void {
             defer content.deinit();
 
             var c = n.firstChild();
-            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids);
+            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids, ctx);
         },
         md.c.CMARK_NODE_LIST => {
             var it = n.firstChild();
@@ -212,7 +422,7 @@ fn renderBlock(n: md.Node, ids: *IdGen) void {
             const col_w = dvui.Font.theme(.body).sizeM(2.2, 0).w;
             while (it) |item_node| : (it = item_node.nextSibling()) {
                 if (item_node.nodeType() != md.c.CMARK_NODE_ITEM) {
-                    renderBlock(item_node, ids);
+                    renderBlock(item_node, ids, ctx);
                     continue;
                 }
                 var row = dvui.box(@src(), .{ .dir = .horizontal }, .{
@@ -264,13 +474,13 @@ fn renderBlock(n: md.Node, ids: *IdGen) void {
 
                 var sub = item_node.firstChild();
                 while (sub) |s| : (sub = s.nextSibling()) {
-                    renderBlock(s, ids);
+                    renderBlock(s, ids, ctx);
                 }
             }
         },
         md.c.CMARK_NODE_ITEM => {
             var c = n.firstChild();
-            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids);
+            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids, ctx);
         },
         md.c.CMARK_NODE_CODE_BLOCK => {
             const info = n.fenceInfo() orelse "";
@@ -330,13 +540,23 @@ fn renderBlock(n: md.Node, ids: *IdGen) void {
             }
         },
         md.c.CMARK_NODE_PARAGRAPH => {
-            var tl = dvui.textLayout(@src(), .{}, .{
-                .expand = .horizontal,
-                .margin = .{ .y = 4, .h = 4 },
-                .id_extra = ids.next(),
-            });
-            defer tl.deinit();
-            renderInlines(tl, n, .{});
+            if (!inlineSubtreeContainsImage(n)) {
+                var tl = dvui.textLayout(@src(), .{}, .{
+                    .expand = .horizontal,
+                    .margin = .{ .y = 4, .h = 4 },
+                    .id_extra = ids.next(),
+                });
+                defer tl.deinit();
+                renderInlines(tl, n, .{}, ctx, ids);
+            } else {
+                var outer = dvui.box(@src(), .{ .dir = .vertical }, .{
+                    .expand = .horizontal,
+                    .margin = .{ .y = 4, .h = 4 },
+                    .id_extra = ids.next(),
+                });
+                defer outer.deinit();
+                renderInlineFlowContainer(n, .{}, ctx, ids);
+            }
         },
         md.c.CMARK_NODE_HEADING => {
             const level = @max(1, @min(6, n.headingLevel()));
@@ -354,15 +574,26 @@ fn renderBlock(n: md.Node, ids: *IdGen) void {
                 else => 7,
             };
             const heading_font = dvui.Font.theme(.heading).larger(size_bump - 2).withWeight(.bold);
+            const span: dvui.Options = .{ .font = heading_font };
 
-            var tl = dvui.textLayout(@src(), .{}, .{
-                .expand = .horizontal,
-                .margin = .{ .y = top_margin, .h = 2 },
-                .font = heading_font,
-                .id_extra = ids.next(),
-            });
-            defer tl.deinit();
-            renderInlines(tl, n, .{});
+            if (!inlineSubtreeContainsImage(n)) {
+                var tl = dvui.textLayout(@src(), .{}, .{
+                    .expand = .horizontal,
+                    .margin = .{ .y = top_margin, .h = 2 },
+                    .font = heading_font,
+                    .id_extra = ids.next(),
+                });
+                defer tl.deinit();
+                renderInlines(tl, n, span, ctx, ids);
+            } else {
+                var outer = dvui.box(@src(), .{ .dir = .vertical }, .{
+                    .expand = .horizontal,
+                    .margin = .{ .y = top_margin, .h = 2 },
+                    .id_extra = ids.next(),
+                });
+                defer outer.deinit();
+                renderInlineFlowContainer(n, span, ctx, ids);
+            }
         },
         md.c.CMARK_NODE_THEMATIC_BREAK => {
             _ = dvui.separator(@src(), .{
@@ -387,7 +618,7 @@ fn renderBlock(n: md.Node, ids: *IdGen) void {
                 tl.deinit();
             }
             var c = n.firstChild();
-            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids);
+            while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids, ctx);
         },
         else => {
             if (isTable(n)) {
@@ -434,18 +665,18 @@ fn renderBlock(n: md.Node, ids: *IdGen) void {
                         });
                         defer cell_box.deinit();
                         var sub = cl.firstChild();
-                        while (sub) |s| : (sub = s.nextSibling()) renderBlock(s, ids);
+                        while (sub) |s| : (sub = s.nextSibling()) renderBlock(s, ids, ctx);
                     }
                 }
             } else {
                 var c = n.firstChild();
-                while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids);
+                while (c) |ch| : (c = ch.nextSibling()) renderBlock(ch, ids, ctx);
             }
         },
     }
 }
 
-pub fn renderDocument(root: md.Node) void {
+pub fn renderDocument(root: md.Node, ctx: RenderContext) void {
     var ids: IdGen = .{};
-    renderBlock(root, &ids);
+    renderBlock(root, &ids, ctx);
 }

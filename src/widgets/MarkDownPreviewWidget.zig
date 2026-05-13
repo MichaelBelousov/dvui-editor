@@ -61,7 +61,11 @@ pub fn processEvents(self: *MarkDownPreviewWidget) void {
         });
         defer v.deinit();
         const root: md_parse.Node = .{ .n = @ptrCast(@alignCast(rp)) };
-        render_ast.renderDocument(root);
+        const base_dir = std.fs.path.dirname(self.file.path) orelse ".";
+        render_ast.renderDocument(root, .{
+            .image_base_dir = base_dir,
+            .io = dvui_editor.app.io,
+        });
     } else {
         dvui.labelNoFmt(
             @src(),
