@@ -81,175 +81,184 @@ pub fn processEvents(self: *CodeEditorWidget) void {
     defer text_edit.deinit();
 }
 
+/// Grammars we ship highlight queries for (mirrors linked `tree_sitter_*` symbols).
+const zig_tree_sitter_highlight_query =
+    \\; Types
+    \\(builtin_type) @type.builtin
+    \\
+    \\; Constants
+    \\[
+    \\  "null"
+    \\  "unreachable"
+    \\  "undefined"
+    \\] @constant.builtin
+    \\
+    \\; Fields
+    \\(field_initializer . (identifier) @variable.member)
+    \\(field_expression member: (identifier) @variable.member)
+    \\(container_field name: (identifier) @variable.member)
+    \\
+    \\; Functions
+    \\(builtin_identifier) @function.builtin
+    \\(call_expression function: (identifier) @function.call)
+    \\(call_expression function: (field_expression member: (identifier) @function.call))
+    \\(function_declaration name: (identifier) @function)
+    \\
+    \\; Keywords
+    \\[
+    \\  "asm"
+    \\  "defer"
+    \\  "errdefer"
+    \\  "test"
+    \\  "error"
+    \\  "const"
+    \\  "var"
+    \\] @keyword
+    \\
+    \\[
+    \\  "struct"
+    \\  "union"
+    \\  "enum"
+    \\  "opaque"
+    \\] @keyword.type
+    \\
+    \\[
+    \\  "async"
+    \\  "await"
+    \\  "suspend"
+    \\  "nosuspend"
+    \\  "resume"
+    \\] @keyword.coroutine
+    \\
+    \\"fn" @keyword.function
+    \\
+    \\[
+    \\  "and"
+    \\  "or"
+    \\  "orelse"
+    \\] @keyword.operator
+    \\
+    \\"return" @keyword.return
+    \\
+    \\[
+    \\  "if"
+    \\  "else"
+    \\  "switch"
+    \\] @keyword.conditional
+    \\
+    \\[
+    \\  "for"
+    \\  "while"
+    \\  "break"
+    \\  "continue"
+    \\] @keyword.repeat
+    \\
+    \\[
+    \\  "usingnamespace"
+    \\  "export"
+    \\] @keyword.import
+    \\
+    \\[
+    \\  "try"
+    \\  "catch"
+    \\] @keyword.exception
+    \\
+    \\[
+    \\  "volatile"
+    \\  "allowzero"
+    \\  "noalias"
+    \\  "addrspace"
+    \\  "align"
+    \\  "callconv"
+    \\  "linksection"
+    \\  "pub"
+    \\  "inline"
+    \\  "noinline"
+    \\  "extern"
+    \\  "comptime"
+    \\  "packed"
+    \\  "threadlocal"
+    \\] @keyword.modifier
+    \\
+    \\; Operators
+    \\[
+    \\  "="
+    \\  "*="
+    \\  "/="
+    \\  "%="
+    \\  "+="
+    \\  "-="
+    \\  "<<="
+    \\  ">>="
+    \\  "&="
+    \\  "^="
+    \\  "|="
+    \\  "!"
+    \\  "~"
+    \\  "-"
+    \\  "&"
+    \\  "=="
+    \\  "!="
+    \\  ">"
+    \\  ">="
+    \\  "<="
+    \\  "<"
+    \\  "^"
+    \\  "|"
+    \\  "<<"
+    \\  ">>"
+    \\  "+"
+    \\  "++"
+    \\  "*"
+    \\  "/"
+    \\  "%"
+    \\  ".*"
+    \\  ".?"
+    \\  "?"
+    \\] @operator
+    \\
+    \\; Literals
+    \\(character) @character
+    \\(string) @string
+    \\(multiline_string) @string
+    \\(integer) @number
+    \\(float) @number.float
+    \\(boolean) @boolean
+    \\(escape_sequence) @string.escape
+    \\
+    \\; Punctuation
+    \\[
+    \\  "["
+    \\  "]"
+    \\  "("
+    \\  ")"
+    \\  "{"
+    \\  "}"
+    \\] @punctuation.bracket
+    \\
+    \\[
+    \\  ";"
+    \\  "."
+    \\  ","
+    \\  ":"
+    \\  "=>"
+    \\  "->"
+    \\] @punctuation.delimiter
+    \\
+    \\(comment) @comment
+;
+
+pub const TreeSitterLanguage = enum {
+    zig,
+};
+
+pub const tree_sitter_highlight_queries: std.enums.EnumMap(TreeSitterLanguage, []const u8) = .initFullWith(.{
+    .zig = zig_tree_sitter_highlight_query,
+});
+
 const TreeSitter = if (dvui.useTreeSitter) struct {
     // DVUI currently links the Zig grammar; other CodeEditor extensions fall back to plain text.
     extern fn tree_sitter_zig() *dvui.c.TSLanguage;
-
-    const zig_query =
-        \\; Types
-        \\(builtin_type) @type.builtin
-        \\
-        \\; Constants
-        \\[
-        \\  "null"
-        \\  "unreachable"
-        \\  "undefined"
-        \\] @constant.builtin
-        \\
-        \\; Fields
-        \\(field_initializer . (identifier) @variable.member)
-        \\(field_expression member: (identifier) @variable.member)
-        \\(container_field name: (identifier) @variable.member)
-        \\
-        \\; Functions
-        \\(builtin_identifier) @function.builtin
-        \\(call_expression function: (identifier) @function.call)
-        \\(call_expression function: (field_expression member: (identifier) @function.call))
-        \\(function_declaration name: (identifier) @function)
-        \\
-        \\; Keywords
-        \\[
-        \\  "asm"
-        \\  "defer"
-        \\  "errdefer"
-        \\  "test"
-        \\  "error"
-        \\  "const"
-        \\  "var"
-        \\] @keyword
-        \\
-        \\[
-        \\  "struct"
-        \\  "union"
-        \\  "enum"
-        \\  "opaque"
-        \\] @keyword.type
-        \\
-        \\[
-        \\  "async"
-        \\  "await"
-        \\  "suspend"
-        \\  "nosuspend"
-        \\  "resume"
-        \\] @keyword.coroutine
-        \\
-        \\"fn" @keyword.function
-        \\
-        \\[
-        \\  "and"
-        \\  "or"
-        \\  "orelse"
-        \\] @keyword.operator
-        \\
-        \\"return" @keyword.return
-        \\
-        \\[
-        \\  "if"
-        \\  "else"
-        \\  "switch"
-        \\] @keyword.conditional
-        \\
-        \\[
-        \\  "for"
-        \\  "while"
-        \\  "break"
-        \\  "continue"
-        \\] @keyword.repeat
-        \\
-        \\[
-        \\  "usingnamespace"
-        \\  "export"
-        \\] @keyword.import
-        \\
-        \\[
-        \\  "try"
-        \\  "catch"
-        \\] @keyword.exception
-        \\
-        \\[
-        \\  "volatile"
-        \\  "allowzero"
-        \\  "noalias"
-        \\  "addrspace"
-        \\  "align"
-        \\  "callconv"
-        \\  "linksection"
-        \\  "pub"
-        \\  "inline"
-        \\  "noinline"
-        \\  "extern"
-        \\  "comptime"
-        \\  "packed"
-        \\  "threadlocal"
-        \\] @keyword.modifier
-        \\
-        \\; Operators
-        \\[
-        \\  "="
-        \\  "*="
-        \\  "/="
-        \\  "%="
-        \\  "+="
-        \\  "-="
-        \\  "<<="
-        \\  ">>="
-        \\  "&="
-        \\  "^="
-        \\  "|="
-        \\  "!"
-        \\  "~"
-        \\  "-"
-        \\  "&"
-        \\  "=="
-        \\  "!="
-        \\  ">"
-        \\  ">="
-        \\  "<="
-        \\  "<"
-        \\  "^"
-        \\  "|"
-        \\  "<<"
-        \\  ">>"
-        \\  "+"
-        \\  "++"
-        \\  "*"
-        \\  "/"
-        \\  "%"
-        \\  ".*"
-        \\  ".?"
-        \\  "?"
-        \\] @operator
-        \\
-        \\; Literals
-        \\(character) @character
-        \\(string) @string
-        \\(multiline_string) @string
-        \\(integer) @number
-        \\(float) @number.float
-        \\(boolean) @boolean
-        \\(escape_sequence) @string.escape
-        \\
-        \\; Punctuation
-        \\[
-        \\  "["
-        \\  "]"
-        \\  "("
-        \\  ")"
-        \\  "{"
-        \\  "}"
-        \\] @punctuation.bracket
-        \\
-        \\[
-        \\  ";"
-        \\  "."
-        \\  ","
-        \\  ":"
-        \\  "=>"
-        \\  "->"
-        \\] @punctuation.delimiter
-        \\
-        \\(comment) @comment
-    ;
 
     const highlights = [_]dvui.TextEntryWidget.SyntaxHighlight{
         highlight("keyword", .{ .r = 0xc6, .g = 0x78, .b = 0xdd }),
@@ -272,16 +281,16 @@ const TreeSitter = if (dvui.useTreeSitter) struct {
     }
 
     fn optionForExtension(extension: []const u8) ?dvui.TextEntryWidget.InitOptions.TreeSitterOption {
-        if (std.ascii.eqlIgnoreCase(extension, ".zig")) return option(tree_sitter_zig());
-        if (std.ascii.eqlIgnoreCase(extension, ".zon")) return option(tree_sitter_zig());
+        if (std.ascii.eqlIgnoreCase(extension, ".zig")) return option(.zig, tree_sitter_zig());
+        if (std.ascii.eqlIgnoreCase(extension, ".zon")) return option(.zig, tree_sitter_zig());
 
         return null;
     }
 
-    fn option(language: *dvui.c.TSLanguage) dvui.TextEntryWidget.InitOptions.TreeSitterOption {
+    fn option(lang: TreeSitterLanguage, language: *dvui.c.TSLanguage) dvui.TextEntryWidget.InitOptions.TreeSitterOption {
         return .{
             .language = language,
-            .queries = zig_query,
+            .queries = tree_sitter_highlight_queries.getAssertContains(lang),
             .highlights = &highlights,
         };
     }
@@ -301,12 +310,13 @@ const TreeSitter = if (dvui.useTreeSitter) struct {
 
 test "zig tree-sitter highlight query compiles" {
     if (dvui.useTreeSitter) {
+        const query_src = tree_sitter_highlight_queries.getAssertContains(.zig);
         var error_offset: u32 = undefined;
         var error_type: dvui.c.TSQueryError = undefined;
         const query = dvui.c.ts_query_new(
             TreeSitter.tree_sitter_zig(),
-            TreeSitter.zig_query.ptr,
-            @intCast(TreeSitter.zig_query.len),
+            query_src.ptr,
+            @intCast(query_src.len),
             &error_offset,
             &error_type,
         ) orelse return error.InvalidTreeSitterQuery;
