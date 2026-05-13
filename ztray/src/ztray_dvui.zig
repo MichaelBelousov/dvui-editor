@@ -231,16 +231,14 @@ fn dispatchMenuShortcuts() void {
     }
 }
 
-fn actionLabel(allocator: std.mem.Allocator, item: ztray.Item.ActionItem) ![]const u8 {
-    if (item.shortcut) |sc| {
-        const shortcut_txt = if (item.shortcut_display) |d|
-            try allocator.dupe(u8, d)
-        else
-            try ztray.formatWindowsShortcut(allocator, sc);
-        defer if (item.shortcut_display == null) allocator.free(shortcut_txt);
-        return try std.fmt.allocPrint(allocator, "{s}\t{s}", .{ item.title, shortcut_txt });
-    }
-    return try allocator.dupe(u8, item.title);
+fn bracketedShortcutText(allocator: std.mem.Allocator, item: ztray.Item.ActionItem) error{OutOfMemory}!?[]const u8 {
+    const sc = item.shortcut orelse return null;
+    const shortcut_txt = if (item.shortcut_display) |d|
+        d
+    else
+        try ztray.formatWindowsShortcut(allocator, sc);
+    defer if (item.shortcut_display == null) allocator.free(shortcut_txt);
+    return try std.fmt.allocPrint(allocator, "[{s}]", .{shortcut_txt});
 }
 
 fn queueAction(id: ztray.ActionId) void {
@@ -317,10 +315,10 @@ pub fn drawMenuBar() !void {
                         _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = row_id });
                     },
                     .action => |act| {
-                        const label = try actionLabel(alloc, act);
-                        defer alloc.free(label);
+                        const shortcut_bracketed = try bracketedShortcutText(alloc, act);
+                        defer if (shortcut_bracketed) |s| alloc.free(s);
 
-                        if (menuLeafItem(@src(), label, act.enabled, .{
+                        if (menuLeafAction(@src(), act.title, shortcut_bracketed, act.enabled, .{
                             .expand = .horizontal,
                             .id_extra = row_id,
                         }) != null) {
@@ -349,19 +347,43 @@ fn menuItemTop(src: std.builtin.SourceLocation, label_str: []const u8, init_opts
     return ret;
 }
 
-fn menuLeafItem(src: std.builtin.SourceLocation, label_str: []const u8, enabled: bool, opts: dvui.Options) ?dvui.Rect.Natural {
+fn menuLeafAction(src: std.builtin.SourceLocation, title: []const u8, shortcut_bracketed: ?[]const u8, enabled: bool, opts: dvui.Options) ?dvui.Rect.Natural {
     const init: dvui.MenuItemWidget.InitOptions = .{};
     var mi = dvui.menuItem(src, init, opts);
+    defer mi.deinit();
     var ret: ?dvui.Rect.Natural = null;
     if (mi.activeRect()) |r| ret = r;
 
-    var label_opts = opts;
-    label_opts.margin = dvui.Rect.all(0);
-    label_opts.padding = dvui.Rect.all(0);
+    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        .expand = .horizontal,
+        .margin = dvui.Rect.all(0),
+        .padding = dvui.Rect.all(0),
+    });
+    defer row.deinit();
+
+    var title_opts = opts.strip();
+    title_opts.expand = .none;
+    title_opts.margin = dvui.Rect.all(0);
+    title_opts.padding = dvui.Rect.all(0);
+    title_opts.gravity_y = 0.5;
     if (!enabled) {
-        label_opts.color_text = dvui.themeGet().color(.control, .text).opacity(0.35);
+        title_opts.color_text = dvui.themeGet().color(.control, .text).opacity(0.35);
     }
-    dvui.labelNoFmt(@src(), label_str, .{}, label_opts);
-    mi.deinit();
+    dvui.labelNoFmt(@src(), title, .{}, title_opts);
+
+    if (shortcut_bracketed) |sc| {
+        _ = dvui.spacer(@src(), .{ .min_size_content = .width(10) });
+        _ = dvui.spacer(@src(), .{ .expand = .horizontal });
+
+        var sc_opts = opts.strip();
+        sc_opts.expand = .none;
+        sc_opts.margin = dvui.Rect.all(0);
+        sc_opts.padding = dvui.Rect.all(0);
+        sc_opts.gravity_y = 0.5;
+        const base = dvui.themeGet().color(.control, .text);
+        sc_opts.color_text = if (enabled) base.opacity(0.48) else base.opacity(0.28);
+        dvui.labelNoFmt(@src(), sc, .{}, sc_opts);
+    }
+
     return ret;
 }
