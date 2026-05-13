@@ -525,10 +525,15 @@ pub fn drawEditor(self: *Workspace) !void {
 
         // dvui_editor.perf.canvasPaneDrawn();
 
-        var file_widget = dvui_editor.dvui.TextEditWidget.init(@src(), file);
-
-        defer file_widget.deinit();
-        file_widget.processEvents();
+        if (std.mem.eql(u8, std.fs.path.extension(file.path), ".md")) {
+            var md_widget = dvui_editor.dvui.MarkDownWidget.init(@src(), file);
+            defer md_widget.deinit();
+            md_widget.processEvents();
+        } else {
+            var file_widget = dvui_editor.dvui.TextEditWidget.init(@src(), file);
+            defer file_widget.deinit();
+            file_widget.processEvents();
+        }
     } else {
         var box = dvui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .both,
