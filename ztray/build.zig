@@ -190,7 +190,7 @@ fn addWioNativeExe(
     exe_name: []const u8,
 ) *std.Build.Step.Compile {
     const example_mod = b.createModule(.{
-        .root_source_file = b.path("examples/wio_native/App.zig"),
+        .root_source_file = b.path("examples/wio_menu/App.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -332,7 +332,7 @@ pub fn build(b: *std.Build) void {
         const wio_mod = wio_dep.module("wio");
 
         {
-            const example_exe = addWioNativeExe(b, ztray_mod, wio_mod, target, optimize, "ztray-wio-native");
+            const example_exe = addWioNativeExe(b, ztray_mod, wio_mod, target, optimize, "ztray-wio-menu");
             linkLinuxDynamic(example_exe, b.graph.host.result.os.tag, target.result.os.tag);
 
             b.installArtifact(example_exe);
@@ -340,11 +340,11 @@ pub fn build(b: *std.Build) void {
             const run_wio_cmd = b.addRunArtifact(example_exe);
             run_wio_cmd.step.dependOn(b.getInstallStep());
 
-            const run_wio_native_step = b.step(
+            const run_wio_menu_step = b.step(
                 "run-wio",
                 "Run the ztray + wio native menu sample",
             );
-            run_wio_native_step.dependOn(&run_wio_cmd.step);
+            run_wio_menu_step.dependOn(&run_wio_cmd.step);
             if (b.args) |args| {
                 run_wio_cmd.addArgs(args);
             }
@@ -494,7 +494,7 @@ fn addZtrayCiExamplesForTarget(
             wio_mod,
             resolved,
             optimize,
-            b.fmt("ztray-wio-native-{s}-{s}", .{ arch_tag, os_tag }),
+            b.fmt("ztray-wio-menu-{s}-{s}", .{ arch_tag, os_tag }),
         );
         linkLinuxDynamic(exe, b.graph.host.result.os.tag, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);

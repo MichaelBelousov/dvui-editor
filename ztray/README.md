@@ -108,7 +108,7 @@ Option names use **underscores** (Zig’s `zig build -D` convention), e.g. `-Dfo
 | Artifact | Step | Notes |
 |----------|------|--------|
 | `ztray-dvui` | `zig build run-dvui` | DVUI window + ztray; native menubar by default, or `-Dforce_dvui_menu=true` for in-app bar (`ztray.dvui_menu`). |
-| `ztray-wio-native` | `zig build run-wio` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
+| `ztray-wio-menu` | `zig build run-wio` | [wio](https://github.com/ypsvlq/wio) window + native ztray menus only. |
 | `ztray-wio-tray` | `zig build run-wio-tray` | wio + native menubar + tray. **`zwindow.setFrameChrome`** after install (`.tray_compatible` on macOS; Windows ignores policy; Linux uses **`LinuxFrameTarget`**). |
 | `ztray-wio-window` | `zig build run-wio-window` | wio + **`zwindow.setFrameChrome`** with **`.full_vibrancy`** on macOS; Linux uses **`LinuxFrameTarget`**; other hosts plain wio. Source: `examples/wio_window`. |
 | `ztray-tray-minimal` | `zig build run-tray` | Tray icon + context menu only (message-only HWND on Windows). |
