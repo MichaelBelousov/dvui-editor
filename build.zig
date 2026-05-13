@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const ztray = @import("ztray");
+
 const EditorBuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -38,7 +40,16 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         .target = opts.target,
         .optimize = opts.optimize,
     });
-    mod.addImport("ztray", ztray_dep.module("ztray"));
+    const ztray_mod = ztray.createZtrayModule(ztray_dep.builder, opts.target, opts.optimize);
+    const ztray_dvui_mod = ztray.createZtrayDvuiModule(
+        ztray_dep.builder,
+        opts.target,
+        opts.optimize,
+        ztray_mod,
+        dvui_dep.module("dvui_sdl3"),
+    );
+    mod.addImport("ztray", ztray_mod);
+    mod.addImport("ztray_dvui", ztray_dvui_mod);
 
     const cmark_gfm = b.dependency("cmark_gfm", .{
         .target = opts.target,

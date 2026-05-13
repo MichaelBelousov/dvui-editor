@@ -46,7 +46,7 @@ fn dvuiImportsFromDep(dep: *std.Build.Dependency) DvuiImports {
 }
 
 /// Core `ztray` module: no DVUI (or other UI toolkit) imports.
-fn createZtrayModule(
+pub fn createZtrayModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -62,7 +62,7 @@ fn createZtrayModule(
 }
 
 /// Optional DVUI menubar helper; depends on `ztray` + `dvui` only on modules that import it.
-fn createZtrayDvuiModule(
+pub fn createZtrayDvuiModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
