@@ -71,6 +71,27 @@ pub fn AppInit(win: *dvui.Window) !void {
     dvui_editor.editor = try gpa.create(Editor);
     dvui_editor.editor.* = Editor.init(io, dvui_editor.app) catch unreachable;
 
+    if (dvui.App.main_init) |pin| {
+        const args = try pin.minimal.args.toSlice(pin.arena.allocator());
+        cli_folder: {
+            if (args.len <= 1 or args[1].len == 0) break :cli_folder;
+            const folder_arg = args[1];
+            const dir_res = if (std.Io.Dir.path.isAbsolute(folder_arg))
+                std.Io.Dir.openDirAbsolute(io, folder_arg, .{ .iterate = true })
+            else
+                std.Io.Dir.cwd().openDir(io, folder_arg, .{ .iterate = true });
+            const dir = dir_res catch |err| {
+                dvui.log.err("Open folder argument is not a readable directory ({s}): {s}", .{ folder_arg, @errorName(err) });
+                break :cli_folder;
+            };
+            defer std.Io.Dir.close(dir, io);
+
+            dvui_editor.editor.setProjectFolder(folder_arg) catch |err| {
+                dvui.log.err("Failed to open project folder {s}: {s}", .{ folder_arg, @errorName(err) });
+            };
+        }
+    }
+
     // dvui.addFont("CozetteVector", cozette_ttf, null) catch {};
     // dvui.addFont("CozetteVectorBold", cozette_bold_ttf, null) catch {};
 }
