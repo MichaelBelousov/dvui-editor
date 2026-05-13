@@ -54,88 +54,21 @@ pub const ShortcutKey = enum {
     eight,
     nine,
 
-    /// Lowercase letter or digit for AppKit `keyEquivalent` / C string.
+    /// Lowercase letter byte or digit char for AppKit `keyEquivalent` / C string.
     pub fn keyEquivalentByte(self: ShortcutKey) u8 {
-        return switch (self) {
-            .a => 'a',
-            .b => 'b',
-            .c => 'c',
-            .d => 'd',
-            .e => 'e',
-            .f => 'f',
-            .g => 'g',
-            .h => 'h',
-            .i => 'i',
-            .j => 'j',
-            .k => 'k',
-            .l => 'l',
-            .m => 'm',
-            .n => 'n',
-            .o => 'o',
-            .p => 'p',
-            .q => 'q',
-            .r => 'r',
-            .s => 's',
-            .t => 't',
-            .u => 'u',
-            .v => 'v',
-            .w => 'w',
-            .x => 'x',
-            .y => 'y',
-            .z => 'z',
-            .zero => '0',
-            .one => '1',
-            .two => '2',
-            .three => '3',
-            .four => '4',
-            .five => '5',
-            .six => '6',
-            .seven => '7',
-            .eight => '8',
-            .nine => '9',
-        };
+        const n = @tagName(self);
+        if (n.len == 1) return n[0]; // letters 'a'..'z'
+        const digit_names = [10][]const u8{ "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine" };
+        for (digit_names, 0..) |name, i| {
+            if (std.mem.eql(u8, n, name)) return '0' + @as(u8, @intCast(i));
+        }
+        unreachable;
     }
 
-    /// Single ASCII character for Windows-style shortcut display (letters uppercased).
+    /// Single ASCII char for Windows-style shortcut display (letters uppercased).
     pub fn displayAscii(self: ShortcutKey) u8 {
-        return switch (self) {
-            .a => 'A',
-            .b => 'B',
-            .c => 'C',
-            .d => 'D',
-            .e => 'E',
-            .f => 'F',
-            .g => 'G',
-            .h => 'H',
-            .i => 'I',
-            .j => 'J',
-            .k => 'K',
-            .l => 'L',
-            .m => 'M',
-            .n => 'N',
-            .o => 'O',
-            .p => 'P',
-            .q => 'Q',
-            .r => 'R',
-            .s => 'S',
-            .t => 'T',
-            .u => 'U',
-            .v => 'V',
-            .w => 'W',
-            .x => 'X',
-            .y => 'Y',
-            .z => 'Z',
-            .zero => '0',
-            .one => '1',
-            .two => '2',
-            .three => '3',
-            .four => '4',
-            .five => '5',
-            .six => '6',
-            .seven => '7',
-            .eight => '8',
-            .nine => '9',
-        };
+        const b = self.keyEquivalentByte();
+        return if (b >= 'a') b - 32 else b;
     }
 };
 

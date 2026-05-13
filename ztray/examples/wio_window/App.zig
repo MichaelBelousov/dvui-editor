@@ -21,63 +21,22 @@ var window: wio.Window = undefined;
 
 fn applyZwindowFrameChrome() void {
     switch (builtin.os.tag) {
-        .windows => {
-            const native: *anyopaque = @ptrCast(window.backend.window);
-            zwindow.setFrameChrome(
-                native,
-                0.18,
-                0.19,
-                0.24,
-                1.0,
-                true,
-                .full_vibrancy,
-            );
-        },
-        .macos => {
-            const native: *anyopaque = @ptrCast(window.backend.window);
-            zwindow.setFrameChrome(
-                native,
-                0.18,
-                0.19,
-                0.24,
-                1.0,
-                true,
-                .full_vibrancy,
-            );
-        },
+        .windows, .macos => zwindow.setFrameChrome(
+            @ptrCast(window.backend.window),
+            0.18, 0.19, 0.24, 1.0, true, .full_vibrancy,
+        ),
         .linux => {
-            switch (wio.backend.active) {
-                .x11 => {
-                    var frame = zwindow.LinuxFrameTarget{ .x11 = .{
-                        .display = @ptrCast(wio.backend.x11.display),
-                        .window = window.backend.x11.window,
-                    } };
-                    zwindow.setFrameChrome(
-                        @ptrCast(&frame),
-                        0.18,
-                        0.19,
-                        0.24,
-                        1.0,
-                        true,
-                        .full_vibrancy,
-                    );
-                },
-                .wayland => {
-                    var frame = zwindow.LinuxFrameTarget{ .wayland = .{
-                        .display = @ptrCast(wio.backend.wayland.display),
-                        .surface = @ptrCast(window.backend.wayland.surface),
-                    } };
-                    zwindow.setFrameChrome(
-                        @ptrCast(&frame),
-                        0.18,
-                        0.19,
-                        0.24,
-                        1.0,
-                        true,
-                        .full_vibrancy,
-                    );
-                },
-            }
+            var frame = switch (wio.backend.active) {
+                .x11 => zwindow.LinuxFrameTarget.fromX11(
+                    @ptrCast(wio.backend.x11.display),
+                    window.backend.x11.window,
+                ),
+                .wayland => zwindow.LinuxFrameTarget.fromWayland(
+                    @ptrCast(wio.backend.wayland.display),
+                    @ptrCast(window.backend.wayland.surface),
+                ),
+            };
+            zwindow.setFrameChrome(@ptrCast(&frame), 0.18, 0.19, 0.24, 1.0, true, .full_vibrancy);
         },
         else => {},
     }

@@ -23,60 +23,24 @@ extern fn NSApplicationLoad() void;
 
 var window: wio.Window = undefined;
 
-fn menuHostHandle(win: *wio.Window) ?*anyopaque {
-    return switch (builtin.os.tag) {
-        .windows => @ptrCast(win.backend.window),
-        else => null,
-    };
-}
-
 fn applyZwindowFrameChrome() void {
     switch (builtin.os.tag) {
-        .windows, .macos => {
-            const native: *anyopaque = @ptrCast(window.backend.window);
-            zwindow.setFrameChrome(
-                native,
-                0.12,
-                0.13,
-                0.17,
-                1.0,
-                true,
-                .tray_compatible,
-            );
-        },
+        .windows, .macos => zwindow.setFrameChrome(
+            @ptrCast(window.backend.window),
+            0.12, 0.13, 0.17, 1.0, true, .tray_compatible,
+        ),
         .linux => {
-            switch (wio.backend.active) {
-                .x11 => {
-                    var frame = zwindow.LinuxFrameTarget{ .x11 = .{
-                        .display = @ptrCast(wio.backend.x11.display),
-                        .window = window.backend.x11.window,
-                    } };
-                    zwindow.setFrameChrome(
-                        @ptrCast(&frame),
-                        0.12,
-                        0.13,
-                        0.17,
-                        1.0,
-                        true,
-                        .tray_compatible,
-                    );
-                },
-                .wayland => {
-                    var frame = zwindow.LinuxFrameTarget{ .wayland = .{
-                        .display = @ptrCast(wio.backend.wayland.display),
-                        .surface = @ptrCast(window.backend.wayland.surface),
-                    } };
-                    zwindow.setFrameChrome(
-                        @ptrCast(&frame),
-                        0.12,
-                        0.13,
-                        0.17,
-                        1.0,
-                        true,
-                        .tray_compatible,
-                    );
-                },
-            }
+            var frame = switch (wio.backend.active) {
+                .x11 => zwindow.LinuxFrameTarget.fromX11(
+                    @ptrCast(wio.backend.x11.display),
+                    window.backend.x11.window,
+                ),
+                .wayland => zwindow.LinuxFrameTarget.fromWayland(
+                    @ptrCast(wio.backend.wayland.display),
+                    @ptrCast(window.backend.wayland.surface),
+                ),
+            };
+            zwindow.setFrameChrome(@ptrCast(&frame), 0.12, 0.13, 0.17, 1.0, true, .tray_compatible);
         },
         else => {},
     }
@@ -96,7 +60,9 @@ pub fn main(init: std.process.Init) !void {
         .size = .{ .width = 560, .height = 360 },
     });
 
-    ztray.installMainMenu(gpa, menu_def.menu_bar, menuHostHandle(&window)) catch |err| {
+    const win_hwnd: ?*anyopaque = if (builtin.os.tag == .windows) @ptrCast(window.backend.window) else null;
+
+    ztray.installMainMenu(gpa, menu_def.menu_bar, .{ .windows_hwnd = win_hwnd }) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
     };
 
@@ -104,7 +70,7 @@ pub fn main(init: std.process.Init) !void {
         .tooltip = "ztray wio (menus + tray)",
         .icon_png = if (builtin.os.tag == .linux) null else ztray.zig_favicon_png,
         .linux_icon_name = if (builtin.os.tag == .linux) "applications-utilities" else null,
-        .windows_hwnd = menuHostHandle(&window),
+        .windows_hwnd = win_hwnd,
     }) catch |err| {
         std.log.err("installTrayIcon: {s}", .{@errorName(err)});
         window.destroy();
@@ -138,7 +104,7 @@ fn loop() !bool {
         }
     }
 
-    ztray.pumpTrayEvents();
+    ztray.pumpEvents();
 
     if (ztray.pollTrayActionId()) |raw| {
         if (std.enums.fromInt(menu_def.TrayAction, raw)) |action| {

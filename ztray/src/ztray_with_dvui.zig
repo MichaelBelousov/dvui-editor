@@ -20,11 +20,13 @@ pub const formatWindowsShortcut = zc.formatWindowsShortcut;
 pub const formatShortcutMenuLabel = zc.formatShortcutMenuLabel;
 
 pub const TrayIconOptions = zc.TrayIconOptions;
+pub const MenuBarOptions = zc.MenuBarOptions;
 
 pub const InstallTrayIconError = zc.InstallTrayIconError;
 pub const SetTrayMenuError = zc.SetTrayMenuError;
 pub const InstallMainMenuError = zc.InstallMainMenuError;
 
+pub const pumpEvents = zc.pumpEvents;
 pub const pumpTrayEvents = zc.pumpTrayEvents;
 pub const installMainMenu = zc.installMainMenu;
 pub const appMenuRegistrarHasOwner = zc.appMenuRegistrarHasOwner;
@@ -34,6 +36,7 @@ pub const setTrayMenu = zc.setTrayMenu;
 pub const pollTrayActionId = zc.pollTrayActionId;
 pub const shutdownTray = zc.shutdownTray;
 
+pub const windows = zc.windows;
 pub const windows_menubar_action_id_max = zc.windows_menubar_action_id_max;
 pub const windows_tray_action_id_max = zc.windows_tray_action_id_max;
 

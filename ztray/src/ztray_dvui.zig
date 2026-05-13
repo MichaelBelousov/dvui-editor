@@ -102,42 +102,7 @@ fn removeRegisteredKeybinds(win: *dvui.Window) void {
 
 fn shortcutKeyToDvuiKey(key: ztray.ShortcutKey) dvui.enums.Key {
     return switch (key) {
-        .a => .a,
-        .b => .b,
-        .c => .c,
-        .d => .d,
-        .e => .e,
-        .f => .f,
-        .g => .g,
-        .h => .h,
-        .i => .i,
-        .j => .j,
-        .k => .k,
-        .l => .l,
-        .m => .m,
-        .n => .n,
-        .o => .o,
-        .p => .p,
-        .q => .q,
-        .r => .r,
-        .s => .s,
-        .t => .t,
-        .u => .u,
-        .v => .v,
-        .w => .w,
-        .x => .x,
-        .y => .y,
-        .z => .z,
-        .zero => .zero,
-        .one => .one,
-        .two => .two,
-        .three => .three,
-        .four => .four,
-        .five => .five,
-        .six => .six,
-        .seven => .seven,
-        .eight => .eight,
-        .nine => .nine,
+        inline else => |k| @field(dvui.enums.Key, @tagName(k)),
     };
 }
 
@@ -395,5 +360,5 @@ pub fn installMainMenuForSdlDvuiWindow(allocator: std.mem.Allocator, menu_bar: z
         );
         break :blk if (raw != null) @as(?*anyopaque, @ptrCast(raw)) else null;
     } else null;
-    return ztray.installMainMenu(allocator, menu_bar, hwnd);
+    return ztray.installMainMenu(allocator, menu_bar, .{ .windows_hwnd = hwnd });
 }

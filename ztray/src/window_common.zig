@@ -16,6 +16,14 @@ pub const LinuxWaylandWindowRef = extern struct {
 pub const LinuxFrameTarget = union(enum) {
     x11: LinuxX11WindowRef,
     wayland: LinuxWaylandWindowRef,
+
+    pub fn fromX11(display: *anyopaque, window: c_ulong) LinuxFrameTarget {
+        return .{ .x11 = .{ .display = display, .window = window } };
+    }
+
+    pub fn fromWayland(display: *anyopaque, surface: *anyopaque) LinuxFrameTarget {
+        return .{ .wayland = .{ .display = display, .surface = surface } };
+    }
 };
 
 pub const TitleBarButton = enum { minimize, maximize, close };

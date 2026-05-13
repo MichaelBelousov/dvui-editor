@@ -32,6 +32,40 @@ extern fn ZTrayMacOSPumpEventsTimeoutMs(ms: c_uint) void;
 
 var macos_tray_active: std.atomic.Value(bool) = .init(false);
 
+const AddItemFn = *const fn ([*:0]const u8, c_int, [*:0]const u8, u32, bool) callconv(.c) bool;
+const AddSepFn = *const fn () callconv(.c) bool;
+
+fn addItemsToTarget(
+    allocator: std.mem.Allocator,
+    items: []const types.Item,
+    addItem: AddItemFn,
+    addSep: AddSepFn,
+) error{ MenuInstallFailed, OutOfMemory }!void {
+    for (items) |item| {
+        switch (item) {
+            .separator => {
+                if (!addSep()) return error.MenuInstallFailed;
+            },
+            .action => |action| {
+                const item_title = try allocator.dupeZ(u8, action.title);
+                defer allocator.free(item_title);
+
+                var key_buf: [2]u8 = undefined;
+                const key_empty = [_:0]u8{0};
+                const key_z: [*:0]const u8 = if (action.shortcut) |shortcut| blk: {
+                    key_buf[0] = shortcut.key.keyEquivalentByte();
+                    key_buf[1] = 0;
+                    break :blk key_buf[0..1 :0];
+                } else key_empty[0..0 :0];
+
+                const modifiers = if (action.shortcut) |shortcut| types.modifierMask(shortcut) else 0;
+                if (!addItem(item_title.ptr, action.action_id, key_z, modifiers, action.enabled))
+                    return error.MenuInstallFailed;
+            },
+        }
+    }
+}
+
 pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) error{ MenuInstallFailed, OutOfMemory }!void {
     if (!ZTrayMacOSBeginMainMenu()) return error.MenuInstallFailed;
 
@@ -39,36 +73,7 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) er
         const title = try allocator.dupeZ(u8, menu.title);
         defer allocator.free(title);
         if (!ZTrayMacOSBeginMenu(title.ptr)) return error.MenuInstallFailed;
-
-        for (menu.items) |item| {
-            switch (item) {
-                .separator => {
-                    if (!ZTrayMacOSAddSeparator()) return error.MenuInstallFailed;
-                },
-                .action => |action| {
-                    const item_title = try allocator.dupeZ(u8, action.title);
-                    defer allocator.free(item_title);
-
-                    var key_buf: [2]u8 = undefined;
-                    const key_empty = [_:0]u8{0};
-                    const key_z: [*:0]const u8 = if (action.shortcut) |shortcut| blk: {
-                        key_buf[0] = shortcut.key.keyEquivalentByte();
-                        key_buf[1] = 0;
-                        break :blk key_buf[0..1 :0];
-                    } else key_empty[0..0 :0];
-
-                    const modifiers = if (action.shortcut) |shortcut| types.modifierMask(shortcut) else 0;
-                    if (!ZTrayMacOSAddItem(
-                        item_title.ptr,
-                        action.action_id,
-                        key_z,
-                        modifiers,
-                        action.enabled,
-                    )) return error.MenuInstallFailed;
-                },
-            }
-        }
-
+        try addItemsToTarget(allocator, menu.items, ZTrayMacOSAddItem, ZTrayMacOSAddSeparator);
         if (!ZTrayMacOSEndMenu()) return error.MenuInstallFailed;
     }
 
@@ -106,35 +111,7 @@ pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_f
 pub fn setTrayMenu(allocator: std.mem.Allocator, menu: types.Menu) error{ OutOfMemory, MenuInstallFailed }!void {
     if (!macos_tray_active.load(.acquire)) return error.MenuInstallFailed;
     if (!ZTrayMacOSTrayClearMenu()) return error.MenuInstallFailed;
-
-    for (menu.items) |item| {
-        switch (item) {
-            .separator => {
-                if (!ZTrayMacOSTrayAddSeparator()) return error.MenuInstallFailed;
-            },
-            .action => |action| {
-                const item_title = try allocator.dupeZ(u8, action.title);
-                defer allocator.free(item_title);
-
-                var key_buf: [2]u8 = undefined;
-                const key_empty = [_:0]u8{0};
-                const key_z: [*:0]const u8 = if (action.shortcut) |shortcut| blk: {
-                    key_buf[0] = shortcut.key.keyEquivalentByte();
-                    key_buf[1] = 0;
-                    break :blk key_buf[0..1 :0];
-                } else key_empty[0..0 :0];
-
-                const modifiers = if (action.shortcut) |shortcut| types.modifierMask(shortcut) else 0;
-                if (!ZTrayMacOSTrayAddItem(
-                    item_title.ptr,
-                    action.action_id,
-                    key_z,
-                    modifiers,
-                    action.enabled,
-                )) return error.MenuInstallFailed;
-            },
-        }
-    }
+    try addItemsToTarget(allocator, menu.items, ZTrayMacOSTrayAddItem, ZTrayMacOSTrayAddSeparator);
 }
 
 pub fn shutdownTray() void {

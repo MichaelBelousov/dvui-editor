@@ -18,13 +18,6 @@ comptime {
 
 var window: wio.Window = undefined;
 
-fn menuHostHandle(win: *wio.Window) ?*anyopaque {
-    return switch (builtin.os.tag) {
-        .windows => @ptrCast(win.backend.window),
-        else => null,
-    };
-}
-
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
@@ -37,7 +30,9 @@ pub fn main(init: std.process.Init) !void {
         .size = .{ .width = 560, .height = 360 },
     });
 
-    ztray.installMainMenu(gpa, menu_def.menu_bar, menuHostHandle(&window)) catch |err| {
+    ztray.installMainMenu(gpa, menu_def.menu_bar, .{
+        .windows_hwnd = if (builtin.os.tag == .windows) @ptrCast(window.backend.window) else null,
+    }) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
     };
 

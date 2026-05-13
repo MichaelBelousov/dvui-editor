@@ -15,16 +15,6 @@ pub const LinuxX11WindowRef = common.LinuxX11WindowRef;
 pub const LinuxWaylandWindowRef = common.LinuxWaylandWindowRef;
 pub const LinuxFrameTarget = common.LinuxFrameTarget;
 
-const stub = struct {
-    pub fn titleBarButtonAt(_: *anyopaque, _: i32, _: i32) ?TitleBarButton {
-        return null;
-    }
-    pub fn performTitleBarButton(_: *anyopaque, _: TitleBarButton) void {}
-    pub fn titleBarButtonWidth() i32 {
-        return 0;
-    }
-};
-
 const impl = switch (builtin.os.tag) {
     .macos => @import("window_macos.zig"),
     .windows => @import("window_windows.zig"),
@@ -35,9 +25,10 @@ const impl = switch (builtin.os.tag) {
     },
 };
 
-const win_impl = switch (builtin.os.tag) {
-    .windows => @import("window_windows.zig"),
-    else => stub,
+const win_impl = if (builtin.os.tag == .windows) @import("window_windows.zig") else struct {
+    fn titleBarButtonAt(_: *anyopaque, _: i32, _: i32) ?TitleBarButton { return null; }
+    fn performTitleBarButton(_: *anyopaque, _: TitleBarButton) void {}
+    fn titleBarButtonWidth() i32 { return 0; }
 };
 
 /// Full-size content view, transparent title bar, and delegate proxy (macOS). On Windows: DWM acrylic-style backdrop and extended client. On Linux: see [`LinuxFrameTarget`].

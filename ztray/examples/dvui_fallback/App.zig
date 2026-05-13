@@ -16,7 +16,7 @@ var hello_count: u32 = 0;
 var use_dvui_menu: bool = false;
 
 fn menuHostHwnd(win: *dvui.Window) ?*anyopaque {
-    if (builtin.os.tag != .windows) return null;
+    if (comptime builtin.os.tag != .windows) return null;
     const raw = sdl3.SDL_GetPointerProperty(
         sdl3.SDL_GetWindowProperties(win.backend.impl.window),
         sdl3.SDL_PROP_WINDOW_WIN32_HWND_POINTER,
@@ -50,7 +50,7 @@ pub fn AppInit(win: *dvui.Window) !void {
             };
         }
     } else {
-        ztray.installMainMenu(win.gpa, menu_def.menu_bar, menuHostHwnd(win)) catch |err| {
+        ztray.installMainMenu(win.gpa, menu_def.menu_bar, .{ .windows_hwnd = menuHostHwnd(win) }) catch |err| {
             std.log.err("ztray installMainMenu: {s}", .{@errorName(err)});
         };
     }

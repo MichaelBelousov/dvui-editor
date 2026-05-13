@@ -12,10 +12,10 @@
 //! (main thread): Win32 subclassing and `HWND`, AppKit, and Linux session D-Bus all expect that.
 //!
 //! - **Windows**: pump messages for the window that hosts the menubar (`PeekMessage` / your framework loop).
-//!   For tray-only mode, call [`pumpTrayEvents`] so the internal message-only `HWND` receives tray callbacks.
-//! - **macOS**: integrate with your `NSApplication` run loop; [`pumpTrayEvents`] runs a short event slice for
+//!   For tray-only mode, call [`pumpEvents`] so the internal message-only `HWND` receives tray callbacks.
+//! - **macOS**: integrate with your `NSApplication` run loop; [`pumpEvents`] runs a short event slice for
 //!   the status item.
-//! - **Linux**: [`pollActionId`], [`pollTrayActionId`], and [`pumpTrayEvents`] all dispatch the same D-Bus
+//! - **Linux**: [`pollActionId`], [`pollTrayActionId`], and [`pumpEvents`] all dispatch the same D-Bus
 //!   connection; calling more than one per frame is safe (redundant dispatches only).
 //!
 //! ## Strings and allocators
@@ -49,9 +49,9 @@ pub const TrayIconOptions = struct {
     tooltip: []const u8,
     /// Raw PNG bytes (e.g. `@embedFile("icon.png")`). When non-empty, used in preference to `icon_file` on macOS and Windows.
     icon_png: ?[]const u8 = null,
-    /// Optional UTF-8 path to an icon file (e.g. `.ico` on Windows, image on macOS). On Linux prefer `linux_icon_name`.
+    /// Optional UTF-8 path to an icon file (e.g. `.ico` on Windows, image on macOS). Ignored on Linux — use `linux_icon_name`.
     icon_file: ?[]const u8 = null,
-    /// Freedesktop icon name for Linux StatusNotifierItem (`IconName`).
+    /// Freedesktop icon name for Linux StatusNotifierItem (`IconName`). Ignored on macOS and Windows.
     linux_icon_name: ?[]const u8 = null,
     /// Windows only: HWND that receives tray callbacks; `null` uses an internal message-only window (tray-only apps).
     windows_hwnd: ?*anyopaque = null,
@@ -60,7 +60,7 @@ pub const TrayIconOptions = struct {
 pub const InstallTrayIconError = error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory, InvalidWtf8 };
 pub const SetTrayMenuError = error{ OutOfMemory, MenuInstallFailed, ActionIdOutOfRange, DBusUnavailable, InvalidWtf8 };
 
-/// Every error [`installMainMenu`] can return on supported platforms (or missing `hwnd` on Windows).
+/// Every error [`installMainMenu`] can return on supported platforms (or missing `windows_hwnd` on Windows).
 pub const InstallMainMenuError = error{
     OutOfMemory,
     MenuInstallFailed,
@@ -71,23 +71,31 @@ pub const InstallMainMenuError = error{
     InvalidWtf8,
 };
 
-/// Pump native tray-related events (D-Bus on Linux, short Cocoa run-loop slice on macOS, `PeekMessage` on Windows).
-pub fn pumpTrayEvents() void {
+pub const MenuBarOptions = struct {
+    /// Windows only: top-level HWND for the menu bar. Required on Windows; ignored on macOS and Linux.
+    windows_hwnd: ?*anyopaque = null,
+};
+
+/// Pump native events: D-Bus on Linux (dispatches both menubar and tray), short Cocoa run-loop slice on macOS, `PeekMessage` on Windows.
+pub fn pumpEvents() void {
     switch (builtin.os.tag) {
         .linux => linux.pumpLinuxDBus(),
         .macos => macos.pumpTrayEventsDarwin(),
-        .windows => windows.pumpTrayMessages(),
+        .windows => win.pumpTrayMessages(),
         else => {},
     }
 }
 
-/// Installs the **native** menu bar. On Windows `hwnd` must be the top-level window handle; on macOS it is ignored.
-pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, hwnd: ?*anyopaque) InstallMainMenuError!void {
+/// Deprecated alias for [`pumpEvents`].
+pub const pumpTrayEvents = pumpEvents;
+
+/// Installs the **native** menu bar. On Windows set `options.windows_hwnd` to the top-level window handle.
+pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, options: MenuBarOptions) InstallMainMenuError!void {
     switch (builtin.os.tag) {
         .macos => return macos.installMainMenu(allocator, menu_bar),
         .windows => {
-            const h = hwnd orelse return error.MissingWindowsHwnd;
-            return windows.installMainMenu(allocator, h, menu_bar);
+            const h = options.windows_hwnd orelse return error.MissingWindowsHwnd;
+            return win.installMainMenu(allocator, h, menu_bar);
         },
         .linux => return linux.installMainMenu(allocator, menu_bar),
         else => return error.UnsupportedPlatform,
@@ -106,7 +114,7 @@ pub fn appMenuRegistrarHasOwner() ?bool {
 pub fn pollActionId() ?ActionId {
     const id = switch (builtin.os.tag) {
         .macos => macos.pollActionId(),
-        .windows => windows.pollActionId(),
+        .windows => win.pollActionId(),
         .linux => linux.pollActionId(),
         else => -1,
     };
@@ -117,14 +125,19 @@ pub fn pollActionId() ?ActionId {
 pub fn installTrayIcon(allocator: std.mem.Allocator, options: TrayIconOptions) InstallTrayIconError!void {
     switch (builtin.os.tag) {
         .macos => return macos.installTrayIcon(allocator, options.tooltip, options.icon_file, options.icon_png),
-        .windows => return windows.installTrayIcon(
+        .windows => return win.installTrayIcon(
             allocator,
             @ptrCast(options.windows_hwnd orelse null),
             options.tooltip,
             options.icon_file,
             options.icon_png,
         ),
-        .linux => return linux.installTrayIcon(allocator, options.tooltip, options.linux_icon_name orelse options.icon_file, options.icon_png),
+        .linux => {
+            if (options.linux_icon_name == null and options.icon_file != null) {
+                std.log.debug("ztray: icon_file ignored on Linux; set linux_icon_name for Freedesktop icon name", .{});
+            }
+            return linux.installTrayIcon(allocator, options.tooltip, options.linux_icon_name, options.icon_png);
+        },
         else => return error.TrayInstallFailed,
     }
 }
@@ -132,7 +145,7 @@ pub fn installTrayIcon(allocator: std.mem.Allocator, options: TrayIconOptions) I
 pub fn setTrayMenu(allocator: std.mem.Allocator, menu: TrayMenu) SetTrayMenuError!void {
     switch (builtin.os.tag) {
         .macos => return macos.setTrayMenu(allocator, menu),
-        .windows => return windows.setTrayMenu(allocator, menu),
+        .windows => return win.setTrayMenu(allocator, menu),
         .linux => return linux.setTrayMenu(allocator, menu),
         else => return error.MenuInstallFailed,
     }
@@ -141,7 +154,7 @@ pub fn setTrayMenu(allocator: std.mem.Allocator, menu: TrayMenu) SetTrayMenuErro
 pub fn pollTrayActionId() ?ActionId {
     const id = switch (builtin.os.tag) {
         .macos => macos.pollTrayActionId(),
-        .windows => windows.pollTrayActionId(),
+        .windows => win.pollTrayActionId(),
         .linux => linux.pollTrayActionId(),
         else => -1,
     };
@@ -152,7 +165,7 @@ pub fn pollTrayActionId() ?ActionId {
 pub fn shutdownTray() void {
     switch (builtin.os.tag) {
         .macos => macos.shutdownTray(),
-        .windows => windows.shutdownTray(),
+        .windows => win.shutdownTray(),
         .linux => linux.shutdownTray(),
         else => {},
     }
@@ -176,7 +189,7 @@ const macos = if (builtin.os.tag == .macos) @import("macos.zig") else struct {
     fn pumpTrayEventsDarwin() void {}
 };
 
-const windows = if (builtin.os.tag == .windows) @import("windows.zig") else struct {
+const win = if (builtin.os.tag == .windows) @import("windows.zig") else struct {
     fn installMainMenu(_: std.mem.Allocator, _: ?*anyopaque, _: MenuBar) InstallMainMenuError!void {}
     fn pollActionId() c_int {
         return -1;
@@ -194,22 +207,30 @@ const windows = if (builtin.os.tag == .windows) @import("windows.zig") else stru
     fn pumpTrayMessages() void {}
 };
 
-/// Inclusive maximum `Item.action.action_id` for the Windows **menubar** (`WM_COMMAND` packing).
-pub const windows_menubar_action_id_max: u16 = if (builtin.os.tag == .windows)
-    windows.menubar_action_id_max
-else
-    0xFFFF - 0x7000;
+/// Windows-internal action ID range limits (rarely needed by application code).
+pub const windows = struct {
+    /// Inclusive maximum `Item.action.action_id` for the Windows **menubar** (`WM_COMMAND` packing).
+    pub const menubar_action_id_max: u16 = if (builtin.os.tag == .windows)
+        @import("windows.zig").menubar_action_id_max
+    else
+        0xFFFF - 0x7000;
 
-/// Inclusive maximum `action_id` for the Windows **tray** popup on the same `HWND` as the menubar.
-pub const windows_tray_action_id_max: u16 = if (builtin.os.tag == .windows)
-    windows.tray_action_id_max
-else
-    0xFFFF - 0x7580;
+    /// Inclusive maximum `action_id` for the Windows **tray** popup on the same `HWND` as the menubar.
+    pub const tray_action_id_max: u16 = if (builtin.os.tag == .windows)
+        @import("windows.zig").tray_action_id_max
+    else
+        0xFFFF - 0x7580;
+};
+
+/// Deprecated: use `ztray.windows.menubar_action_id_max`.
+pub const windows_menubar_action_id_max: u16 = windows.menubar_action_id_max;
+/// Deprecated: use `ztray.windows.tray_action_id_max`.
+pub const windows_tray_action_id_max: u16 = windows.tray_action_id_max;
 
 comptime {
     if (builtin.os.tag == .windows) {
-        std.debug.assert(windows_menubar_action_id_max == windows.menubar_action_id_max);
-        std.debug.assert(windows_tray_action_id_max == windows.tray_action_id_max);
+        std.debug.assert(windows.menubar_action_id_max == @import("windows.zig").menubar_action_id_max);
+        std.debug.assert(windows.tray_action_id_max == @import("windows.zig").tray_action_id_max);
     }
 }
 
@@ -229,4 +250,7 @@ const linux = if (builtin.os.tag == .linux) @import("linux.zig") else struct {
         return -1;
     }
     fn pumpLinuxDBus() void {}
+    fn appMenuRegistrarHasOwner() ?bool {
+        return null;
+    }
 };

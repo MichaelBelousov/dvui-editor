@@ -39,7 +39,7 @@ pub fn main(init: std.process.Init) !void {
     std.log.info("Tray running. Use the tray icon menu (right-click on Windows).", .{});
 
     while (true) {
-        ztray.pumpTrayEvents();
+        ztray.pumpEvents();
         if (ztray.pollTrayActionId()) |raw| {
             if (std.enums.fromInt(menu_def.TrayAction, raw)) |action| {
                 switch (action) {
