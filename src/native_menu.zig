@@ -35,7 +35,6 @@ const file_menu_items = [_]ztray.Item{
         .title = "Close Tab",
         .action_id = @intFromEnum(NativeMenuAction.close_tab),
         .shortcut = .{ .key = .w, .modifiers = &.{.primary} },
-        .suppress_next_window_close = true,
     } },
 };
 

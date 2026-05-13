@@ -1,5 +1,5 @@
 //! [wio](https://github.com/ypsvlq/wio) window + **zwindow** only (no ztray menu or tray).
-//! On macOS: transparent title bar and vibrancy via `zwindow`. Other platforms: plain wio window (zwindow APIs no-op).
+//! On macOS: **`zwindow.setFrameChrome`** with **`.full_vibrancy`**. Other platforms: plain wio window (zwindow APIs no-op).
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -33,11 +33,16 @@ pub fn main(init: std.process.Init) !void {
         .size = .{ .width = 520, .height = 340 },
     });
 
-    if (builtin.os.tag == .macos) {
-        const ns: *anyopaque = @ptrCast(window.backend.window);
-        zwindow.applyTransparentTitlebar(ns);
-        zwindow.setVibrantChrome(ns, 0.18, 0.19, 0.24, 1.0, true);
-    }
+    const ns: *anyopaque = @ptrCast(window.backend.window);
+    zwindow.setFrameChrome(
+        ns,
+        0.18,
+        0.19,
+        0.24,
+        1.0,
+        true,
+        .full_vibrancy,
+    );
 
     try wio.run(loop);
 }

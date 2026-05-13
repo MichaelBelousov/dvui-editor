@@ -10,13 +10,11 @@ extern fn ZTrayMacOSAddItem(
     key: [*:0]const u8,
     modifiers: u32,
     enabled: bool,
-    suppress_next_window_close: bool,
 ) bool;
 extern fn ZTrayMacOSAddSeparator() bool;
 extern fn ZTrayMacOSEndMenu() bool;
 extern fn ZTrayMacOSEndMainMenu() bool;
 extern fn ZTrayMacOSPollAction() c_int;
-extern fn ZTrayMacOSConsumeCloseTabSuppression() bool;
 
 extern fn ZTrayMacOSTrayInstall(tooltip: [*:0]const u8, icon_path_utf8_or_null: ?[*:0]const u8, png_bytes: ?[*]const u8, png_len: usize) bool;
 extern fn ZTrayMacOSTrayClearMenu() bool;
@@ -26,7 +24,6 @@ extern fn ZTrayMacOSTrayAddItem(
     key: [*:0]const u8,
     modifiers: u32,
     enabled: bool,
-    suppress_next_window_close: bool,
 ) bool;
 extern fn ZTrayMacOSTrayAddSeparator() bool;
 extern fn ZTrayMacOSTrayPollAction() c_int;
@@ -67,7 +64,6 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) er
                         key_z,
                         modifiers,
                         action.enabled,
-                        action.suppress_next_window_close,
                     )) return error.MenuInstallFailed;
                 },
             }
@@ -81,10 +77,6 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) er
 
 pub fn pollActionId() c_int {
     return ZTrayMacOSPollAction();
-}
-
-pub fn consumeCloseTabSuppression() bool {
-    return ZTrayMacOSConsumeCloseTabSuppression();
 }
 
 pub fn installTrayIcon(allocator: std.mem.Allocator, tooltip: []const u8, icon_file_utf8: ?[]const u8, icon_png: ?[]const u8) error{ TrayInstallFailed, TrayAlreadyInstalled, OutOfMemory }!void {
@@ -139,7 +131,6 @@ pub fn setTrayMenu(allocator: std.mem.Allocator, menu: types.Menu) error{ OutOfM
                     key_z,
                     modifiers,
                     action.enabled,
-                    action.suppress_next_window_close,
                 )) return error.MenuInstallFailed;
             },
         }

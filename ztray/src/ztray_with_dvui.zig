@@ -29,7 +29,6 @@ pub const pumpTrayEvents = zc.pumpTrayEvents;
 pub const installMainMenu = zc.installMainMenu;
 pub const appMenuRegistrarHasOwner = zc.appMenuRegistrarHasOwner;
 pub const pollActionId = zc.pollActionId;
-pub const consumeCloseTabSuppression = zc.consumeCloseTabSuppression;
 pub const installTrayIcon = zc.installTrayIcon;
 pub const setTrayMenu = zc.setTrayMenu;
 pub const pollTrayActionId = zc.pollTrayActionId;

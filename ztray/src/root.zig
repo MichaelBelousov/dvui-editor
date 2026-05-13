@@ -114,14 +114,6 @@ pub fn pollActionId() ?ActionId {
     return id;
 }
 
-/// macOS only: whether the last "close tab" style action requested consuming the next window close / quit.
-pub fn consumeCloseTabSuppression() bool {
-    return switch (builtin.os.tag) {
-        .macos => macos.consumeCloseTabSuppression(),
-        else => false,
-    };
-}
-
 pub fn installTrayIcon(allocator: std.mem.Allocator, options: TrayIconOptions) InstallTrayIconError!void {
     switch (builtin.os.tag) {
         .macos => return macos.installTrayIcon(allocator, options.tooltip, options.icon_file, options.icon_png),
@@ -170,9 +162,6 @@ const macos = if (builtin.os.tag == .macos) @import("macos.zig") else struct {
     fn installMainMenu(_: std.mem.Allocator, _: MenuBar) InstallMainMenuError!void {}
     fn pollActionId() c_int {
         return -1;
-    }
-    fn consumeCloseTabSuppression() bool {
-        return false;
     }
     fn installTrayIcon(_: std.mem.Allocator, _: []const u8, _: ?[]const u8, _: ?[]const u8) InstallTrayIconError!void {
         return error.TrayInstallFailed;

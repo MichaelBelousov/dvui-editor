@@ -1,9 +1,10 @@
 //! Win32 HWND: DWM acrylic/Mica-style backdrop, extended client into caption, hit-testing.
 //! First argument to public APIs is `HWND` as `*anyopaque` (e.g. from SDL `SDL_PROP_WINDOW_WIN32_HWND_POINTER`).
 
-const std = @import("std");
 const win32 = @import("win32");
 const common = @import("window_common.zig");
+
+extern "kernel32" fn FreeLibrary(hModule: ?win32.foundation.HINSTANCE) callconv(.winapi) win32.foundation.BOOL;
 
 // Windows 11 (Build 22621+): System backdrop and extended frame for title bar drawing.
 const DWMWA_SYSTEMBACKDROP_TYPE: u32 = 38; // Windows 11 SDK
@@ -37,9 +38,11 @@ const win32_mica_margins = win32.ui.controls.MARGINS{
 const win32_mica_subclass_id: usize = 0x50584931; // "PXI1"
 
 fn applyWin32AcrylicAccent(hwnd: win32.foundation.HWND) void {
-    var user32_dll = std.DynLib.open("user32.dll") catch return;
-    defer user32_dll.close();
-    const SetWindowCompositionAttribute = user32_dll.lookup(*const fn (win32.foundation.HWND, *const WINCOMPATTR_DATA) callconv(.winapi) i32, "SetWindowCompositionAttribute") orelse return;
+    const user32_mod = win32.system.library_loader.LoadLibraryA("user32.dll") orelse return;
+    defer _ = FreeLibrary(user32_mod);
+
+    const proc = win32.system.library_loader.GetProcAddress(user32_mod, "SetWindowCompositionAttribute") orelse return;
+    const SetWindowCompositionAttribute: *const fn (win32.foundation.HWND, *const WINCOMPATTR_DATA) callconv(.winapi) i32 = @ptrCast(proc);
     var policy = ACCENT_POLICY{
         .accent_state = ACCENT_ENABLE_ACRYLICBLURBEHIND,
         .accent_flags = 0,
@@ -236,7 +239,7 @@ pub fn applyTransparentTitlebar(window: *anyopaque) void {
 }
 
 /// Re-applies backdrop styling then clears caption/border tint and sets full window opacity to 255. RGBA/dark are ignored (SDL-friendly).
-pub fn setVibrantChrome(window: *anyopaque, _: f64, _: f64, _: f64, _: f64, _: bool) void {
+fn setVibrantChrome(window: *anyopaque, _: f64, _: f64, _: f64, _: f64, _: bool) void {
     const hwnd_h: win32.foundation.HWND = @ptrCast(window);
 
     applyTransparentTitlebar(window);
@@ -284,4 +287,9 @@ pub fn performTitleBarButton(hwnd: *anyopaque, button: common.TitleBarButton) vo
 
 pub fn titleBarButtonWidth() i32 {
     return captionButtonWidth();
+}
+
+pub fn setFrameChrome(window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool, policy: common.FrameChromePolicy) void {
+    _ = policy;
+    setVibrantChrome(window, red, green, blue, alpha, dark);
 }

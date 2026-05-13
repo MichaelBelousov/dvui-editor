@@ -67,17 +67,6 @@ pub fn AppFrame() !dvui.App.Result {
         try ztray.dvui_menu.drawMenuBar();
     }
 
-    if (builtin.os.tag == .macos and !use_dvui_menu) {
-        const suppress_close = ztray.consumeCloseTabSuppression();
-        const wd = dvui.currentWindow().data();
-        for (dvui.events()) |*e| {
-            if (!dvui.eventMatchSimple(e, wd)) continue;
-            if (suppress_close and ((e.evt == .window and e.evt.window.action == .close) or (e.evt == .app and e.evt.app.action == .quit))) {
-                e.handle(@src(), wd);
-            }
-        }
-    }
-
     const menu_action = if (use_dvui_menu)
         ztray.dvui_menu.pollActionId()
     else

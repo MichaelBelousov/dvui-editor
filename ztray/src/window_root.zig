@@ -1,12 +1,16 @@
 //! Optional **native window frame** styling: macOS transparent title bar + vibrancy; Windows DWM acrylic + extended caption.
-//! **`titleBarButtonAt`**, **`performTitleBarButton`**, and **`titleBarButtonWidth`** are implemented on **Windows only** (custom in-client title bar). On macOS they are no-ops / null / 0 — use standard traffic lights or draw outside those APIs. On **Linux** and other targets, all entry points are no-ops (no Wayland/X11 client-side decoration here).
+//! Use [`setFrameChrome`] with [`FrameChromePolicy`]: on macOS, **`.tray_compatible`** avoids `NSVisualEffectView` (safe with `NSStatusItem` / tray); **`.full_vibrancy`** adds blur behind content but can abort with tray on recent macOS. On **Windows**, both policies map to the same DWM path (`policy` is ignored). On **Linux** and other targets, entry points are no-ops.
+//! **`titleBarButtonAt`**, **`performTitleBarButton`**, and **`titleBarButtonWidth`** are implemented on **Windows only** (custom in-client title bar). On macOS they are no-ops / null / 0 — use standard traffic lights or draw outside those APIs.
 //!
 //! Wire with **`createZwindowModule`** from this package’s `build.zig` and **`addImport("zwindow", …)`**. Not re-exported from [`root.zig`](root.zig).
 //!
 //! On Windows, `*anyopaque` arguments are native `HWND` (e.g. from SDL `SDL_PROP_WINDOW_WIN32_HWND_POINTER`). On macOS they are `NSWindow *`.
 const builtin = @import("builtin");
 
-pub const TitleBarButton = @import("window_common.zig").TitleBarButton;
+const common = @import("window_common.zig");
+
+pub const TitleBarButton = common.TitleBarButton;
+pub const FrameChromePolicy = common.FrameChromePolicy;
 
 const stub = struct {
     pub fn titleBarButtonAt(_: *anyopaque, _: i32, _: i32) ?TitleBarButton {
@@ -23,7 +27,7 @@ const impl = switch (builtin.os.tag) {
     .windows => @import("window_windows.zig"),
     else => struct {
         pub fn applyTransparentTitlebar(_: *anyopaque) void {}
-        pub fn setVibrantChrome(_: *anyopaque, _: f64, _: f64, _: f64, _: f64, _: bool) void {}
+        pub fn setFrameChrome(_: *anyopaque, _: f64, _: f64, _: f64, _: f64, _: bool, _: FrameChromePolicy) void {}
     },
 };
 
@@ -37,9 +41,9 @@ pub fn applyTransparentTitlebar(native_window: *anyopaque) void {
     impl.applyTransparentTitlebar(native_window);
 }
 
-/// macOS: applies [`applyTransparentTitlebar`] then vibrancy material. Windows: reapplies backdrop and clears caption tint; RGBA/dark ignored (opaque window for SDL).
-pub fn setVibrantChrome(native_window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool) void {
-    impl.setVibrantChrome(native_window, red, green, blue, alpha, dark);
+/// Transparent title bar, backdrop/tint, and optional macOS vibrancy per [`FrameChromePolicy`]. On Windows `policy` is ignored (same DWM path as either enum value). On Linux/other: no-op.
+pub fn setFrameChrome(native_window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool, policy: FrameChromePolicy) void {
+    impl.setFrameChrome(native_window, red, green, blue, alpha, dark, policy);
 }
 
 /// Custom title bar: which OS caption button (if any) is at client coordinates. Windows only; other platforms return null.

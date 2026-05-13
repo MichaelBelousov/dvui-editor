@@ -40,7 +40,6 @@ fn dupMenuBar(a: std.mem.Allocator, menu_bar: ztray.MenuBar) !ztray.MenuBar {
                     } else null,
                     .shortcut_display = if (act.shortcut_display) |sd| try a.dupe(u8, sd) else null,
                     .enabled = act.enabled,
-                    .suppress_next_window_close = act.suppress_next_window_close,
                 } },
             };
         }

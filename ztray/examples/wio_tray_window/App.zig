@@ -1,11 +1,12 @@
 //! [wio](https://github.com/ypsvlq/wio) window with ztray **native** menubar and **system tray** (icon + menu).
 //! On Windows the same top-level `HWND` is used for the menubar and tray callbacks (`windows_hwnd`).
+//! **Windows / macOS:** after menus + tray, `zwindow.setFrameChrome` styles the wio window (`.tray_compatible` on macOS avoids `NSVisualEffectView`, which can abort with tray on recent macOS).
 const std = @import("std");
 const builtin = @import("builtin");
 
 const wio = @import("wio");
-const zwindow = @import("zwindow");
 const ztray = @import("ztray");
+const zwindow = @import("zwindow");
 
 const menu_def = @import("menu_def.zig");
 
@@ -43,12 +44,6 @@ pub fn main(init: std.process.Init) !void {
         .size = .{ .width = 560, .height = 360 },
     });
 
-    if (builtin.os.tag == .macos) {
-        const ns: *anyopaque = @ptrCast(window.backend.window);
-        zwindow.applyTransparentTitlebar(ns);
-        zwindow.setVibrantChrome(ns, 0.12, 0.13, 0.17, 1.0, true);
-    }
-
     ztray.installMainMenu(gpa, menu_def.menu_bar, menuHostHandle(&window)) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
     };
@@ -72,6 +67,17 @@ pub fn main(init: std.process.Init) !void {
         wio.deinit();
         return;
     };
+
+    const hwnd: *anyopaque = @ptrCast(window.backend.window);
+    zwindow.setFrameChrome(
+        hwnd,
+        0.12,
+        0.13,
+        0.17,
+        1.0,
+        true,
+        .tray_compatible,
+    );
 
     try wio.run(loop);
 }

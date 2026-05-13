@@ -311,17 +311,6 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     const environ = dvui_editor.app.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
-    if (builtin.os.tag == .macos) {
-        const suppress_close = ztray.consumeCloseTabSuppression();
-        const wd = dvui.currentWindow().data();
-        for (dvui.events()) |*e| {
-            if (!dvui.eventMatchSimple(e, wd)) continue;
-            if (suppress_close and ((e.evt == .window and e.evt.window.action == .close) or (e.evt == .app and e.evt.app.action == .quit))) {
-                e.handle(@src(), wd);
-            }
-        }
-    }
-
     if (ztray.pollActionId()) |raw| {
         if (nativeMenuActionFromPoll(raw)) |action| {
             editor.queueNativeMenuAction(action);

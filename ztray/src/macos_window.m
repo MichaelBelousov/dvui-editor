@@ -132,3 +132,15 @@ void ZWindowSetVibrantChrome(void *window_ptr, double red, double green, double 
     window.appearance = [NSAppearance appearanceNamed:(dark ? NSAppearanceNameVibrantDark : NSAppearanceNameVibrantLight)];
     window.hasShadow = YES;
 }
+
+/// Same title bar + tint/appearance as [`ZWindowSetVibrantChrome`] but does **not** wrap the content view in `NSVisualEffectView`.
+/// Use with `NSStatusItem` (e.g. ztray tray): full vibrancy can abort in Launch Services on recent macOS.
+void ZWindowSetTitlebarChromeNoEffectView(void *window_ptr, double red, double green, double blue, double alpha, bool dark) {
+    NSWindow *window = (__bridge NSWindow *)window_ptr;
+    if (window == nil) return;
+
+    ZWindowApplyTransparentTitlebar(window_ptr);
+    window.backgroundColor = [NSColor colorWithRed:red green:green blue:blue alpha:alpha];
+    window.appearance = [NSAppearance appearanceNamed:(dark ? NSAppearanceNameVibrantDark : NSAppearanceNameVibrantLight)];
+    window.hasShadow = YES;
+}

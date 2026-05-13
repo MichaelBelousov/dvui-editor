@@ -155,8 +155,6 @@ pub const Item = union(enum) {
         /// If non-null, shown in the Windows menu shortcut column instead of the default formatter.
         shortcut_display: ?[]const u8 = null,
         enabled: bool = true,
-        /// macOS: when true, the next window close is suppressed (e.g. Cmd+W closes a tab instead of the window).
-        suppress_next_window_close: bool = false,
     };
 };
 

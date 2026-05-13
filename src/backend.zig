@@ -74,24 +74,26 @@ pub fn setTitlebarColor(win: *dvui.Window, color: dvui.Color) void {
             null,
         );
         if (raw_ptr != null) {
-            zwindow.setVibrantChrome(
+            zwindow.setFrameChrome(
                 @ptrCast(raw_ptr),
                 @as(f64, @floatFromInt(color.r)) / 255.0,
                 @as(f64, @floatFromInt(color.g)) / 255.0,
                 @as(f64, @floatFromInt(color.b)) / 255.0,
                 @as(f64, @floatFromInt(color.a)) / 255.0,
                 dvui.themeGet().dark,
+                .full_vibrancy,
             );
         }
     } else if (builtin.os.tag == .windows) {
         const hwnd = getWin32Hwnd(win) orelse return;
-        zwindow.setVibrantChrome(
+        zwindow.setFrameChrome(
             hwnd,
             @as(f64, @floatFromInt(color.r)) / 255.0,
             @as(f64, @floatFromInt(color.g)) / 255.0,
             @as(f64, @floatFromInt(color.b)) / 255.0,
             @as(f64, @floatFromInt(color.a)) / 255.0,
             dvui.themeGet().dark,
+            .full_vibrancy,
         );
     }
 }

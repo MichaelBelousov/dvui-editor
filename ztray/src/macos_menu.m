@@ -1,12 +1,9 @@
 #import <AppKit/AppKit.h>
 #include <stdbool.h>
 #include <stdatomic.h>
-#import <objc/runtime.h>
 
 static bool ztray_menu_bar_set_up = false;
 static atomic_int ztray_pending_action_id = -1;
-static atomic_bool ztray_suppress_close_tab_close = false;
-static const void *ZTrayWindowDelegateProxyAssociationKey = &ZTrayWindowDelegateProxyAssociationKey;
 static NSMenu *ztray_pending_main_menu = nil;
 static NSMenu *ztray_pending_menu = nil;
 static id ztray_menu_target = nil;
@@ -21,72 +18,6 @@ enum {
     ZTrayModifierSuper = 1u << 4,
 };
 
-@interface ZTrayWindowDelegateProxy : NSObject <NSWindowDelegate>
-@property (nonatomic, assign) id<NSWindowDelegate> originalDelegate;
-@property (nonatomic, assign) BOOL suppressNextWindowClose;
-- (instancetype)initWithOriginalDelegate:(id<NSWindowDelegate>)originalDelegate;
-@end
-
-@implementation ZTrayWindowDelegateProxy
-- (instancetype)initWithOriginalDelegate:(id<NSWindowDelegate>)originalDelegate {
-    self = [super init];
-    if (self != nil) {
-        _originalDelegate = originalDelegate;
-        _suppressNextWindowClose = NO;
-    }
-    return self;
-}
-
-- (BOOL)windowShouldClose:(NSWindow *)sender {
-    if (self.suppressNextWindowClose) {
-        self.suppressNextWindowClose = NO;
-        return NO;
-    }
-    if ([self.originalDelegate respondsToSelector:@selector(windowShouldClose:)]) {
-        return [self.originalDelegate windowShouldClose:sender];
-    }
-    return YES;
-}
-
-- (BOOL)respondsToSelector:(SEL)selector {
-    return [super respondsToSelector:selector] || [self.originalDelegate respondsToSelector:selector];
-}
-
-- (id)forwardingTargetForSelector:(SEL)selector {
-    if ([self.originalDelegate respondsToSelector:selector]) {
-        return self.originalDelegate;
-    }
-    return [super forwardingTargetForSelector:selector];
-}
-@end
-
-static ZTrayWindowDelegateProxy *ztrayInstallWindowDelegateProxy(NSWindow *window) {
-    if (window == nil) return nil;
-
-    ZTrayWindowDelegateProxy *proxy = objc_getAssociatedObject(window, ZTrayWindowDelegateProxyAssociationKey);
-    if (proxy != nil) return proxy;
-
-    id<NSWindowDelegate> originalDelegate = window.delegate;
-    if ([originalDelegate isKindOfClass:[ZTrayWindowDelegateProxy class]]) {
-        return (ZTrayWindowDelegateProxy *)originalDelegate;
-    }
-
-    proxy = [[ZTrayWindowDelegateProxy alloc] initWithOriginalDelegate:originalDelegate];
-    if (proxy == nil) return nil;
-
-    objc_setAssociatedObject(window, ZTrayWindowDelegateProxyAssociationKey, proxy, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    window.delegate = proxy;
-    return proxy;
-}
-
-static void ztraySuppressNextWindowCloseForCurrentWindow(void) {
-    NSWindow *window = NSApp.keyWindow ?: NSApp.mainWindow;
-    ZTrayWindowDelegateProxy *proxy = ztrayInstallWindowDelegateProxy(window);
-    if (proxy != nil) {
-        proxy.suppressNextWindowClose = YES;
-    }
-}
-
 @interface ZTrayMenuTarget : NSObject
 - (void)performZTrayAction:(id)sender;
 @end
@@ -94,16 +25,6 @@ static void ztraySuppressNextWindowCloseForCurrentWindow(void) {
 @implementation ZTrayMenuTarget
 - (void)performZTrayAction:(id)sender {
     NSInteger tag = [sender respondsToSelector:@selector(tag)] ? [sender tag] : -1;
-
-    if ([sender isKindOfClass:[NSMenuItem class]]) {
-        NSMenuItem *item = (NSMenuItem *)sender;
-        id rep = item.representedObject;
-        if ([rep isKindOfClass:[NSNumber class]] && [(NSNumber *)rep boolValue]) {
-            ztraySuppressNextWindowCloseForCurrentWindow();
-            atomic_store(&ztray_suppress_close_tab_close, true);
-        }
-    }
-
     atomic_store(&ztray_pending_action_id, (int)tag);
 }
 @end
@@ -193,7 +114,7 @@ bool ZTrayMacOSBeginMenu(const char *title) {
     return ztray_pending_menu != nil;
 }
 
-bool ZTrayMacOSAddItem(const char *title, int action_id, const char *key, unsigned int modifiers, bool enabled, bool suppress_next_window_close) {
+bool ZTrayMacOSAddItem(const char *title, int action_id, const char *key, unsigned int modifiers, bool enabled) {
     if (ztray_pending_menu == nil) return false;
 
     NSMenuItem *item = [ztray_pending_menu addItemWithTitle:ztrayString(title) action:@selector(performZTrayAction:) keyEquivalent:ztrayString(key)];
@@ -203,7 +124,6 @@ bool ZTrayMacOSAddItem(const char *title, int action_id, const char *key, unsign
     item.tag = action_id;
     item.enabled = enabled ? YES : NO;
     item.keyEquivalentModifierMask = ztrayModifierFlags(modifiers);
-    item.representedObject = suppress_next_window_close ? @YES : @NO;
     return true;
 }
 
@@ -239,8 +159,4 @@ bool ZTrayMacOSEndMainMenu(void) {
 
 int ZTrayMacOSPollAction(void) {
     return atomic_exchange(&ztray_pending_action_id, -1);
-}
-
-bool ZTrayMacOSConsumeCloseTabSuppression(void) {
-    return atomic_exchange(&ztray_suppress_close_tab_close, false);
 }

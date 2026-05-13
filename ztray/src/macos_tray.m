@@ -93,8 +93,7 @@ bool ZTrayMacOSTrayClearMenu(void) {
     return true;
 }
 
-bool ZTrayMacOSTrayAddItem(const char *title, int action_id, const char *key, unsigned int modifiers, bool enabled, bool suppress_next_window_close) {
-    (void)suppress_next_window_close;
+bool ZTrayMacOSTrayAddItem(const char *title, int action_id, const char *key, unsigned int modifiers, bool enabled) {
     if (ztray_tray_menu == nil) return false;
 
     NSMenuItem *item = [ztray_tray_menu addItemWithTitle:ztrayTrayString(title) action:@selector(performZTrayTrayAction:) keyEquivalent:ztrayTrayString(key)];
