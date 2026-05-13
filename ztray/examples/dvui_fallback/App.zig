@@ -6,12 +6,10 @@ const builtin = @import("builtin");
 const dvui = @import("dvui");
 pub const main = dvui.App.main;
 pub const panic = dvui.App.panic;
-const sdl3 = @import("sdl-backend").c;
 const zopts = @import("zmenu_dvui_opts");
 const zmenu = @import("zmenu");
 
 var hello_count: u32 = 0;
-var use_dvui_menu: bool = false;
 
 const DemoAction = enum(zmenu.ActionId) {
     say_hello = 0,
@@ -33,16 +31,6 @@ const menus = [_]zmenu.Menu{
 };
 const menu_bar: zmenu.MenuBar = .{ .menus = &menus };
 
-fn menuHostHwnd(win: *dvui.Window) ?*anyopaque {
-    if (comptime builtin.os.tag != .windows) return null;
-    const raw = sdl3.SDL_GetPointerProperty(
-        sdl3.SDL_GetWindowProperties(win.backend.impl.window),
-        sdl3.SDL_PROP_WINDOW_WIN32_HWND_POINTER,
-        null,
-    );
-    return if (raw != null) @ptrCast(raw) else null;
-}
-
 pub const dvui_app: dvui.App = .{ .config = .{ .options = .{
     .size = .{ .w = 720.0, .h = 480.0 },
     .min_size = .{ .w = 400.0, .h = 300.0 },
@@ -53,43 +41,25 @@ pub const dvui_app: dvui.App = .{ .config = .{ .options = .{
 pub const std_options: std.Options = .{ .logFn = dvui.App.logFn };
 
 pub fn AppInit(win: *dvui.Window) !void {
-    use_dvui_menu = zopts.force_dvui_menu or (builtin.os.tag == .linux and zmenu.appMenuRegistrarHasOwner() == false);
-
-    if (use_dvui_menu) {
-        dvui_menu_install_and_sync: {
-            zmenu.dvui_menu.installMainMenu(win.gpa, menu_bar) catch |err| {
-                std.log.err("zmenu.dvui_menu installMainMenu: {s}", .{@errorName(err)});
-                break :dvui_menu_install_and_sync;
-            };
-            zmenu.dvui_menu.syncMenuShortcuts(win) catch |err| {
-                std.log.err("zmenu.dvui_menu syncMenuShortcuts: {s}", .{@errorName(err)});
-            };
-        }
-    } else {
-        zmenu.installMainMenu(win.gpa, menu_bar, .{ .windows_hwnd = menuHostHwnd(win) }) catch |err| {
-            std.log.err("zmenu installMainMenu: {s}", .{@errorName(err)});
-        };
-    }
+    zmenu.installMainMenu(win.gpa, menu_bar, .{
+        .force_dvui = zopts.force_dvui_menu,
+    }) catch |err| {
+        std.log.err("installMainMenu: {s}", .{@errorName(err)});
+    };
 }
 
 pub fn AppDeinit() void {
-    if (use_dvui_menu) zmenu.dvui_menu.shutdownMenu();
+    zmenu.shutdownMenu();
 }
 
 pub fn AppFrame() !dvui.App.Result {
-    if (use_dvui_menu) try zmenu.dvui_menu.drawMenuBar();
+    try zmenu.drawMenuBar();
 
-    const menu_action = if (use_dvui_menu)
-        zmenu.dvui_menu.pollAction(DemoAction)
-    else
-        zmenu.pollAction(DemoAction);
-
-    if (menu_action) |action| {
+    if (zmenu.pollAction(DemoAction)) |action| {
         switch (action) {
             .say_hello => {
                 hello_count += 1;
-                const src: []const u8 = if (use_dvui_menu) "DVUI menu" else "native menu";
-                std.log.info("Hello from zmenu ({s}) (#{d})", .{ src, hello_count });
+                std.log.info("Hello from zmenu (#{d})", .{hello_count});
             },
             .toggle_demo => { dvui.Examples.show_demo_window = !dvui.Examples.show_demo_window; },
             .quit_hint => std.log.info("Use the window close button or platform shortcut to quit.", .{}),
