@@ -50,6 +50,16 @@ const NOTIFYICON_VERSION_4: UINT = 4;
 const command_base: u16 = 0x7000;
 /// Distinct from menubar command ids so both can coexist on one HWND.
 const tray_command_base: u16 = 0x7580;
+
+/// Largest `Item.ActionItem.action_id` allowed for the native menubar (`command_base` + id must fit in `u16`).
+pub const menubar_action_id_max: u16 = 0xFFFF - command_base;
+/// Largest `action_id` allowed for the tray popup menu on the same HWND.
+pub const tray_action_id_max: u16 = 0xFFFF - tray_command_base;
+
+comptime {
+    std.debug.assert(@as(u32, command_base) + menubar_action_id_max == 0xFFFF);
+    std.debug.assert(@as(u32, tray_command_base) + tray_action_id_max == 0xFFFF);
+}
 const subclass_id: UINT_PTR = 0x5A545241; // "ZTRA"
 const tray_subclass_id: UINT_PTR = 0x5A545254; // "ZTRT"
 
@@ -164,7 +174,7 @@ fn appendItemsToPopupMenu(allocator: std.mem.Allocator, popup: HMENU, menu: type
     }
 }
 
-pub fn installMainMenu(allocator: std.mem.Allocator, hwnd: HWND, menu_bar: types.MenuBar) !void {
+pub fn installMainMenu(allocator: std.mem.Allocator, hwnd: HWND, menu_bar: types.MenuBar) error{ OutOfMemory, MenuInstallFailed, ActionIdOutOfRange, InvalidWtf8 }!void {
     if (menu_installed.swap(true, .acq_rel)) return error.MenuInstallFailed;
     errdefer _ = menu_installed.store(false, .release);
     if (hwnd == null) return error.MenuInstallFailed;

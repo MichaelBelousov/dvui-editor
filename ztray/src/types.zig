@@ -75,3 +75,30 @@ fn hasModifier(shortcut: Shortcut, modifier: Modifier) bool {
     }
     return false;
 }
+
+test "modifierMask empty" {
+    const sc: Shortcut = .{ .key = "s", .modifiers = &.{} };
+    try std.testing.expectEqual(@as(u32, 0), modifierMask(sc));
+}
+
+test "modifierMask command and shift" {
+    const sc: Shortcut = .{ .key = "z", .modifiers = &.{ .command, .shift } };
+    const m = modifierMask(sc);
+    try std.testing.expectEqual(@as(u32, (1 << 0) | (1 << 1)), m);
+}
+
+test "formatWindowsShortcut command maps to Ctrl" {
+    const ally = std.testing.allocator;
+    const sc: Shortcut = .{ .key = "n", .modifiers = &.{.command} };
+    const s = try formatWindowsShortcut(ally, sc);
+    defer ally.free(s);
+    try std.testing.expectEqualStrings("Ctrl+N", s);
+}
+
+test "formatWindowsShortcut modifiers order" {
+    const ally = std.testing.allocator;
+    const sc: Shortcut = .{ .key = "x", .modifiers = &.{ .control, .option, .shift } };
+    const s = try formatWindowsShortcut(ally, sc);
+    defer ally.free(s);
+    try std.testing.expectEqualStrings("Ctrl+Alt+Shift+X", s);
+}

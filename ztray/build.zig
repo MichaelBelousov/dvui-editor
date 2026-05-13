@@ -26,6 +26,152 @@ fn linkNativeMenu(ztray_mod: *std.Build.Module, b: *std.Build, target: std.Build
     }
 }
 
+fn ztrayOptionsModule(b: *std.Build, dvui_fallback: bool, force_dvui_menu: bool) *std.Build.Module {
+    const zopts = b.addOptions();
+    zopts.addOption(bool, "dvui_fallback", dvui_fallback);
+    zopts.addOption(bool, "force_dvui_menu", force_dvui_menu);
+    return zopts.createModule();
+}
+
+const DvuiImports = struct {
+    dvui: *std.Build.Module,
+    sdl: *std.Build.Module,
+};
+
+fn dvuiDependencyModules(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) DvuiImports {
+    const dep = b.dependency("dvui", .{
+        .target = target,
+        .optimize = optimize,
+        .backend = .sdl3,
+    });
+    return .{
+        .dvui = dep.module("dvui_sdl3"),
+        .sdl = dep.module("sdl3"),
+    };
+}
+
+fn createZtrayModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    zopts_mod: *std.Build.Module,
+    dvui_imports: ?DvuiImports,
+) *std.Build.Module {
+    const ztray_mod = b.addModule("ztray", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ztray_mod.addImport("ztray_build_options", zopts_mod);
+    linkNativeMenu(ztray_mod, b, target);
+    if (dvui_imports) |d| {
+        ztray_mod.addImport("dvui", d.dvui);
+        ztray_mod.addImport("sdl-backend", d.sdl);
+    }
+    return ztray_mod;
+}
+
+fn addDvuiFallbackExe(
+    b: *std.Build,
+    ztray_mod: *std.Build.Module,
+    zopts_mod: *std.Build.Module,
+    d: DvuiImports,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    exe_name: []const u8,
+) *std.Build.Step.Compile {
+    const example_mod = b.createModule(.{
+        .root_source_file = b.path("examples/dvui_fallback/App.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    example_mod.addImport("dvui", d.dvui);
+    example_mod.addImport("sdl-backend", d.sdl);
+    example_mod.addImport("ztray", ztray_mod);
+    example_mod.addImport("ztray_build_options", zopts_mod);
+
+    return b.addExecutable(.{
+        .name = exe_name,
+        .root_module = example_mod,
+    });
+}
+
+fn addWioNativeExe(
+    b: *std.Build,
+    ztray_mod: *std.Build.Module,
+    wio_mod: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    exe_name: []const u8,
+) *std.Build.Step.Compile {
+    const example_mod = b.createModule(.{
+        .root_source_file = b.path("examples/wio_native/App.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    example_mod.addImport("wio", wio_mod);
+    example_mod.addImport("ztray", ztray_mod);
+
+    return b.addExecutable(.{
+        .name = exe_name,
+        .root_module = example_mod,
+    });
+}
+
+fn addWioTrayExe(
+    b: *std.Build,
+    ztray_mod: *std.Build.Module,
+    wio_mod: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    exe_name: []const u8,
+) *std.Build.Step.Compile {
+    const example_mod = b.createModule(.{
+        .root_source_file = b.path("examples/wio_tray/App.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    example_mod.addImport("wio", wio_mod);
+    example_mod.addImport("ztray", ztray_mod);
+
+    const exe = b.addExecutable(.{
+        .name = exe_name,
+        .root_module = example_mod,
+    });
+    if (target.result.os.tag == .macos) {
+        exe.root_module.linkFramework("AppKit", .{});
+    }
+    return exe;
+}
+
+fn addTrayMinimalExe(
+    b: *std.Build,
+    ztray_mod: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    exe_name: []const u8,
+) *std.Build.Step.Compile {
+    const example_mod = b.createModule(.{
+        .root_source_file = b.path("examples/tray_minimal/App.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    example_mod.addImport("ztray", ztray_mod);
+
+    const exe = b.addExecutable(.{
+        .name = exe_name,
+        .root_module = example_mod,
+    });
+    if (target.result.os.tag == .macos) {
+        exe.root_module.linkFramework("AppKit", .{});
+    }
+    return exe;
+}
+
+fn linkLinuxDynamic(exe: *std.Build.Step.Compile, os_tag: std.Target.Os.Tag) void {
+    if (os_tag == .linux) exe.linkage = .dynamic;
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -33,43 +179,13 @@ pub fn build(b: *std.Build) void {
     const force_dvui_menu = b.option(bool, "force_dvui_menu", "Use in-app DVUI menu bar instead of native shell menus") orelse false;
     const dvui_fallback = b.option(bool, "dvui_fallback", "Compile DVUI immediate-mode menu fallback (requires the dvui dependency)") orelse false;
 
-    const zopts = b.addOptions();
-    zopts.addOption(bool, "dvui_fallback", dvui_fallback);
-    zopts.addOption(bool, "force_dvui_menu", force_dvui_menu);
-    const zopts_mod = zopts.createModule();
-
-    const ztray_mod = b.addModule("ztray", .{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    ztray_mod.addImport("ztray_build_options", zopts_mod);
-
-    linkNativeMenu(ztray_mod, b, target);
+    const zopts_mod = ztrayOptionsModule(b, dvui_fallback, force_dvui_menu);
+    const dvui_imports: ?DvuiImports = if (dvui_fallback) dvuiDependencyModules(b, target, optimize) else null;
+    const ztray_mod = createZtrayModule(b, target, optimize, zopts_mod, dvui_imports);
 
     if (dvui_fallback) {
-        const dvui_dep = b.dependency("dvui", .{
-            .target = target,
-            .optimize = optimize,
-            .backend = .sdl3,
-        });
-        ztray_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-        ztray_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
-
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/dvui_fallback/App.zig"),
-            .target = target,
-            .optimize = optimize,
-        });
-        example_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-        example_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
-        example_mod.addImport("ztray", ztray_mod);
-        example_mod.addImport("ztray_build_options", zopts_mod);
-
-        const example_exe = b.addExecutable(.{
-            .name = "ztray-dvui",
-            .root_module = example_mod,
-        });
+        const d = dvui_imports.?;
+        const example_exe = addDvuiFallbackExe(b, ztray_mod, zopts_mod, d, target, optimize, "ztray-dvui");
 
         b.installArtifact(example_exe);
 
@@ -93,21 +209,8 @@ pub fn build(b: *std.Build) void {
         const wio_mod = wio_dep.module("wio");
 
         {
-            const example_mod = b.createModule(.{
-                .root_source_file = b.path("examples/wio_native/App.zig"),
-                .target = target,
-                .optimize = optimize,
-            });
-            example_mod.addImport("wio", wio_mod);
-            example_mod.addImport("ztray", ztray_mod);
-
-            const example_exe = b.addExecutable(.{
-                .name = "ztray-wio-native",
-                .root_module = example_mod,
-            });
-            if (target.result.os.tag == .linux) {
-                example_exe.linkage = .dynamic;
-            }
+            const example_exe = addWioNativeExe(b, ztray_mod, wio_mod, target, optimize, "ztray-wio-native");
+            linkLinuxDynamic(example_exe, target.result.os.tag);
 
             b.installArtifact(example_exe);
 
@@ -125,24 +228,8 @@ pub fn build(b: *std.Build) void {
         }
 
         {
-            const example_mod = b.createModule(.{
-                .root_source_file = b.path("examples/wio_tray/App.zig"),
-                .target = target,
-                .optimize = optimize,
-            });
-            example_mod.addImport("wio", wio_mod);
-            example_mod.addImport("ztray", ztray_mod);
-
-            const example_exe = b.addExecutable(.{
-                .name = "ztray-wio-tray",
-                .root_module = example_mod,
-            });
-            if (target.result.os.tag == .linux) {
-                example_exe.linkage = .dynamic;
-            }
-            if (target.result.os.tag == .macos) {
-                example_exe.root_module.linkFramework("AppKit", .{});
-            }
+            const example_exe = addWioTrayExe(b, ztray_mod, wio_mod, target, optimize, "ztray-wio-tray");
+            linkLinuxDynamic(example_exe, target.result.os.tag);
 
             b.installArtifact(example_exe);
 
@@ -161,23 +248,8 @@ pub fn build(b: *std.Build) void {
     }
 
     {
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/tray_minimal/App.zig"),
-            .target = target,
-            .optimize = optimize,
-        });
-        example_mod.addImport("ztray", ztray_mod);
-
-        const example_exe = b.addExecutable(.{
-            .name = "ztray-tray-minimal",
-            .root_module = example_mod,
-        });
-        if (target.result.os.tag == .macos) {
-            example_exe.root_module.linkFramework("AppKit", .{});
-        }
-        if (target.result.os.tag == .linux) {
-            example_exe.linkage = .dynamic;
-        }
+        const example_exe = addTrayMinimalExe(b, ztray_mod, target, optimize, "ztray-tray-minimal");
+        linkLinuxDynamic(example_exe, target.result.os.tag);
 
         b.installArtifact(example_exe);
 
@@ -193,6 +265,19 @@ pub fn build(b: *std.Build) void {
             run_tray_cmd.addArgs(args);
         }
     }
+
+    const types_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/types.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const types_tests = b.addTest(.{
+        .name = "ztray-types-tests",
+        .root_module = types_test_mod,
+    });
+    const run_types_tests = b.addRunArtifact(types_tests);
+    const test_step = b.step("test", "Run ztray unit tests (types and helpers)");
+    test_step.dependOn(&run_types_tests.step);
 
     const ci_step = b.step(
         "ci",
@@ -228,118 +313,64 @@ fn addZtrayCiExamplesForTarget(
     optimize: std.builtin.OptimizeMode,
     force_dvui_menu: bool,
 ) void {
-    const zopts = b.addOptions();
-    zopts.addOption(bool, "dvui_fallback", true);
-    zopts.addOption(bool, "force_dvui_menu", force_dvui_menu);
-    const zopts_mod = zopts.createModule();
-
-    const ztray_mod = b.addModule("ztray", .{
-        .root_source_file = b.path("src/root.zig"),
-        .target = resolved,
-        .optimize = optimize,
-    });
-    ztray_mod.addImport("ztray_build_options", zopts_mod);
-
-    linkNativeMenu(ztray_mod, b, resolved);
-
-    const dvui_dep = b.dependency("dvui", .{
-        .target = resolved,
-        .optimize = optimize,
-        .backend = .sdl3,
-    });
-    ztray_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-    ztray_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
+    const zopts_mod = ztrayOptionsModule(b, true, force_dvui_menu);
+    const d = dvuiDependencyModules(b, resolved, optimize);
+    const ztray_mod = createZtrayModule(b, resolved, optimize, zopts_mod, d);
 
     const os_tag = @tagName(resolved.result.os.tag);
     const arch_tag = @tagName(resolved.result.cpu.arch);
 
-    {
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/dvui_fallback/App.zig"),
-            .target = resolved,
-            .optimize = optimize,
-        });
-        example_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-        example_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
-        example_mod.addImport("ztray", ztray_mod);
-        example_mod.addImport("ztray_build_options", zopts_mod);
+    const wio_dep = b.dependency("wio", .{
+        .target = resolved,
+        .optimize = optimize,
+    });
+    const wio_mod = wio_dep.module("wio");
 
-        const exe = b.addExecutable(.{
-            .name = b.fmt("ztray-dvui-{s}-{s}", .{ arch_tag, os_tag }),
-            .root_module = example_mod,
-        });
+    ci_step.dependOn(&addDvuiFallbackExe(
+        b,
+        ztray_mod,
+        zopts_mod,
+        d,
+        resolved,
+        optimize,
+        b.fmt("ztray-dvui-{s}-{s}", .{ arch_tag, os_tag }),
+    ).step);
+
+    {
+        const exe = addWioNativeExe(
+            b,
+            ztray_mod,
+            wio_mod,
+            resolved,
+            optimize,
+            b.fmt("ztray-wio-native-{s}-{s}", .{ arch_tag, os_tag }),
+        );
+        linkLinuxDynamic(exe, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);
     }
 
     {
-        const wio_dep = b.dependency("wio", .{
-            .target = resolved,
-            .optimize = optimize,
-        });
-
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/wio_native/App.zig"),
-            .target = resolved,
-            .optimize = optimize,
-        });
-        example_mod.addImport("wio", wio_dep.module("wio"));
-        example_mod.addImport("ztray", ztray_mod);
-
-        const exe = b.addExecutable(.{
-            .name = b.fmt("ztray-wio-native-{s}-{s}", .{ arch_tag, os_tag }),
-            .root_module = example_mod,
-        });
-        if (resolved.result.os.tag == .linux) {
-            exe.linkage = .dynamic;
-        }
+        const exe = addWioTrayExe(
+            b,
+            ztray_mod,
+            wio_mod,
+            resolved,
+            optimize,
+            b.fmt("ztray-wio-tray-{s}-{s}", .{ arch_tag, os_tag }),
+        );
+        linkLinuxDynamic(exe, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);
     }
 
     {
-        const wio_dep = b.dependency("wio", .{
-            .target = resolved,
-            .optimize = optimize,
-        });
-
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/wio_tray/App.zig"),
-            .target = resolved,
-            .optimize = optimize,
-        });
-        example_mod.addImport("wio", wio_dep.module("wio"));
-        example_mod.addImport("ztray", ztray_mod);
-
-        const exe = b.addExecutable(.{
-            .name = b.fmt("ztray-wio-tray-{s}-{s}", .{ arch_tag, os_tag }),
-            .root_module = example_mod,
-        });
-        if (resolved.result.os.tag == .linux) {
-            exe.linkage = .dynamic;
-        }
-        if (resolved.result.os.tag == .macos) {
-            exe.root_module.linkFramework("AppKit", .{});
-        }
-        ci_step.dependOn(&exe.step);
-    }
-
-    {
-        const example_mod = b.createModule(.{
-            .root_source_file = b.path("examples/tray_minimal/App.zig"),
-            .target = resolved,
-            .optimize = optimize,
-        });
-        example_mod.addImport("ztray", ztray_mod);
-
-        const exe = b.addExecutable(.{
-            .name = b.fmt("ztray-tray-minimal-{s}-{s}", .{ arch_tag, os_tag }),
-            .root_module = example_mod,
-        });
-        if (resolved.result.os.tag == .macos) {
-            exe.root_module.linkFramework("AppKit", .{});
-        }
-        if (resolved.result.os.tag == .linux) {
-            exe.linkage = .dynamic;
-        }
+        const exe = addTrayMinimalExe(
+            b,
+            ztray_mod,
+            resolved,
+            optimize,
+            b.fmt("ztray-tray-minimal-{s}-{s}", .{ arch_tag, os_tag }),
+        );
+        linkLinuxDynamic(exe, resolved.result.os.tag);
         ci_step.dependOn(&exe.step);
     }
 }

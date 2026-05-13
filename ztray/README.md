@@ -18,9 +18,14 @@ On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to `installMainMe
 
 ## API (summary)
 
+### Public error sets
+
+- **`InstallMainMenuError`** — All outcomes from [`installMainMenu`](src/root.zig): `OutOfMemory`, `MenuInstallFailed`, `ActionIdOutOfRange`, `DBusUnavailable`, `MissingWindowsHwnd`, `UnsupportedPlatform`, `InvalidWtf8`. The DVUI-only path (`force_dvui_menu`) only uses `OutOfMemory` in practice.
+- **`InstallTrayIconError`** / **`SetTrayMenuError`** — Declared on [`root.zig`](src/root.zig); Linux `setTrayMenu` never returns `InvalidWtf8`.
+
 ### Menu bar
 
-- **`installMainMenu(allocator, menu_bar, hwnd)`** — Install menus. `hwnd` is required on Windows for native menus; ignored on macOS; unused on Linux for D-Bus registration.
+- **`installMainMenu(allocator, menu_bar, hwnd)`** — Install menus. `hwnd` is required on Windows for native menus; ignored on macOS; unused on Linux for D-Bus registration. On platforms outside macOS / Windows / Linux, returns `error.UnsupportedPlatform`.
 - **`pollActionId()`** — Returns the last **menubar** menu action id, or `null` (cleared on read).
 - **`drawMenuBar()`** — Only when compile-time **`force_dvui_menu`** is set: call each frame from your DVUI tick to draw the in-app menu bar.
 - **`shutdownDvuiMenu()`** — Release DVUI fallback menu storage when applicable.
@@ -30,10 +35,37 @@ On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to `installMainMe
 
 - **`TrayMenu`** — Alias of [`Menu`](src/types.zig); same `Item` / `ActionId` model as submenus. Root `title` is mainly relevant on Linux (DBus layout).
 - **`installTrayIcon(allocator, options: TrayIconOptions)`** — Native tray icon. On Windows, `options.windows_hwnd == null` uses a message-only window so tray-only binaries work without a UI toolkit.
-- **`setTrayMenu(allocator, menu: TrayMenu)`** — Attach or replace the tray context menu (independent of `installMainMenu`).
+- **`setTrayMenu(allocator, menu: TrayMenu)`** — Attach or replace the tray context menu (independent of `installMainMenu`). On Linux, if the tray was not installed first, returns `error.MenuInstallFailed` (same idea as macOS when the tray session is inactive).
 - **`pollTrayActionId()`** — Like `pollActionId`, but only for tray menu actions (separate queue from the menubar).
 - **`pumpTrayEvents()`** — Linux: D-Bus dispatch. macOS: short `NSApplication` event slice. Windows: `PeekMessage` / `DispatchMessage` for the tray HWND (call regularly from your loop).
 - **`shutdownTray()`** — Remove the tray icon and release tray resources (independent of `shutdownDvuiMenu`).
+
+### Threading, event loops, and strings
+
+Use the **main / UI thread** for `installMainMenu`, `installTrayIcon`, and `setTrayMenu`. Pump the platform message loop (or call `pumpTrayEvents` for tray-only Windows apps) from that thread.
+
+On **Linux**, `pollActionId`, `pollTrayActionId`, and `pumpTrayEvents` all run D-Bus dispatch on the same connection; calling several per frame is redundant but safe.
+
+Menu titles and shortcuts are **copied** when menus are installed. After a successful `installMainMenu` or `setTrayMenu`, you may free your `Menu` / `MenuBar` data.
+
+### Windows `action_id` range
+
+Menubar and tray command ids use separate bases on Win32. Use non-negative ids no larger than:
+
+| Surface | Constant (re-exported from `ztray`) | Decimal |
+|---------|-------------------------------------|---------|
+| Menubar | `windows_menubar_action_id_max` | 36863 |
+| Tray popup | `windows_tray_action_id_max` | 35455 |
+
+(`src/windows.zig` defines the same limits as `menubar_action_id_max` / `tray_action_id_max`.)
+
+### Tray icon options by OS
+
+| Field | macOS | Windows | Linux |
+|-------|-------|---------|-------|
+| `icon_png` | Preferred if set | Preferred if set | Ignored (use `linux_icon_name`) |
+| `icon_file` | Fallback path | Fallback `.ico` / image path | Used if `linux_icon_name` is null (name/path for SNI) |
+| `linux_icon_name` | — | — | Freedesktop **IconName** for StatusNotifierItem |
 
 Compile-time options are supplied through the generated module **`ztray_build_options`** (see this package’s `build.zig`).
 
@@ -44,6 +76,7 @@ From the `ztray/` directory:
 ```sh
 zig fetch   # resolves lazy dependencies (dvui, wio) for examples
 zig build
+zig build test   # unit tests (types / pure helpers)
 ```
 
 ### Build option

@@ -35,7 +35,7 @@ extern fn ZTrayMacOSPumpEventsTimeoutMs(ms: c_uint) void;
 
 var macos_tray_active: std.atomic.Value(bool) = .init(false);
 
-pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) !void {
+pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) error{ MenuInstallFailed, OutOfMemory }!void {
     if (!ZTrayMacOSBeginMainMenu()) return error.MenuInstallFailed;
 
     for (menu_bar.menus) |menu| {

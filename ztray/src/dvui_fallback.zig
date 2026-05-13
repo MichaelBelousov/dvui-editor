@@ -37,7 +37,7 @@ fn dupMenuBar(a: std.mem.Allocator, menu_bar: types.MenuBar) !types.MenuBar {
     return .{ .menus = menus };
 }
 
-pub fn installMainMenu(parent_allocator: std.mem.Allocator, menu_bar: types.MenuBar) !void {
+pub fn installMainMenu(parent_allocator: std.mem.Allocator, menu_bar: types.MenuBar) error{OutOfMemory}!void {
     if (menu_arena_init) {
         menu_arena.deinit();
         menu_arena_init = false;
