@@ -10,9 +10,9 @@ pub fn applyTransparentTitlebar(ns_window: *anyopaque) void {
     ZWindowApplyTransparentTitlebar(ns_window);
 }
 
-pub fn setFrameChrome(ns_window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool, policy: common.FrameChromePolicy) void {
-    switch (policy) {
-        .full_vibrancy => ZWindowSetVibrantChrome(ns_window, red, green, blue, alpha, dark),
-        .tray_compatible => ZWindowSetTitlebarChromeNoEffectView(ns_window, red, green, blue, alpha, dark),
+pub fn setFrameChrome(ns_window: *anyopaque, chrome: common.FrameChrome) void {
+    switch (chrome.policy) {
+        .full_vibrancy => ZWindowSetVibrantChrome(ns_window, chrome.r, chrome.g, chrome.b, chrome.a, chrome.dark),
+        .tray_compatible => ZWindowSetTitlebarChromeNoEffectView(ns_window, chrome.r, chrome.g, chrome.b, chrome.a, chrome.dark),
     }
 }

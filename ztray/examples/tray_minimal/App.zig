@@ -20,12 +20,11 @@ pub fn main(init: std.process.Init) !void {
 
     if (builtin.os.tag == .macos) NSApplicationLoad();
 
-    ztray.installTrayIcon(gpa, .{
-        .tooltip = "ztray tray example",
-        .icon_png = if (builtin.os.tag == .linux) null else ztray.zig_favicon_png,
-        // Linux tray uses Freedesktop IconName in SNI; PNG path is not used here.
-        .linux_icon_name = if (builtin.os.tag == .linux) "applications-utilities" else null,
-    }) catch |err| {
+    ztray.installTrayIcon(gpa, ztray.trayIcon(
+        "ztray tray example",
+        ztray.zig_favicon_png,
+        "applications-utilities",
+    )) catch |err| {
         std.log.err("installTrayIcon: {s}", .{@errorName(err)});
         return;
     };
@@ -40,15 +39,13 @@ pub fn main(init: std.process.Init) !void {
 
     while (true) {
         ztray.pumpEvents();
-        if (ztray.pollTrayActionId()) |raw| {
-            if (std.enums.fromInt(menu_def.TrayAction, raw)) |action| {
-                switch (action) {
-                    .hello => std.log.info("Hello from tray", .{}),
-                    .quit => {
-                        ztray.shutdownTray();
-                        return;
-                    },
-                }
+        if (ztray.pollTrayAction(menu_def.TrayAction)) |action| {
+            switch (action) {
+                .hello => std.log.info("Hello from tray", .{}),
+                .quit => {
+                    ztray.shutdownTray();
+                    return;
+                },
             }
         }
         try io.sleep(.fromMilliseconds(50), .awake);

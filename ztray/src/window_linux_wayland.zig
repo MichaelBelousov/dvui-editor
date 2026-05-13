@@ -352,27 +352,12 @@ pub fn applyTransparentTitlebar(ref: *const common.LinuxWaylandWindowRef) void {
     surfaceClearOpaqueRegion(surface);
 }
 
-pub fn setFrameChrome(
-    ref: *const common.LinuxWaylandWindowRef,
-    red: f64,
-    green: f64,
-    blue: f64,
-    alpha: f64,
-    dark: bool,
-    policy: common.FrameChromePolicy,
-) void {
-    _ = red;
-    _ = green;
-    _ = blue;
-    _ = alpha;
-    _ = dark;
-
+pub fn setFrameChrome(ref: *const common.LinuxWaylandWindowRef, chrome: common.FrameChrome) void {
     const display: *Proxy = @ptrCast(@alignCast(ref.display));
     const surface: *Proxy = @ptrCast(@alignCast(ref.surface));
     if (!ensureInit(display)) return;
-
     surfaceClearOpaqueRegion(surface);
-    switch (policy) {
+    switch (chrome.policy) {
         .full_vibrancy => applyKdeBlur(surface),
         .tray_compatible => releaseKdeBlur(surface),
     }

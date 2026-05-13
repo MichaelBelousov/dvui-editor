@@ -11,6 +11,7 @@ const common = @import("window_common.zig");
 
 pub const TitleBarButton = common.TitleBarButton;
 pub const FrameChromePolicy = common.FrameChromePolicy;
+pub const FrameChrome = common.FrameChrome;
 pub const LinuxX11WindowRef = common.LinuxX11WindowRef;
 pub const LinuxWaylandWindowRef = common.LinuxWaylandWindowRef;
 pub const LinuxFrameTarget = common.LinuxFrameTarget;
@@ -21,7 +22,7 @@ const impl = switch (builtin.os.tag) {
     .linux => @import("window_linux.zig"),
     else => struct {
         pub fn applyTransparentTitlebar(_: *anyopaque) void {}
-        pub fn setFrameChrome(_: *anyopaque, _: f64, _: f64, _: f64, _: f64, _: bool, _: FrameChromePolicy) void {}
+        pub fn setFrameChrome(_: *anyopaque, _: FrameChrome) void {}
     },
 };
 
@@ -31,14 +32,15 @@ const win_impl = if (builtin.os.tag == .windows) @import("window_windows.zig") e
     fn titleBarButtonWidth() i32 { return 0; }
 };
 
-/// Full-size content view, transparent title bar, and delegate proxy (macOS). On Windows: DWM acrylic-style backdrop and extended client. On Linux: see [`LinuxFrameTarget`].
+/// Deprecated: use [`setFrameChrome`] with `.{}` defaults instead.
 pub fn applyTransparentTitlebar(native_window: *anyopaque) void {
     impl.applyTransparentTitlebar(native_window);
 }
 
-/// Transparent title bar, backdrop/tint, and optional macOS vibrancy per [`FrameChromePolicy`]. On Windows `policy` is ignored. On Linux, `native_window` is `*LinuxFrameTarget` (see module doc).
-pub fn setFrameChrome(native_window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool, policy: FrameChromePolicy) void {
-    impl.setFrameChrome(native_window, red, green, blue, alpha, dark, policy);
+/// Transparent title bar, backdrop/tint, and optional macOS vibrancy. Pass a [`FrameChrome`] options struct.
+/// On Windows `policy` is ignored. On Linux, `native_window` is `*LinuxFrameTarget` (see module doc).
+pub fn setFrameChrome(native_window: *anyopaque, chrome: FrameChrome) void {
+    impl.setFrameChrome(native_window, chrome);
 }
 
 /// Custom title bar: which OS caption button (if any) is at client coordinates. Windows only; other platforms return null.

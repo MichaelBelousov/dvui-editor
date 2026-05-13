@@ -67,34 +67,24 @@ pub fn setWindowStyle(win: *dvui.Window) void {
 }
 
 pub fn setTitlebarColor(win: *dvui.Window, color: dvui.Color) void {
+    const chrome = zwindow.FrameChrome{
+        .r = @as(f64, @floatFromInt(color.r)) / 255.0,
+        .g = @as(f64, @floatFromInt(color.g)) / 255.0,
+        .b = @as(f64, @floatFromInt(color.b)) / 255.0,
+        .a = @as(f64, @floatFromInt(color.a)) / 255.0,
+        .dark = dvui.themeGet().dark,
+        .policy = .full_vibrancy,
+    };
     if (builtin.os.tag == .macos) {
         const raw_ptr = sdl3.SDL_GetPointerProperty(
             sdl3.SDL_GetWindowProperties(win.backend.impl.window),
             sdl3.SDL_PROP_WINDOW_COCOA_WINDOW_POINTER,
             null,
         );
-        if (raw_ptr != null) {
-            zwindow.setFrameChrome(
-                @ptrCast(raw_ptr),
-                @as(f64, @floatFromInt(color.r)) / 255.0,
-                @as(f64, @floatFromInt(color.g)) / 255.0,
-                @as(f64, @floatFromInt(color.b)) / 255.0,
-                @as(f64, @floatFromInt(color.a)) / 255.0,
-                dvui.themeGet().dark,
-                .full_vibrancy,
-            );
-        }
+        if (raw_ptr != null) zwindow.setFrameChrome(@ptrCast(raw_ptr), chrome);
     } else if (builtin.os.tag == .windows) {
         const hwnd = getWin32Hwnd(win) orelse return;
-        zwindow.setFrameChrome(
-            hwnd,
-            @as(f64, @floatFromInt(color.r)) / 255.0,
-            @as(f64, @floatFromInt(color.g)) / 255.0,
-            @as(f64, @floatFromInt(color.b)) / 255.0,
-            @as(f64, @floatFromInt(color.a)) / 255.0,
-            dvui.themeGet().dark,
-            .full_vibrancy,
-        );
+        zwindow.setFrameChrome(hwnd, chrome);
     }
 }
 

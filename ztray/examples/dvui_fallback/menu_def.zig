@@ -11,13 +11,13 @@ const file_items = [_]ztray.Item{
     .{ .action = .{
         .title = "Say Hello",
         .action_id = @intFromEnum(DemoAction.say_hello),
-        .shortcut = .{ .key = .a, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .a, .primary = true },
     } },
     .separator,
     .{ .action = .{
         .title = "Toggle DVUI Demo Window",
         .action_id = @intFromEnum(DemoAction.toggle_demo),
-        .shortcut = .{ .key = .d, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .d, .primary = true },
     } },
 };
 

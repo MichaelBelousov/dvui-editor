@@ -28,7 +28,6 @@ const builtin = @import("builtin");
 const types = @import("types.zig");
 
 pub const ActionId = types.ActionId;
-pub const Modifier = types.Modifier;
 pub const ShortcutKey = types.ShortcutKey;
 pub const Shortcut = types.Shortcut;
 pub const Item = types.Item;
@@ -169,6 +168,27 @@ pub fn shutdownTray() void {
         .linux => linux.shutdownTray(),
         else => {},
     }
+}
+
+/// Typed menubar poll: returns the action id cast to `T`, or null if none pending.
+pub fn pollAction(comptime T: type) ?T {
+    const id = pollActionId() orelse return null;
+    return std.enums.fromInt(T, id);
+}
+
+/// Typed tray poll: returns the action id cast to `T`, or null if none pending.
+pub fn pollTrayAction(comptime T: type) ?T {
+    const id = pollTrayActionId() orelse return null;
+    return std.enums.fromInt(T, id);
+}
+
+/// Convenience constructor for [`TrayIconOptions`]: uses `icon_png` on macOS/Windows, `linux_icon_name` on Linux.
+pub fn trayIcon(tooltip: []const u8, icon_png: []const u8, linux_icon_name: []const u8) TrayIconOptions {
+    return .{
+        .tooltip = tooltip,
+        .icon_png = if (builtin.os.tag == .linux) null else icon_png,
+        .linux_icon_name = if (builtin.os.tag == .linux) linux_icon_name else null,
+    };
 }
 
 const macos = if (builtin.os.tag == .macos) @import("macos.zig") else struct {

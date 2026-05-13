@@ -27,7 +27,7 @@ fn applyZwindowFrameChrome() void {
     switch (builtin.os.tag) {
         .windows, .macos => zwindow.setFrameChrome(
             @ptrCast(window.backend.window),
-            0.12, 0.13, 0.17, 1.0, true, .tray_compatible,
+            .{ .r = 0.12, .g = 0.13, .b = 0.17, .dark = true },
         ),
         .linux => {
             var frame = switch (wio.backend.active) {
@@ -40,7 +40,7 @@ fn applyZwindowFrameChrome() void {
                     @ptrCast(window.backend.wayland.surface),
                 ),
             };
-            zwindow.setFrameChrome(@ptrCast(&frame), 0.12, 0.13, 0.17, 1.0, true, .tray_compatible);
+            zwindow.setFrameChrome(@ptrCast(&frame), .{ .r = 0.12, .g = 0.13, .b = 0.17, .dark = true });
         },
         else => {},
     }
@@ -106,26 +106,22 @@ fn loop() !bool {
 
     ztray.pumpEvents();
 
-    if (ztray.pollTrayActionId()) |raw| {
-        if (std.enums.fromInt(menu_def.TrayAction, raw)) |action| {
-            switch (action) {
-                .hello => std.log.info("Hello from tray", .{}),
-                .quit => {
-                    ztray.shutdownTray();
-                    window.destroy();
-                    wio.deinit();
-                    return false;
-                },
-            }
+    if (ztray.pollTrayAction(menu_def.TrayAction)) |action| {
+        switch (action) {
+            .hello => std.log.info("Hello from tray", .{}),
+            .quit => {
+                ztray.shutdownTray();
+                window.destroy();
+                wio.deinit();
+                return false;
+            },
         }
     }
 
-    if (ztray.pollActionId()) |raw| {
-        if (std.enums.fromInt(menu_def.MenuBarAction, raw)) |action| {
-            switch (action) {
-                .say_hello => std.log.info("Hello from native menu", .{}),
-                .about => std.log.info("ztray wio example: shell menu + tray.", .{}),
-            }
+    if (ztray.pollAction(menu_def.MenuBarAction)) |action| {
+        switch (action) {
+            .say_hello => std.log.info("Hello from native menu", .{}),
+            .about => std.log.info("ztray wio example: shell menu + tray.", .{}),
         }
     }
 

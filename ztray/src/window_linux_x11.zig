@@ -127,21 +127,10 @@ pub fn applyTransparentTitlebar(ref: *const common.LinuxX11WindowRef) void {
     _ = XFlush(displayPtr(ref));
 }
 
-pub fn setFrameChrome(
-    ref: *const common.LinuxX11WindowRef,
-    red: f64,
-    green: f64,
-    blue: f64,
-    alpha: f64,
-    dark: bool,
-    policy: common.FrameChromePolicy,
-) void {
-    _ = red;
-    _ = green;
-    _ = blue;
-    applyGtkThemeVariant(ref, dark);
-    applyWindowOpacity(ref, alpha);
-    switch (policy) {
+pub fn setFrameChrome(ref: *const common.LinuxX11WindowRef, chrome: common.FrameChrome) void {
+    applyGtkThemeVariant(ref, chrome.dark);
+    applyWindowOpacity(ref, chrome.a);
+    switch (chrome.policy) {
         .full_vibrancy => applyKdeBlurIfPresent(ref),
         .tray_compatible => clearKdeBlur(ref),
     }

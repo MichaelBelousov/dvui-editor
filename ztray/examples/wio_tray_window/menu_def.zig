@@ -10,7 +10,7 @@ const file_items = [_]ztray.Item{
     .{ .action = .{
         .title = "Say Hello",
         .action_id = @intFromEnum(MenuBarAction.say_hello),
-        .shortcut = .{ .key = .h, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .h, .primary = true },
     } },
 };
 

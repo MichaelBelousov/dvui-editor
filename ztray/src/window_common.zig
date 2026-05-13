@@ -35,3 +35,13 @@ pub const FrameChromePolicy = enum {
     /// macOS: transparent title bar + tint without `NSVisualEffectView` (safe with tray).
     tray_compatible,
 };
+
+/// Options for [`setFrameChrome`](window_root.zig). All fields have safe defaults (black, opaque, not dark, tray-safe).
+pub const FrameChrome = struct {
+    r: f64 = 0.0,
+    g: f64 = 0.0,
+    b: f64 = 0.0,
+    a: f64 = 1.0,
+    dark: bool = false,
+    policy: FrameChromePolicy = .tray_compatible,
+};

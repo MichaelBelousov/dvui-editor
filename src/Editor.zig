@@ -310,10 +310,8 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     const environ = dvui_editor.app.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
-    if (ztray.pollActionId()) |raw| {
-        if (nativeMenuActionFromPoll(raw)) |action| {
-            editor.queueNativeMenuAction(action);
-        }
+    if (ztray.pollAction(native_menu.NativeMenuAction)) |action| {
+        editor.queueNativeMenuAction(action);
     }
 
     if (editor.project_folder_watch.refresh_pending.swap(false, .acq_rel)) {
@@ -616,10 +614,6 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     _ = editor.arena.reset(.retain_capacity);
 
     return .ok;
-}
-
-fn nativeMenuActionFromPoll(raw: ztray.ActionId) ?native_menu.NativeMenuAction {
-    return std.enums.fromInt(native_menu.NativeMenuAction, raw);
 }
 
 fn queueNativeMenuAction(editor: *Editor, action: native_menu.NativeMenuAction) void {

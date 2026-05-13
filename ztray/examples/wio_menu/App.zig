@@ -51,12 +51,10 @@ fn loop() !bool {
         }
     }
 
-    if (ztray.pollActionId()) |raw| {
-        if (std.enums.fromInt(menu_def.DemoAction, raw)) |action| {
-            switch (action) {
-                .say_hello => std.log.info("Hello from native menu", .{}),
-                .about => std.log.info("ztray native menu example using wio.", .{}),
-            }
+    if (ztray.pollAction(menu_def.DemoAction)) |action| {
+        switch (action) {
+            .say_hello => std.log.info("Hello from native menu", .{}),
+            .about => std.log.info("ztray native menu example using wio.", .{}),
         }
     }
 

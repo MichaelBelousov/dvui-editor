@@ -289,7 +289,6 @@ pub fn titleBarButtonWidth() i32 {
     return captionButtonWidth();
 }
 
-pub fn setFrameChrome(window: *anyopaque, red: f64, green: f64, blue: f64, alpha: f64, dark: bool, policy: common.FrameChromePolicy) void {
-    _ = policy;
-    setVibrantChrome(window, red, green, blue, alpha, dark);
+pub fn setFrameChrome(window: *anyopaque, chrome: common.FrameChrome) void {
+    setVibrantChrome(window, chrome.r, chrome.g, chrome.b, chrome.a, chrome.dark);
 }

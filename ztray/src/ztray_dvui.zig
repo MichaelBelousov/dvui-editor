@@ -34,10 +34,7 @@ fn dupMenuBar(a: std.mem.Allocator, menu_bar: ztray.MenuBar) !ztray.MenuBar {
                 .action => |act| .{ .action = .{
                     .title = try a.dupe(u8, act.title),
                     .action_id = act.action_id,
-                    .shortcut = if (act.shortcut) |sc| ztray.Shortcut{
-                        .key = sc.key,
-                        .modifiers = try a.dupe(ztray.Modifier, sc.modifiers),
-                    } else null,
+                    .shortcut = act.shortcut,
                     .shortcut_display = if (act.shortcut_display) |sd| try a.dupe(u8, sd) else null,
                     .enabled = act.enabled,
                 } },
@@ -107,32 +104,14 @@ fn shortcutKeyToDvuiKey(key: ztray.ShortcutKey) dvui.enums.Key {
 }
 
 fn shortcutToKeybind(sc: ztray.Shortcut) dvui.enums.Keybind {
-    const key = shortcutKeyToDvuiKey(sc.key);
-    var kb: dvui.enums.Keybind = .{ .key = key };
-
-    var has_primary = false;
-    var has_super = false;
-    var has_ctrl = false;
-    for (sc.modifiers) |m| {
-        switch (m) {
-            .primary => has_primary = true,
-            .super => has_super = true,
-            .ctrl => has_ctrl = true,
-            .shift => kb.shift = true,
-            .alt => kb.alt = true,
-        }
+    var kb: dvui.enums.Keybind = .{ .key = shortcutKeyToDvuiKey(sc.key) };
+    if (sc.shift) kb.shift = true;
+    if (sc.alt) kb.alt = true;
+    if (sc.ctrl) kb.control = true;
+    if (sc.primary) {
+        if (builtin.os.tag == .macos) kb.command = true else kb.control = true;
     }
-    if (has_ctrl) kb.control = true;
-    if (has_primary) {
-        if (builtin.os.tag == .macos) {
-            kb.command = true;
-        } else {
-            kb.control = true;
-        }
-    }
-    if (has_super) {
-        kb.command = true;
-    }
+    if (sc.super) kb.command = true;
     return kb;
 }
 
@@ -210,6 +189,12 @@ pub fn pollActionId() ?ztray.ActionId {
     const v = pending_action.swap(-1, .acq_rel);
     if (v < 0) return null;
     return v;
+}
+
+/// Typed poll: returns the queued action cast to `T`, or null if none pending.
+pub fn pollAction(comptime T: type) ?T {
+    const id = pollActionId() orelse return null;
+    return std.enums.fromInt(T, id);
 }
 
 fn topMenuBarItemId(menu_index: usize) usize {

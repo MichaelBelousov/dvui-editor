@@ -5,7 +5,6 @@
 const zc = @import("ztray_core");
 
 pub const ActionId = zc.ActionId;
-pub const Modifier = zc.Modifier;
 pub const ShortcutKey = zc.ShortcutKey;
 pub const Shortcut = zc.Shortcut;
 pub const Item = zc.Item;
@@ -35,6 +34,9 @@ pub const installTrayIcon = zc.installTrayIcon;
 pub const setTrayMenu = zc.setTrayMenu;
 pub const pollTrayActionId = zc.pollTrayActionId;
 pub const shutdownTray = zc.shutdownTray;
+pub const pollAction = zc.pollAction;
+pub const pollTrayAction = zc.pollTrayAction;
+pub const trayIcon = zc.trayIcon;
 
 pub const windows = zc.windows;
 pub const windows_menubar_action_id_max = zc.windows_menubar_action_id_max;

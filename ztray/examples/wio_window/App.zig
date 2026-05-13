@@ -23,7 +23,7 @@ fn applyZwindowFrameChrome() void {
     switch (builtin.os.tag) {
         .windows, .macos => zwindow.setFrameChrome(
             @ptrCast(window.backend.window),
-            0.18, 0.19, 0.24, 1.0, true, .full_vibrancy,
+            .{ .r = 0.18, .g = 0.19, .b = 0.24, .dark = true, .policy = .full_vibrancy },
         ),
         .linux => {
             var frame = switch (wio.backend.active) {
@@ -36,7 +36,7 @@ fn applyZwindowFrameChrome() void {
                     @ptrCast(window.backend.wayland.surface),
                 ),
             };
-            zwindow.setFrameChrome(@ptrCast(&frame), 0.18, 0.19, 0.24, 1.0, true, .full_vibrancy);
+            zwindow.setFrameChrome(@ptrCast(&frame), .{ .r = 0.18, .g = 0.19, .b = 0.24, .dark = true, .policy = .full_vibrancy });
         },
         else => {},
     }

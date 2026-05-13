@@ -18,23 +18,23 @@ const file_menu_items = [_]ztray.Item{
     .{ .action = .{
         .title = "Open Folder",
         .action_id = @intFromEnum(NativeMenuAction.open_folder),
-        .shortcut = .{ .key = .f, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .f, .primary = true },
     } },
     .{ .action = .{
         .title = "Open Files",
         .action_id = @intFromEnum(NativeMenuAction.open_files),
-        .shortcut = .{ .key = .o, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .o, .primary = true },
     } },
     .separator,
     .{ .action = .{
         .title = "Save",
         .action_id = @intFromEnum(NativeMenuAction.save),
-        .shortcut = .{ .key = .s, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .s, .primary = true },
     } },
     .{ .action = .{
         .title = "Close Tab",
         .action_id = @intFromEnum(NativeMenuAction.close_tab),
-        .shortcut = .{ .key = .w, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .w, .primary = true },
     } },
 };
 
@@ -42,24 +42,24 @@ const edit_menu_items = [_]ztray.Item{
     .{ .action = .{
         .title = "Copy",
         .action_id = @intFromEnum(NativeMenuAction.copy),
-        .shortcut = .{ .key = .c, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .c, .primary = true },
     } },
     .{ .action = .{
         .title = "Paste",
         .action_id = @intFromEnum(NativeMenuAction.paste),
-        .shortcut = .{ .key = .v, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .v, .primary = true },
     } },
     .separator,
     .{ .action = .{
         .title = "Undo",
         .action_id = @intFromEnum(NativeMenuAction.undo),
-        .shortcut = .{ .key = .z, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .z, .primary = true },
         .enabled = false,
     } },
     .{ .action = .{
         .title = "Redo",
         .action_id = @intFromEnum(NativeMenuAction.redo),
-        .shortcut = .{ .key = .z, .modifiers = &.{ .primary, .shift } },
+        .shortcut = .{ .key = .z, .primary = true, .shift = true },
         .enabled = false,
     } },
 };
@@ -68,7 +68,7 @@ const view_menu_items = [_]ztray.Item{
     .{ .action = .{
         .title = "Show Explorer",
         .action_id = @intFromEnum(NativeMenuAction.toggle_explorer),
-        .shortcut = .{ .key = .e, .modifiers = &.{.primary} },
+        .shortcut = .{ .key = .e, .primary = true },
     } },
     .separator,
     .{ .action = .{

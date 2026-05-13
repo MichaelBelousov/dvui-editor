@@ -68,25 +68,23 @@ pub fn AppFrame() !dvui.App.Result {
     }
 
     const menu_action = if (use_dvui_menu)
-        ztray.dvui_menu.pollActionId()
+        ztray.dvui_menu.pollAction(menu_def.DemoAction)
     else
-        ztray.pollActionId();
+        ztray.pollAction(menu_def.DemoAction);
 
-    if (menu_action) |raw| {
-        if (std.enums.fromInt(menu_def.DemoAction, raw)) |action| {
-            switch (action) {
-                .say_hello => {
-                    hello_count += 1;
-                    const src: []const u8 = if (use_dvui_menu) "DVUI menu" else "native menu";
-                    std.log.info("Hello from ztray ({s}) (#{d})", .{ src, hello_count });
-                },
-                .toggle_demo => {
-                    dvui.Examples.show_demo_window = !dvui.Examples.show_demo_window;
-                },
-                .quit_hint => {
-                    std.log.info("Use the window close button or platform shortcut to quit.", .{});
-                },
-            }
+    if (menu_action) |action| {
+        switch (action) {
+            .say_hello => {
+                hello_count += 1;
+                const src: []const u8 = if (use_dvui_menu) "DVUI menu" else "native menu";
+                std.log.info("Hello from ztray ({s}) (#{d})", .{ src, hello_count });
+            },
+            .toggle_demo => {
+                dvui.Examples.show_demo_window = !dvui.Examples.show_demo_window;
+            },
+            .quit_hint => {
+                std.log.info("Use the window close button or platform shortcut to quit.", .{});
+            },
         }
     }
 
