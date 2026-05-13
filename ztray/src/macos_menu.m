@@ -12,10 +12,13 @@ static NSMenu *ztray_pending_menu = nil;
 static id ztray_menu_target = nil;
 
 enum {
+    // Bit 0: Zig `Modifier.primary` → Command on macOS.
     ZTrayModifierCommand = 1u << 0,
     ZTrayModifierShift = 1u << 1,
     ZTrayModifierOption = 1u << 2,
     ZTrayModifierControl = 1u << 3,
+    // Bit 4: Zig `Modifier.super` (GUI / ⊞). No separate AppKit flag; same physical ⌘ chord for menu key equivalents.
+    ZTrayModifierSuper = 1u << 4,
 };
 
 @interface ZTrayWindowDelegateProxy : NSObject <NSWindowDelegate>
@@ -113,6 +116,7 @@ static NSString *ztrayString(const char *value) {
 static NSEventModifierFlags ztrayModifierFlags(unsigned int modifiers) {
     NSEventModifierFlags flags = 0;
     if ((modifiers & ZTrayModifierCommand) != 0) flags |= NSEventModifierFlagCommand;
+    if ((modifiers & ZTrayModifierSuper) != 0) flags |= NSEventModifierFlagCommand;
     if ((modifiers & ZTrayModifierShift) != 0) flags |= NSEventModifierFlagShift;
     if ((modifiers & ZTrayModifierOption) != 0) flags |= NSEventModifierFlagOption;
     if ((modifiers & ZTrayModifierControl) != 0) flags |= NSEventModifierFlagControl;

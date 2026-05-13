@@ -52,14 +52,19 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: types.MenuBar) er
                     const item_title = try allocator.dupeZ(u8, action.title);
                     defer allocator.free(item_title);
 
-                    const key = if (action.shortcut) |shortcut| try allocator.dupeZ(u8, shortcut.key) else try allocator.dupeZ(u8, "");
-                    defer allocator.free(key);
+                    var key_buf: [2]u8 = undefined;
+                    const key_empty = [_:0]u8{0};
+                    const key_z: [*:0]const u8 = if (action.shortcut) |shortcut| blk: {
+                        key_buf[0] = shortcut.key.keyEquivalentByte();
+                        key_buf[1] = 0;
+                        break :blk key_buf[0..1 :0];
+                    } else key_empty[0..0 :0];
 
                     const modifiers = if (action.shortcut) |shortcut| types.modifierMask(shortcut) else 0;
                     if (!ZTrayMacOSAddItem(
                         item_title.ptr,
                         action.action_id,
-                        key.ptr,
+                        key_z,
                         modifiers,
                         action.enabled,
                         action.suppress_next_window_close,
@@ -119,14 +124,19 @@ pub fn setTrayMenu(allocator: std.mem.Allocator, menu: types.Menu) error{ OutOfM
                 const item_title = try allocator.dupeZ(u8, action.title);
                 defer allocator.free(item_title);
 
-                const key = if (action.shortcut) |shortcut| try allocator.dupeZ(u8, shortcut.key) else try allocator.dupeZ(u8, "");
-                defer allocator.free(key);
+                var key_buf: [2]u8 = undefined;
+                const key_empty = [_:0]u8{0};
+                const key_z: [*:0]const u8 = if (action.shortcut) |shortcut| blk: {
+                    key_buf[0] = shortcut.key.keyEquivalentByte();
+                    key_buf[1] = 0;
+                    break :blk key_buf[0..1 :0];
+                } else key_empty[0..0 :0];
 
                 const modifiers = if (action.shortcut) |shortcut| types.modifierMask(shortcut) else 0;
                 if (!ZTrayMacOSTrayAddItem(
                     item_title.ptr,
                     action.action_id,
-                    key.ptr,
+                    key_z,
                     modifiers,
                     action.enabled,
                     action.suppress_next_window_close,

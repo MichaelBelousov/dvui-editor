@@ -35,7 +35,7 @@ fn dupMenuBar(a: std.mem.Allocator, menu_bar: ztray.MenuBar) !ztray.MenuBar {
                     .title = try a.dupe(u8, act.title),
                     .action_id = act.action_id,
                     .shortcut = if (act.shortcut) |sc| ztray.Shortcut{
-                        .key = try a.dupe(u8, sc.key),
+                        .key = sc.key,
                         .modifiers = try a.dupe(ztray.Modifier, sc.modifiers),
                     } else null,
                     .shortcut_display = if (act.shortcut_display) |sd| try a.dupe(u8, sd) else null,
@@ -101,76 +101,73 @@ fn removeRegisteredKeybinds(win: *dvui.Window) void {
     }
 }
 
-/// Parses a single UTF-8 scalar for keys supported on [`dvui.enums.Key`]. Extend as needed.
-fn parseShortcutKey(key: []const u8) ?dvui.enums.Key {
-    const view = std.unicode.Utf8View.init(key) catch return null;
-    var it = view.iterator();
-    const cp = it.nextCodepoint() orelse return null;
-    if (it.nextCodepoint() != null) return null;
-    if (cp > 127) return null;
-    const c = std.ascii.toLower(@as(u8, @truncate(cp)));
-    return switch (c) {
-        'a' => .a,
-        'b' => .b,
-        'c' => .c,
-        'd' => .d,
-        'e' => .e,
-        'f' => .f,
-        'g' => .g,
-        'h' => .h,
-        'i' => .i,
-        'j' => .j,
-        'k' => .k,
-        'l' => .l,
-        'm' => .m,
-        'n' => .n,
-        'o' => .o,
-        'p' => .p,
-        'q' => .q,
-        'r' => .r,
-        's' => .s,
-        't' => .t,
-        'u' => .u,
-        'v' => .v,
-        'w' => .w,
-        'x' => .x,
-        'y' => .y,
-        'z' => .z,
-        '0' => .zero,
-        '1' => .one,
-        '2' => .two,
-        '3' => .three,
-        '4' => .four,
-        '5' => .five,
-        '6' => .six,
-        '7' => .seven,
-        '8' => .eight,
-        '9' => .nine,
-        else => null,
+fn shortcutKeyToDvuiKey(key: ztray.ShortcutKey) dvui.enums.Key {
+    return switch (key) {
+        .a => .a,
+        .b => .b,
+        .c => .c,
+        .d => .d,
+        .e => .e,
+        .f => .f,
+        .g => .g,
+        .h => .h,
+        .i => .i,
+        .j => .j,
+        .k => .k,
+        .l => .l,
+        .m => .m,
+        .n => .n,
+        .o => .o,
+        .p => .p,
+        .q => .q,
+        .r => .r,
+        .s => .s,
+        .t => .t,
+        .u => .u,
+        .v => .v,
+        .w => .w,
+        .x => .x,
+        .y => .y,
+        .z => .z,
+        .zero => .zero,
+        .one => .one,
+        .two => .two,
+        .three => .three,
+        .four => .four,
+        .five => .five,
+        .six => .six,
+        .seven => .seven,
+        .eight => .eight,
+        .nine => .nine,
     };
 }
 
-fn shortcutToKeybind(sc: ztray.Shortcut) ?dvui.enums.Keybind {
-    const key = parseShortcutKey(sc.key) orelse return null;
+fn shortcutToKeybind(sc: ztray.Shortcut) dvui.enums.Keybind {
+    const key = shortcutKeyToDvuiKey(sc.key);
     var kb: dvui.enums.Keybind = .{ .key = key };
 
-    var has_command = false;
-    var has_control = false;
+    var has_primary = false;
+    var has_super = false;
+    var has_ctrl = false;
     for (sc.modifiers) |m| {
         switch (m) {
-            .command => has_command = true,
-            .control => has_control = true,
+            .primary => has_primary = true,
+            .super => has_super = true,
+            .ctrl => has_ctrl = true,
             .shift => kb.shift = true,
-            .option => kb.alt = true,
+            .alt => kb.alt = true,
         }
     }
-    if (has_control) kb.control = true;
-    if (has_command) {
+    if (has_ctrl) kb.control = true;
+    if (has_primary) {
         if (builtin.os.tag == .macos) {
             kb.command = true;
         } else {
             kb.control = true;
         }
+    }
+    if (has_super) {
+        kb.command = true;
     }
     return kb;
 }
@@ -196,7 +193,7 @@ fn syncMenuKeybinds(win: *dvui.Window) !void {
                 .action => |act| {
                     if (!act.enabled) continue;
                     const sc = act.shortcut orelse continue;
-                    const kb = shortcutToKeybind(sc) orelse continue;
+                    const kb = shortcutToKeybind(sc);
                     const name = try std.fmt.bufPrint(buf[0..], "ztray_menu_{d}", .{act.action_id});
                     try win.keybinds.put(win.gpa, name, kb);
                     if (shortcut_ids_len >= shortcut_ids_storage.len) return error.OutOfMemory;
@@ -236,7 +233,7 @@ fn bracketedShortcutText(allocator: std.mem.Allocator, item: ztray.Item.ActionIt
     const shortcut_txt = if (item.shortcut_display) |d|
         d
     else
-        try ztray.formatWindowsShortcut(allocator, sc);
+        try ztray.formatShortcutMenuLabel(allocator, sc);
     defer if (item.shortcut_display == null) allocator.free(shortcut_txt);
     return try std.fmt.allocPrint(allocator, "[{s}]", .{shortcut_txt});
 }

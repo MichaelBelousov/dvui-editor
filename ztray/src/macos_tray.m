@@ -8,10 +8,12 @@ static id ztray_tray_menu_target = nil;
 static atomic_int ztray_tray_pending_action_id = -1;
 
 enum {
+    // Bit 0: Zig `Modifier.primary` → Command on macOS.
     ZTrayTrayModifierCommand = 1u << 0,
     ZTrayTrayModifierShift = 1u << 1,
     ZTrayTrayModifierOption = 1u << 2,
     ZTrayTrayModifierControl = 1u << 3,
+    ZTrayTrayModifierSuper = 1u << 4,
 };
 
 @interface ZTrayTrayMenuTarget : NSObject
@@ -34,6 +36,7 @@ static NSString *ztrayTrayString(const char *value) {
 static NSEventModifierFlags ztrayTrayModifierFlags(unsigned int modifiers) {
     NSEventModifierFlags flags = 0;
     if ((modifiers & ZTrayTrayModifierCommand) != 0) flags |= NSEventModifierFlagCommand;
+    if ((modifiers & ZTrayTrayModifierSuper) != 0) flags |= NSEventModifierFlagCommand;
     if ((modifiers & ZTrayTrayModifierShift) != 0) flags |= NSEventModifierFlagShift;
     if ((modifiers & ZTrayTrayModifierOption) != 0) flags |= NSEventModifierFlagOption;
     if ((modifiers & ZTrayTrayModifierControl) != 0) flags |= NSEventModifierFlagControl;

@@ -30,6 +30,7 @@ const types = @import("types.zig");
 
 pub const ActionId = types.ActionId;
 pub const Modifier = types.Modifier;
+pub const ShortcutKey = types.ShortcutKey;
 pub const Shortcut = types.Shortcut;
 pub const Item = types.Item;
 pub const Menu = types.Menu;
@@ -43,6 +44,7 @@ pub const zig_favicon_png = @embedFile("zig-favicon.png");
 
 pub const modifierMask = types.modifierMask;
 pub const formatWindowsShortcut = types.formatWindowsShortcut;
+pub const formatShortcutMenuLabel = types.formatShortcutMenuLabel;
 
 pub const TrayIconOptions = struct {
     tooltip: []const u8,
