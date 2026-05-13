@@ -6,19 +6,35 @@ const builtin = @import("builtin");
 
 const ztray = @import("ztray");
 
-const menu_def = @import("menu_def.zig");
-
 pub const std_options = std.Options{
     .log_level = .info,
 };
 
-extern fn NSApplicationLoad() void;
+const TrayAction = enum(c_int) {
+    hello = 1,
+    quit = 2,
+};
+
+const items = [_]ztray.Item{
+    .{ .action = .{
+        .title = "Say hello",
+        .action_id = @intFromEnum(TrayAction.hello),
+    } },
+    .separator,
+    .{ .action = .{
+        .title = "Quit",
+        .action_id = @intFromEnum(TrayAction.quit),
+    } },
+};
+
+const tray_menu: ztray.TrayMenu = .{
+    .title = "Tray",
+    .items = &items,
+};
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
-
-    if (builtin.os.tag == .macos) NSApplicationLoad();
 
     ztray.installTrayIcon(gpa, ztray.trayIcon(
         "ztray tray example",
@@ -29,7 +45,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    ztray.setTrayMenu(gpa, menu_def.tray_menu) catch |err| {
+    ztray.setTrayMenu(gpa, tray_menu) catch |err| {
         std.log.err("setTrayMenu: {s}", .{@errorName(err)});
         ztray.shutdownTray();
         return;
@@ -39,7 +55,7 @@ pub fn main(init: std.process.Init) !void {
 
     while (true) {
         ztray.pumpEvents();
-        if (ztray.pollTrayAction(menu_def.TrayAction)) |action| {
+        if (ztray.pollTrayAction(TrayAction)) |action| {
             switch (action) {
                 .hello => std.log.info("Hello from tray", .{}),
                 .quit => {
