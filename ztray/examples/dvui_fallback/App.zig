@@ -1,4 +1,5 @@
-//! DVUI app + ztray: **native** shell menu by default; in-app DVUI menu bar with `-Dforce_dvui_menu=true` in this package’s `zig build`.
+//! DVUI app + ztray: **native** shell menu by default; in-app DVUI menu bar with `-Dforce_dvui_menu=true`
+//! or on Linux when `com.canonical.AppMenu.Registrar` has no D-Bus owner.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -13,6 +14,7 @@ const ztray_dvui = @import("ztray_dvui");
 const menu_def = @import("menu_def.zig");
 
 var hello_count: u32 = 0;
+var use_dvui_menu: bool = false;
 
 fn menuHostHwnd(win: *dvui.Window) ?*anyopaque {
     if (builtin.os.tag != .windows) return null;
@@ -27,10 +29,7 @@ fn menuHostHwnd(win: *dvui.Window) ?*anyopaque {
 pub const dvui_app: dvui.App = .{ .config = .{ .options = .{
     .size = .{ .w = 720.0, .h = 480.0 },
     .min_size = .{ .w = 400.0, .h = 300.0 },
-    .title = if (zopts.force_dvui_menu)
-        "ztray + DVUI (in-app menu)"
-    else
-        "ztray + DVUI (native menu)",
+    .title = "ztray + DVUI",
     .transparent = if (builtin.os.tag == .macos or builtin.os.tag == .windows) true else false,
 } }, .frameFn = AppFrame, .initFn = AppInit, .deinitFn = AppDeinit };
 
@@ -39,7 +38,9 @@ pub const std_options: std.Options = .{
 };
 
 pub fn AppInit(win: *dvui.Window) !void {
-    if (zopts.force_dvui_menu) {
+    use_dvui_menu = zopts.force_dvui_menu or (builtin.os.tag == .linux and ztray.appMenuRegistrarHasOwner() == false);
+
+    if (use_dvui_menu) {
         ztray_dvui.installMainMenu(win.gpa, menu_def.menu_bar) catch |err| {
             std.log.err("ztray_dvui installMainMenu: {s}", .{@errorName(err)});
         };
@@ -51,17 +52,17 @@ pub fn AppInit(win: *dvui.Window) !void {
 }
 
 pub fn AppDeinit() void {
-    if (zopts.force_dvui_menu) {
+    if (use_dvui_menu) {
         ztray_dvui.shutdownMenu();
     }
 }
 
 pub fn AppFrame() !dvui.App.Result {
-    if (zopts.force_dvui_menu) {
+    if (use_dvui_menu) {
         try ztray_dvui.drawMenuBar();
     }
 
-    if (builtin.os.tag == .macos and !zopts.force_dvui_menu) {
+    if (builtin.os.tag == .macos and !use_dvui_menu) {
         const suppress_close = ztray.consumeCloseTabSuppression();
         const wd = dvui.currentWindow().data();
         for (dvui.events()) |*e| {
@@ -72,7 +73,7 @@ pub fn AppFrame() !dvui.App.Result {
         }
     }
 
-    const menu_action = if (zopts.force_dvui_menu)
+    const menu_action = if (use_dvui_menu)
         ztray_dvui.pollActionId()
     else
         ztray.pollActionId();
@@ -82,7 +83,7 @@ pub fn AppFrame() !dvui.App.Result {
             switch (action) {
                 .say_hello => {
                     hello_count += 1;
-                    const src: []const u8 = if (zopts.force_dvui_menu) "DVUI menu" else "native menu";
+                    const src: []const u8 = if (use_dvui_menu) "DVUI menu" else "native menu";
                     std.log.info("Hello from ztray ({s}) (#{d})", .{ src, hello_count });
                 },
                 .toggle_demo => {
@@ -99,8 +100,9 @@ pub fn AppFrame() !dvui.App.Result {
     defer box.deinit();
 
     const hint =
-        \\Default: native shell menu (Windows HMENU / macOS NSMenu / Linux D-Bus).
-        \\In-app DVUI menu bar: zig build run-dvui -Dforce_dvui_menu=true
+        \\Default: native shell menu (Windows HMENU / macOS NSMenu / Linux D-Bus when an AppMenu registrar exists).
+        \\On Linux, if com.canonical.AppMenu.Registrar has no owner, the sample uses an in-app DVUI menu bar automatically.
+        \\Force in-app DVUI menu on all platforms: zig build run-dvui -Dforce_dvui_menu=true
         \\
         \\From ztray/: zig build run-dvui
     ;

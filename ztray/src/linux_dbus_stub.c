@@ -9,6 +9,8 @@ typedef struct {
     const char *label;
 } ZTrayLinuxItem;
 
+int ztray_linux_appmenu_registrar_has_owner(void) { return -1; }
+
 int ztray_linux_dbus_init(void) { return 1; }
 void ztray_linux_dbus_shutdown(void) {}
 int ztray_linux_dbus_set_items(const ZTrayLinuxItem *items, int n) {

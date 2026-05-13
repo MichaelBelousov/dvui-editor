@@ -2,6 +2,7 @@
 //!
 //! For an **in-app** menu bar with [DVUI](https://github.com/david-vanderson/dvui), use the separate **`ztray_dvui`** module
 //! (see this package’s `build.zig` and [`ztray_dvui.zig`](ztray_dvui.zig)); the core `ztray` module does not import DVUI.
+//! On Linux, [`appMenuRegistrarHasOwner`] reports whether a global AppMenu host is present (`false` → typical DVUI menubar fallback).
 //!
 //! **System tray** (`installTrayIcon`, `setTrayMenu`, `pollTrayActionId`, `shutdownTray`) is independent of the
 //! menu bar API: use either, both, or neither.
@@ -90,6 +91,14 @@ pub fn installMainMenu(allocator: std.mem.Allocator, menu_bar: MenuBar, hwnd: ?*
         .linux => return linux.installMainMenu(allocator, menu_bar),
         else => return error.UnsupportedPlatform,
     }
+}
+
+/// Linux: whether `com.canonical.AppMenu.Registrar` has a session-bus owner (global menubar). `false` means no host—DVUI in-app menubar is a typical fallback. Non-Linux or unknown (D-Bus error, stub build): `null`.
+pub fn appMenuRegistrarHasOwner() ?bool {
+    return switch (builtin.os.tag) {
+        .linux => linux.appMenuRegistrarHasOwner(),
+        else => null,
+    };
 }
 
 /// Returns and clears the last **native** menubar action id, or null if none.

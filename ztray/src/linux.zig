@@ -10,6 +10,8 @@ pub const LinuxItemC = extern struct {
     label: [*:0]const u8,
 };
 
+extern fn ztray_linux_appmenu_registrar_has_owner() c_int;
+
 extern fn ztray_linux_dbus_init() c_int;
 extern fn ztray_linux_dbus_shutdown() void;
 extern fn ztray_linux_dbus_set_items(items: [*]const LinuxItemC, n: c_int) c_int;
@@ -27,6 +29,15 @@ const FLAG_DISABLED: u32 = 4;
 
 var menu_installed: std.atomic.Value(bool) = .init(false);
 var tray_session_active: std.atomic.Value(bool) = .init(false);
+
+/// Session D-Bus `NameHasOwner` for `com.canonical.AppMenu.Registrar`. `false` means no global AppMenu host (typical DVUI in-app menubar fallback). `null` if unknown (D-Bus error or stub build).
+pub fn appMenuRegistrarHasOwner() ?bool {
+    return switch (ztray_linux_appmenu_registrar_has_owner()) {
+        0 => false,
+        1 => true,
+        else => null,
+    };
+}
 
 fn freeFlatLabels(allocator: std.mem.Allocator, flat: *std.ArrayList(LinuxItemC)) void {
     for (flat.items) |it| allocator.free(std.mem.span(it.label));

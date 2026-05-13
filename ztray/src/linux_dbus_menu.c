@@ -500,6 +500,68 @@ static DBusHandlerResult filter_message(DBusConnection *connection, DBusMessage 
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
+/* 1 = com.canonical.AppMenu.Registrar has an owner, 0 = no owner, -1 = error / unknown */
+int ztray_linux_appmenu_registrar_has_owner(void) {
+    DBusError err;
+    dbus_error_init(&err);
+    DBusConnection *conn = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (!conn) {
+        dbus_error_free(&err);
+        return -1;
+    }
+
+    DBusMessage *msg = dbus_message_new_method_call(
+        "org.freedesktop.DBus",
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+        "NameHasOwner");
+    if (!msg) {
+        dbus_connection_unref(conn);
+        return -1;
+    }
+
+    const char *registrar = "com.canonical.AppMenu.Registrar";
+    if (!dbus_message_append_args(msg, DBUS_TYPE_STRING, &registrar, DBUS_TYPE_INVALID)) {
+        dbus_message_unref(msg);
+        dbus_connection_unref(conn);
+        return -1;
+    }
+
+    DBusMessage *reply = dbus_connection_send_with_reply_and_block(conn, msg, 5000, &err);
+    dbus_message_unref(msg);
+    if (!reply) {
+        dbus_error_free(&err);
+        dbus_connection_unref(conn);
+        return -1;
+    }
+
+    if (dbus_message_get_type(reply) == DBUS_MESSAGE_TYPE_ERROR) {
+        dbus_message_unref(reply);
+        dbus_connection_unref(conn);
+        return -1;
+    }
+
+    DBusMessageIter args;
+    if (!dbus_message_iter_init(reply, &args)) {
+        dbus_message_unref(reply);
+        dbus_connection_unref(conn);
+        return -1;
+    }
+
+    if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_BOOLEAN) {
+        dbus_message_unref(reply);
+        dbus_connection_unref(conn);
+        return -1;
+    }
+
+    dbus_bool_t has_owner = FALSE;
+    dbus_message_iter_get_basic(&args, &has_owner);
+
+    dbus_message_unref(reply);
+    dbus_connection_unref(conn);
+    return has_owner ? 1 : 0;
+}
+
 int ztray_linux_dbus_init(void) {
     if (g_conn) return 1;
     DBusError err;

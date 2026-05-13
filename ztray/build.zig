@@ -209,7 +209,7 @@ pub fn build(b: *std.Build) void {
 
         const run_dvui_step = b.step(
             "run-dvui",
-            "Run the DVUI + ztray sample (add -Dforce_dvui_menu=true for in-app DVUI menubar)",
+            "Run the DVUI + ztray sample (-Dforce_dvui_menu=true forces in-app menubar; Linux auto-fallback when AppMenu registrar is absent)",
         );
         run_dvui_step.dependOn(&run_dvui_cmd.step);
         if (b.args) |args| {

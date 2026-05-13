@@ -18,6 +18,8 @@ This package’s **`build.zig`** attaches the native implementation (Objective-C
 
 The core module does **not** import DVUI. To draw a menubar inside a DVUI app, add a second module whose root is `ztray/src/ztray_dvui.zig`, import **`ztray`** and **`dvui`** into it, then call `ztray_dvui.installMainMenu`, `ztray_dvui.drawMenuBar` each frame, `ztray_dvui.pollActionId`, and `ztray_dvui.shutdownMenu` as needed. See this repo’s `build.zig` (`createZtrayDvuiModule` + `examples/dvui_fallback/App.zig`).
 
+On **Linux**, call **`ztray.appMenuRegistrarHasOwner()`** (session D-Bus `NameHasOwner` on `com.canonical.AppMenu.Registrar`). When it is **`false`**, there is no global AppMenu host, so native DBusMenu menubars usually do not appear in the shell—use **`ztray_dvui`** for an in-app bar instead. When the result is **`null`** (D-Bus error or cross-build stub), keep your previous behavior (typically still try native). The sample enables DVUI automatically in the `false` case; **`-Dforce_dvui_menu=true`** still forces the in-app bar on every platform.
+
 On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to **`ztray.installMainMenu`** for native menus (for example from SDL’s `SDL_PROP_WINDOW_WIN32_HWND_POINTER`).
 
 ## API (summary)
@@ -30,6 +32,7 @@ On **Windows**, pass the top-level **`HWND`** as `?*anyopaque` to **`ztray.insta
 ### Menu bar (native, `ztray` module)
 
 - **`installMainMenu(allocator, menu_bar, hwnd)`** — Install **native** shell menus. `hwnd` is required on Windows; ignored on macOS; unused on Linux for D-Bus registration. On platforms outside macOS / Windows / Linux, returns `error.UnsupportedPlatform`.
+- **`appMenuRegistrarHasOwner()`** — Linux only: `true` / `false` if the session bus reports an owner for `com.canonical.AppMenu.Registrar`; `null` on other OS tags, on D-Bus failure, or when built with the non-Linux cross stub. Use with DVUI to decide an in-app menubar fallback (see DVUI subsection above).
 - **`pollActionId()`** — Returns the last **native** menubar action id, or `null` (cleared on read).
 - **`consumeCloseTabSuppression()`** — macOS helper for “close tab” style items that suppress the next window close.
 
