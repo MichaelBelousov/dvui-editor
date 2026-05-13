@@ -61,6 +61,17 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
     mod.addImport("zmenu", zmenu_dvui_mod);
     mod.addImport("zwindow", zwindow_mod);
 
+    const inkz_dep = b.dependency("inkz", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+    });
+    const inkz_mod = b.createModule(.{
+        .root_source_file = inkz_dep.path("src/root.zig"),
+        .target = opts.target,
+        .optimize = opts.optimize,
+    });
+    mod.addImport("inkz", inkz_mod);
+
     const cmark_gfm = b.dependency("cmark_gfm", .{
         .target = opts.target,
         .optimize = opts.optimize,

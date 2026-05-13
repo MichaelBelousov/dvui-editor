@@ -4,6 +4,7 @@ const Io = std.Io;
 const dvui = @import("dvui");
 
 const dvui_editor = @import("../root.zig");
+const inkz = @import("inkz");
 const md_parse = @import("../md/cmark_parse.zig");
 const TextEditWidget = @import("../widgets/TextEditWidget.zig");
 
@@ -23,6 +24,12 @@ pub const EditorData = struct {
     markdown_preview_scroll: dvui.ScrollInfo = .{},
     markdown_preview_content_hash: u64 = std.math.maxInt(u64),
     markdown_preview_ast_root: ?*anyopaque = null,
+
+    ink_preview_scroll: dvui.ScrollInfo = .{},
+    ink_preview_content_hash: u64 = std.math.maxInt(u64),
+    ink_preview_story: ?*inkz.Story = null,
+    ink_preview_transcript: std.ArrayList(u8) = .empty,
+    ink_preview_err: ?[]u8 = null,
 };
 
 pub const InitOptions = struct {};
@@ -55,6 +62,16 @@ pub fn deinit(self: *TextFile) void {
     const gpa = dvui_editor.app.gpa;
     md_parse.freeCachedRoot(self.editor.markdown_preview_ast_root);
     self.editor.markdown_preview_ast_root = null;
+    if (self.editor.ink_preview_story) |story| {
+        story.deinit();
+        gpa.destroy(story);
+        self.editor.ink_preview_story = null;
+    }
+    self.editor.ink_preview_transcript.deinit(gpa);
+    if (self.editor.ink_preview_err) |msg| {
+        gpa.free(msg);
+        self.editor.ink_preview_err = null;
+    }
     gpa.free(self.path);
     gpa.free(self.content);
 }

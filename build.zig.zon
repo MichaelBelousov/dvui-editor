@@ -55,6 +55,10 @@
             .url = "git+https://github.com/kristoff-it/cmark-gfm#cd0aba87cc89f0c8aa9393e59505db271ea30239",
             .hash = "cmark_gfm-0.1.0-uQgTKymaFwDK0jVZszXfDtQtW6BnS44Bp0GS55TVBD4p",
         },
+        .inkz = .{
+            .url = "git+https://codeberg.org/BSF/inkz.git#2ad855b9b2d7bb32114d480bd2eb40279f0a3a05",
+            .hash = "inkz-0.0.1-2kQZr2nXEwCQM7_dYJ59VvzRwrVvRHACqR6LedbfLL3f",
+        },
     },
     .paths = .{
         "build.zig",
