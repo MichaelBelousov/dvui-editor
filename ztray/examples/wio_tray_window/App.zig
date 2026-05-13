@@ -1,6 +1,6 @@
 //! [wio](https://github.com/ypsvlq/wio) window with ztray **native** menubar and **system tray** (icon + menu).
 //! On Windows the same top-level `HWND` is used for the menubar and tray callbacks (`windows_hwnd`).
-//! **Windows / macOS:** after menus + tray, `zwindow.setFrameChrome` styles the wio window (`.tray_compatible` on macOS avoids `NSVisualEffectView`, which can abort with tray on recent macOS). **Linux:** skipped — zwindow frame APIs are no-ops and wio’s Unix backend has no `HWND`/`NSWindow` handle field.
+//! **Linux:** pass `zwindow.LinuxFrameTarget` built from `wio.backend.active` and `window.backend`.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -28,6 +28,69 @@ fn menuHostHandle(win: *wio.Window) ?*anyopaque {
         .windows => @ptrCast(win.backend.window),
         else => null,
     };
+}
+
+fn applyZwindowFrameChrome() void {
+    switch (builtin.os.tag) {
+        .windows => {
+            const native: *anyopaque = @ptrCast(window.backend.window);
+            zwindow.setFrameChrome(
+                native,
+                0.12,
+                0.13,
+                0.17,
+                1.0,
+                true,
+                .tray_compatible,
+            );
+        },
+        .macos => {
+            const native: *anyopaque = @ptrCast(window.backend.window);
+            zwindow.setFrameChrome(
+                native,
+                0.12,
+                0.13,
+                0.17,
+                1.0,
+                true,
+                .tray_compatible,
+            );
+        },
+        .linux => {
+            switch (wio.backend.active) {
+                .x11 => {
+                    var frame = zwindow.LinuxFrameTarget{ .x11 = .{
+                        .display = @ptrCast(wio.backend.x11.display),
+                        .window = window.backend.x11.window,
+                    } };
+                    zwindow.setFrameChrome(
+                        @ptrCast(&frame),
+                        0.12,
+                        0.13,
+                        0.17,
+                        1.0,
+                        true,
+                        .tray_compatible,
+                    );
+                },
+                .wayland => {
+                    var frame = zwindow.LinuxFrameTarget{ .wayland = .{
+                        .surface = @ptrCast(window.backend.wayland),
+                    } };
+                    zwindow.setFrameChrome(
+                        @ptrCast(&frame),
+                        0.12,
+                        0.13,
+                        0.17,
+                        1.0,
+                        true,
+                        .tray_compatible,
+                    );
+                },
+            }
+        },
+        else => {},
+    }
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -68,21 +131,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    switch (builtin.os.tag) {
-        .windows, .macos => {
-            const native: *anyopaque = @ptrCast(window.backend.window);
-            zwindow.setFrameChrome(
-                native,
-                0.12,
-                0.13,
-                0.17,
-                1.0,
-                true,
-                .tray_compatible,
-            );
-        },
-        else => {},
-    }
+    applyZwindowFrameChrome();
 
     try wio.run(loop);
 }

@@ -1,5 +1,42 @@
 const std = @import("std");
 
+/// Which Unix display backends the **zwindow** Linux module compiles in (`zwindow_build_options`). Parse from `-Dzwindow_unix_backends` (comma-separated `x11` / `wayland`) or pass enum values from CI.
+pub const ZwindowUnixBackends = enum {
+    x11,
+    wayland,
+    both,
+
+    /// Same rules as wio’s `unix_backends` string: comma-separated `x11` and/or `wayland`; empty → **`.both`**.
+    pub fn parse(backends_str: []const u8) ZwindowUnixBackends {
+        var enable_x11 = false;
+        var enable_wayland = false;
+        var iter = std.mem.tokenizeScalar(u8, backends_str, ',');
+        while (iter.next()) |raw| {
+            const t = std.mem.trim(u8, raw, " \t\r\n");
+            if (t.len == 0) continue;
+            if (std.mem.eql(u8, t, "x11")) {
+                enable_x11 = true;
+            } else if (std.mem.eql(u8, t, "wayland")) {
+                enable_wayland = true;
+            } else {
+                @panic("invalid zwindow_unix_backends token (expected x11 and/or wayland)");
+            }
+        }
+        if (!enable_x11 and !enable_wayland) return .both;
+        if (enable_x11 and enable_wayland) return .both;
+        if (enable_x11) return .x11;
+        return .wayland;
+    }
+
+    pub fn x11Enabled(self: ZwindowUnixBackends) bool {
+        return self != .wayland;
+    }
+
+    pub fn waylandEnabled(self: ZwindowUnixBackends) bool {
+        return self != .x11;
+    }
+};
+
 /// Native menu implementation files; attached to the `ztray` module so consumers only `addImport("ztray", ...)`.
 fn linkNativeMenu(ztray_mod: *std.Build.Module, b: *std.Build, target: std.Build.ResolvedTarget) void {
     switch (target.result.os.tag) {
@@ -61,11 +98,13 @@ pub fn createZtrayModule(
     return ztray_mod;
 }
 
-/// Optional native window frame styling: macOS (transparent title bar + vibrancy) and Windows (DWM acrylic + extended caption). **Not** re-exported from the core `ztray` module; add as `addImport("zwindow", …)` separately from menu/tray.
+/// Optional native window frame styling: macOS (transparent title bar + vibrancy), Windows (DWM acrylic + extended caption), Linux X11/Wayland (see `-Dzwindow_unix_backends`). **Not** re-exported from the core `ztray` module; add as `addImport("zwindow", …)` separately from menu/tray.
+/// `unix_backends`: which Linux backends to compile; use [`ZwindowUnixBackends.parse`] for `-Dzwindow_unix_backends` strings or pass [`ZwindowUnixBackends`] literals from CI.
 pub fn createZwindowModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    unix_backends: ZwindowUnixBackends,
 ) *std.Build.Module {
     const zwindow_mod = b.addModule("zwindow", .{
         .root_source_file = b.path("src/window_root.zig"),
@@ -84,6 +123,15 @@ pub fn createZwindowModule(
         zwindow_mod.linkSystemLibrary("comctl32", .{});
         zwindow_mod.linkSystemLibrary("user32", .{});
         zwindow_mod.linkSystemLibrary("gdi32", .{});
+    }
+    if (target.result.os.tag == .linux) {
+        const zwindow_opts = b.addOptions();
+        zwindow_opts.addOption(bool, "x11", unix_backends.x11Enabled());
+        zwindow_opts.addOption(bool, "wayland", unix_backends.waylandEnabled());
+        zwindow_mod.addOptions("zwindow_build_options", zwindow_opts);
+        if (unix_backends.x11Enabled()) zwindow_mod.linkSystemLibrary("X11", .{});
+        // Wayland stub has no native calls yet; omit libwayland-client so cross-CI from macOS works.
+        zwindow_mod.link_libc = true;
     }
     return zwindow_mod;
 }
@@ -245,7 +293,11 @@ pub fn build(b: *std.Build) void {
     const force_dvui_menu = b.option(bool, "force_dvui_menu", "DVUI sample only: use in-app menu bar instead of native shell menus") orelse false;
 
     const ztray_mod = createZtrayModule(b, target, optimize);
-    const zwindow_mod = createZwindowModule(b, target, optimize);
+    const zwindow_mod = createZwindowModule(b, target, optimize, ZwindowUnixBackends.parse(b.option(
+        []const u8,
+        "zwindow_unix_backends",
+        "Comma-separated zwindow Linux backends: x11, wayland (default: x11,wayland)",
+    ) orelse "x11,wayland"));
 
     if (b.lazyDependency("dvui", .{
         .target = target,
@@ -371,7 +423,7 @@ pub fn build(b: *std.Build) void {
 
     const ci_step = b.step(
         "ci",
-        "Build all ztray examples for CI targets (Linux aarch64/x86_64, Windows x86_64; native macOS when host is macOS). Includes wio_tray_window.",
+        "Build all ztray examples for CI targets (Linux aarch64/x86_64 with zwindow x11/wayland/both, Windows x86_64; native macOS when host is macOS).",
     );
     setupZtrayCi(b, ci_step, force_dvui_menu);
 }
@@ -416,7 +468,6 @@ fn addZtrayCiExamplesForTarget(
     const wio_dep = wio_dep_opt orelse return;
 
     const ztray_mod = createZtrayModule(b, resolved, optimize);
-    const zwindow_mod = createZwindowModule(b, resolved, optimize);
     const example_opts_mod = dvuiExampleOptsModule(b, force_dvui_menu);
     const d = dvuiImportsFromDep(dvui_dep);
     const ztray_unified_mod = createZtrayDvuiModule(b, resolved, optimize, ztray_mod, d.dvui, d.sdl);
@@ -449,7 +500,23 @@ fn addZtrayCiExamplesForTarget(
         ci_step.dependOn(&exe.step);
     }
 
-    {
+    if (resolved.result.os.tag == .linux) {
+        inline for (std.enums.values(ZwindowUnixBackends)) |zwb| {
+            const zwindow_ci = createZwindowModule(b, resolved, optimize, zwb);
+            const exe = addWioTrayExe(
+                b,
+                ztray_mod,
+                zwindow_ci,
+                wio_mod,
+                resolved,
+                optimize,
+                b.fmt("ztray-wio-tray-{s}-{s}-zw-{s}", .{ arch_tag, os_tag, @tagName(zwb) }),
+            );
+            linkLinuxDynamic(exe, b.graph.host.result.os.tag, resolved.result.os.tag);
+            ci_step.dependOn(&exe.step);
+        }
+    } else {
+        const zwindow_mod = createZwindowModule(b, resolved, optimize, .both);
         const exe = addWioTrayExe(
             b,
             ztray_mod,
@@ -464,6 +531,7 @@ fn addZtrayCiExamplesForTarget(
     }
 
     if (resolved.result.os.tag == .macos) {
+        const zwindow_mod = createZwindowModule(b, resolved, optimize, .both);
         const exe = addWioMacosWindowExe(
             b,
             zwindow_mod,

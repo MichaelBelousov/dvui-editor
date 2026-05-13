@@ -5,6 +5,8 @@ const ztray = @import("ztray");
 const EditorBuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    /// When set, passed to `createZwindowModule`. The root `build()` passes the parsed `-Dzwindow_unix_backends` here for the main app; CI passes explicit `ztray.ZwindowUnixBackends` values.
+    zwindow_unix_backends: ztray.ZwindowUnixBackends = .both,
 };
 
 pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
@@ -40,8 +42,9 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         .target = opts.target,
         .optimize = opts.optimize,
     });
+    const zwb = opts.zwindow_unix_backends;
     const ztray_mod = ztray.createZtrayModule(ztray_dep.builder, opts.target, opts.optimize);
-    const zwindow_mod = ztray.createZwindowModule(ztray_dep.builder, opts.target, opts.optimize);
+    const zwindow_mod = ztray.createZwindowModule(ztray_dep.builder, opts.target, opts.optimize, zwb);
     const ztray_dvui_mod = ztray.createZtrayDvuiModule(
         ztray_dep.builder,
         opts.target,
@@ -110,7 +113,17 @@ pub fn build(b: *std.Build) void {
     //     .target = target,
     // });
 
-    const app_mod = editorMod(b, .{ .target = target, .optimize = optimize });
+    const zwindow_unix_backends = ztray.ZwindowUnixBackends.parse(b.option(
+        []const u8,
+        "zwindow_unix_backends",
+        "Comma-separated zwindow Linux backends: x11, wayland (default: x11,wayland)",
+    ) orelse "x11,wayland");
+
+    const app_mod = editorMod(b, .{
+        .target = target,
+        .optimize = optimize,
+        .zwindow_unix_backends = zwindow_unix_backends,
+    });
 
     const exe = b.addExecutable(.{
         .name = "dvui-editor",
@@ -172,7 +185,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_exe_tests.step);
 
     const ci_step = b.step("ci", "Run CI");
-    setupCi(b, ci_step);
+    setupCi(b, ci_step, zwindow_unix_backends);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
@@ -186,7 +199,7 @@ pub fn build(b: *std.Build) void {
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
 }
-pub fn setupCi(b: *std.Build, step: *std.Build.Step) void {
+pub fn setupCi(b: *std.Build, step: *std.Build.Step, zwindow_unix_backends: ztray.ZwindowUnixBackends) void {
     const targets: []const std.Target.Query = &.{
         // macOS cross-compilation requires the Apple SDK; build natively instead.
         // .{ .cpu_arch = .aarch64, .os_tag = .macos },
@@ -199,14 +212,37 @@ pub fn setupCi(b: *std.Build, step: *std.Build.Step) void {
 
     for (targets) |t| {
         const target = b.resolveTargetQuery(t);
-        const app_mod = editorMod(b, .{ .target = target, .optimize = .Debug });
-        const exe = b.addExecutable(.{
-            .name = b.fmt("dvui-editor-{s}-{s}", .{
-                @tagName(t.cpu_arch.?),
-                @tagName(t.os_tag.?),
-            }),
-            .root_module = app_mod,
-        });
-        step.dependOn(&exe.step);
+        if (t.os_tag.? == .linux) {
+            inline for (std.enums.values(ztray.ZwindowUnixBackends)) |zwb| {
+                const app_mod = editorMod(b, .{
+                    .target = target,
+                    .optimize = .Debug,
+                    .zwindow_unix_backends = zwb,
+                });
+                const exe = b.addExecutable(.{
+                    .name = b.fmt("dvui-editor-{s}-{s}-zw-{s}", .{
+                        @tagName(t.cpu_arch.?),
+                        @tagName(t.os_tag.?),
+                        @tagName(zwb),
+                    }),
+                    .root_module = app_mod,
+                });
+                step.dependOn(&exe.step);
+            }
+        } else {
+            const app_mod = editorMod(b, .{
+                .target = target,
+                .optimize = .Debug,
+                .zwindow_unix_backends = zwindow_unix_backends,
+            });
+            const exe = b.addExecutable(.{
+                .name = b.fmt("dvui-editor-{s}-{s}", .{
+                    @tagName(t.cpu_arch.?),
+                    @tagName(t.os_tag.?),
+                }),
+                .root_module = app_mod,
+            });
+            step.dependOn(&exe.step);
+        }
     }
 }

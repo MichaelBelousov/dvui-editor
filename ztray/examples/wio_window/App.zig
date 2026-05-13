@@ -1,5 +1,5 @@
 //! [wio](https://github.com/ypsvlq/wio) window + **zwindow** only (no ztray menu or tray).
-//! On macOS: **`zwindow.setFrameChrome`** with **`.full_vibrancy`**. Other platforms: plain wio window (zwindow APIs no-op).
+//! On Linux: `zwindow.LinuxFrameTarget` from `wio.backend` + `window.backend`.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -19,6 +19,69 @@ extern fn NSApplicationLoad() void;
 
 var window: wio.Window = undefined;
 
+fn applyZwindowFrameChrome() void {
+    switch (builtin.os.tag) {
+        .windows => {
+            const native: *anyopaque = @ptrCast(window.backend.window);
+            zwindow.setFrameChrome(
+                native,
+                0.18,
+                0.19,
+                0.24,
+                1.0,
+                true,
+                .full_vibrancy,
+            );
+        },
+        .macos => {
+            const native: *anyopaque = @ptrCast(window.backend.window);
+            zwindow.setFrameChrome(
+                native,
+                0.18,
+                0.19,
+                0.24,
+                1.0,
+                true,
+                .full_vibrancy,
+            );
+        },
+        .linux => {
+            switch (wio.backend.active) {
+                .x11 => {
+                    var frame = zwindow.LinuxFrameTarget{ .x11 = .{
+                        .display = @ptrCast(wio.backend.x11.display),
+                        .window = window.backend.x11.window,
+                    } };
+                    zwindow.setFrameChrome(
+                        @ptrCast(&frame),
+                        0.18,
+                        0.19,
+                        0.24,
+                        1.0,
+                        true,
+                        .full_vibrancy,
+                    );
+                },
+                .wayland => {
+                    var frame = zwindow.LinuxFrameTarget{ .wayland = .{
+                        .surface = @ptrCast(window.backend.wayland),
+                    } };
+                    zwindow.setFrameChrome(
+                        @ptrCast(&frame),
+                        0.18,
+                        0.19,
+                        0.24,
+                        1.0,
+                        true,
+                        .full_vibrancy,
+                    );
+                },
+            }
+        },
+        else => {},
+    }
+}
+
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
@@ -33,16 +96,7 @@ pub fn main(init: std.process.Init) !void {
         .size = .{ .width = 520, .height = 340 },
     });
 
-    const ns: *anyopaque = @ptrCast(window.backend.window);
-    zwindow.setFrameChrome(
-        ns,
-        0.18,
-        0.19,
-        0.24,
-        1.0,
-        true,
-        .full_vibrancy,
-    );
+    applyZwindowFrameChrome();
 
     try wio.run(loop);
 }
