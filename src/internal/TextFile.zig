@@ -43,8 +43,9 @@ pub fn fromPath(path: []const u8) !TextFile {
 
 pub fn saveAsync(self: *const TextFile) !void {
     const io = dvui_editor.app.io;
+    const data = self.content[0 .. std.mem.indexOfScalar(u8, self.content, 0) orelse self.content.len];
     try Io.Dir.cwd().writeFile(io, .{
-        .data = self.content,
+        .data = data,
         .sub_path = self.path,
         .flags = .{},
     });

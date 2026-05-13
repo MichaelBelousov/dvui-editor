@@ -19,7 +19,9 @@ pub fn deinit(_: MarkDownPreviewWidget) void {}
 
 pub fn processEvents(self: *MarkDownPreviewWidget) void {
     const file = self.file;
-    const content: []const u8 = file.content;
+    const raw = file.content;
+    // backing buffer may be larger than actual content; content ends at first null byte
+    const content: []const u8 = raw[0 .. std.mem.indexOfScalar(u8, raw, 0) orelse raw.len];
 
     var wh = std.hash.Wyhash.init(0);
     wh.update(content);
@@ -41,6 +43,13 @@ pub fn processEvents(self: *MarkDownPreviewWidget) void {
         .vertical_bar = .auto_overlay,
     }, .{
         .expand = .both,
+        .margin = dvui.Rect.all(4),
+        .corner_radius = dvui.Rect.all(5),
+        .border = dvui.Rect.all(1),
+        .padding = dvui.Rect.all(6),
+        .background = true,
+        .color_fill = dvui.themeGet().fill,
+        .style = .content,
         .id_extra = self.file.id,
     });
     defer scroll.deinit();
