@@ -40,6 +40,16 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
     });
     mod.addImport("ztray", ztray_dep.module("ztray"));
 
+    const cmark_gfm = b.dependency("cmark_gfm", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+    });
+    mod.linkLibrary(cmark_gfm.artifact("cmark-gfm"));
+    mod.linkLibrary(cmark_gfm.artifact("cmark-gfm-extensions"));
+    mod.addIncludePath(cmark_gfm.path("src"));
+    mod.addIncludePath(cmark_gfm.path("extensions"));
+    mod.addIncludePath(b.path("src/md"));
+
     if (opts.target.result.os.tag == .macos) {
         mod.addCSourceFile(.{ .file = std.Build.path(b, "src/macos_native.m") });
     } else if (opts.target.result.os.tag == .windows) {

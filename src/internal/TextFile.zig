@@ -1,7 +1,10 @@
 const std = @import("std");
 const Io = std.Io;
 
+const dvui = @import("dvui");
+
 const dvui_editor = @import("../root.zig");
+const md_parse = @import("../md/cmark_parse.zig");
 const TextEditWidget = @import("../widgets/TextEditWidget.zig");
 
 const TextFile = @This();
@@ -17,6 +20,9 @@ pub const EditorData = struct {
     workspace: *dvui_editor.Editor.Workspace = undefined,
     grouping: u64 = 0,
     text_edit_widget: TextEditWidget = .{},
+    markdown_preview_scroll: dvui.ScrollInfo = .{},
+    markdown_preview_content_hash: u64 = std.math.maxInt(u64),
+    markdown_preview_ast_root: ?*anyopaque = null,
 };
 
 pub const InitOptions = struct {};
@@ -46,6 +52,8 @@ pub fn saveAsync(self: *const TextFile) !void {
 
 pub fn deinit(self: *TextFile) void {
     const gpa = dvui_editor.app.gpa;
+    md_parse.freeCachedRoot(self.editor.markdown_preview_ast_root);
+    self.editor.markdown_preview_ast_root = null;
     gpa.free(self.path);
     gpa.free(self.content);
 }

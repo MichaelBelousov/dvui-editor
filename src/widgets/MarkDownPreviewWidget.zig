@@ -3,6 +3,8 @@ const std = @import("std");
 const dvui = @import("dvui");
 
 const dvui_editor = @import("../root.zig");
+const md_parse = @import("../md/cmark_parse.zig");
+const render_ast = @import("../md/render_ast.zig");
 
 pub const MarkDownPreviewWidget = @This();
 
@@ -16,16 +18,53 @@ pub fn init(src: std.builtin.SourceLocation, file: *dvui_editor.Internal.TextFil
 pub fn deinit(_: MarkDownPreviewWidget) void {}
 
 pub fn processEvents(self: *MarkDownPreviewWidget) void {
-    dvui.labelNoFmt(
-        @src(),
-        "Markdown preview",
-        .{},
-        .{
-            .expand = .both,
-            .gravity_x = 0.5,
-            .gravity_y = 0.5,
-            .color_text = dvui.themeGet().color(.control, .text).opacity(0.6),
-            .id_extra = self.file.id,
-        },
-    );
+    const file = self.file;
+    const content: []const u8 = file.content;
+
+    var wh = std.hash.Wyhash.init(0);
+    wh.update(content);
+    const h = wh.final();
+
+    if (file.editor.markdown_preview_content_hash != h) {
+        md_parse.freeCachedRoot(file.editor.markdown_preview_ast_root);
+        file.editor.markdown_preview_ast_root = null;
+        file.editor.markdown_preview_content_hash = h;
+        if (md_parse.parseMarkdown(content)) |ast| {
+            file.editor.markdown_preview_ast_root = @ptrCast(ast.root.n);
+            _ = ast.extensions;
+        }
+    }
+
+    var scroll = dvui.scrollArea(@src(), .{
+        .scroll_info = &file.editor.markdown_preview_scroll,
+        .horizontal_bar = .auto_overlay,
+        .vertical_bar = .auto_overlay,
+    }, .{
+        .expand = .both,
+        .id_extra = self.file.id,
+    });
+    defer scroll.deinit();
+
+    if (file.editor.markdown_preview_ast_root) |rp| {
+        var v = dvui.box(@src(), .{ .dir = .vertical }, .{
+            .expand = .horizontal,
+            .padding = .{ .x = 8, .y = 8, .w = 8, .h = 8 },
+        });
+        defer v.deinit();
+        const root: md_parse.Node = .{ .n = @ptrCast(@alignCast(rp)) };
+        render_ast.renderDocument(root);
+    } else {
+        dvui.labelNoFmt(
+            @src(),
+            "Could not parse markdown.",
+            .{},
+            .{
+                .expand = .both,
+                .gravity_x = 0.5,
+                .gravity_y = 0.5,
+                .color_text = dvui.themeGet().color(.err, .text).opacity(0.85),
+                .id_extra = self.file.id,
+            },
+        );
+    }
 }
