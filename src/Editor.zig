@@ -1127,6 +1127,7 @@ pub fn saving(editor: *Editor) bool {
 pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
     for (editor.open_files.values(), 0..) |*file, i| {
         if (std.mem.eql(u8, file.path, path)) {
+            try editor.rebuildWorkspaces();
             editor.setActiveFile(i);
             return false;
         }
@@ -1138,11 +1139,10 @@ pub fn openFilePath(editor: *Editor, path: []const u8, grouping: u64) !bool {
             f.editor.grouping = grouping;
         }
 
-        // At this point, if the workspace grouping doesn't exist, it will next frame
-        // once the workspaces are rebuilt. Since we cant wait on that, go ahead and set it now
         editor.open_workspace_grouping = grouping;
-
-        // If the workspace grouping does exist, go ahead and set the active file
+        // `rebuildWorkspaces` runs at tick start, before UI events — rebuild here so the workspace
+        // exists before `setActiveFile` updates `open_file_index` (otherwise the wrong tab can draw).
+        try editor.rebuildWorkspaces();
         editor.setActiveFile(editor.open_files.count() - 1);
         return true;
     }
@@ -1170,6 +1170,9 @@ pub fn newFile(editor: *Editor, path: []const u8, options: dvui_editor.Internal.
     if (editor.open_files.getPtr(file.id)) |f| {
         f.editor.grouping = editor.open_workspace_grouping;
     }
+    editor.rebuildWorkspaces() catch {
+        dvui.log.err("Failed to rebuild workspaces after new file", .{});
+    };
     editor.setActiveFile(editor.open_files.count() - 1);
     // editor.composite_warmup_pending = true;
 

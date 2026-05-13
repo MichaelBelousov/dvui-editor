@@ -1,0 +1,16 @@
+Upstream: https://github.com/rhizoome/tree-sitter-ink2 (MIT OR Apache-2.0)
+
+Vendored / generated files under this directory must match the Tree-sitter ABI
+linked by DVUI (see zig-pkg tree_sitter dependency, currently 0.27.x).
+
+Root inputs (sync from upstream `main` when bumping the grammar):
+  grammar.js
+  tree-sitter.json
+
+Regenerate C sources (requires tree-sitter CLI on PATH):
+  cd vendor/tree-sitter-ink2
+  tree-sitter generate
+
+That refreshes at least: src/parser.c, src/grammar.json, src/node-types.json,
+and src/tree_sitter/parser.h. Hand-written src/scanner.c is kept as-is unless
+upstream changes it.

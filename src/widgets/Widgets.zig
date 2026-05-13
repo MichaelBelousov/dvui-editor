@@ -11,4 +11,6 @@ pub const TextEditWidget = @import("TextEditWidget.zig");
 pub const CodeEditorWidget = @import("CodeEditorWidget.zig");
 pub const MarkDownWidget = @import("MarkDownWidget.zig");
 pub const MarkDownPreviewWidget = @import("MarkDownPreviewWidget.zig");
+pub const InkEditorWidget = @import("InkEditorWidget.zig");
+pub const InkPreviewWidget = @import("InkPreviewWidget.zig");
 pub const TreeWidget = @import("TreeWidget.zig");

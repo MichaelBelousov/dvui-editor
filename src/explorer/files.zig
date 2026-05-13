@@ -740,9 +740,9 @@ pub fn recurseFiles(io_outer: Io, environ_outer: *const std.process.Environ.Map,
 pub fn extension(file: []const u8) Extension {
     const ext = std.fs.path.extension(file);
     if (std.mem.eql(u8, ext, "")) return .hidden;
-    if (std.mem.eql(u8, ext, ".ink")) return .ink;
-    if (std.mem.eql(u8, ext, ".md")) return .md;
-    if (std.mem.eql(u8, ext, ".txt")) return .txt;
+    if (std.ascii.eqlIgnoreCase(ext, ".ink")) return .ink;
+    if (std.ascii.eqlIgnoreCase(ext, ".md")) return .md;
+    if (std.ascii.eqlIgnoreCase(ext, ".txt")) return .txt;
     if (dvui_editor.dvui.CodeEditorWidget.supportsExtension(ext)) return .source;
     return .unsupported;
 }

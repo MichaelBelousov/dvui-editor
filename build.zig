@@ -71,6 +71,20 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
     mod.addIncludePath(cmark_gfm.path("extensions"));
     mod.addIncludePath(b.path("src/md"));
 
+    // Ink (inkle) grammar — C sources vendored under vendor/tree-sitter-ink2 (see UPSTREAM.txt).
+    mod.addIncludePath(b.path("vendor/tree-sitter-ink2/src"));
+    mod.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-ink2"),
+        .files = &.{
+            "src/parser.c",
+            "src/scanner.c",
+        },
+        .flags = &.{
+            "-std=c11",
+            "-Wno-missing-field-initializers",
+        },
+    });
+
     // const assetpack = @import("assetpack");
     // const assets_module = assetpack.pack(b, b.path("assets"), .{});
     // exe.root_module.addImport("assets", assets_module);

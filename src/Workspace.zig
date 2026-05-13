@@ -102,32 +102,11 @@ pub fn draw(self: *Workspace) !dvui.App.Result {
         }
     }
 
-    if (dvui_editor.editor.explorer.pane == .project) {
-        self.drawProject();
-    } else {
-        self.drawTabs();
-        try self.drawEditor();
-    }
+    // Explorer pane (Files / Project / …) only changes the sidebar, not which editor drives the main area.
+    self.drawTabs();
+    try self.drawEditor();
 
     return .ok;
-}
-
-fn drawProject(self: *Workspace) void {
-    var canvas_vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both, .id_extra = self.grouping });
-    defer canvas_vbox.deinit();
-
-    // if (dvui_editor.packer.atlas) |*atlas| {
-    //     var image_widget = dvui_editor.dvui.ImageWidget.init(@src(), .{
-    //         .source = atlas.source,
-    //         .canvas = &atlas.canvas,
-    //     }, .{
-    //         .id_extra = self.grouping,
-    //         .expand = .both,
-    //     });
-    //     defer image_widget.deinit();
-
-    //     image_widget.processEvents();
-    // }
 }
 
 fn drawTabs(self: *Workspace) void {
@@ -525,10 +504,14 @@ pub fn drawEditor(self: *Workspace) !void {
 
         // dvui_editor.perf.canvasPaneDrawn();
 
-        if (std.mem.eql(u8, std.fs.path.extension(file.path), ".md")) {
+        if (std.ascii.eqlIgnoreCase(std.fs.path.extension(file.path), ".md")) {
             var md_widget = dvui_editor.dvui.MarkDownWidget.init(@src(), file);
             defer md_widget.deinit();
             md_widget.processEvents();
+        } else if (std.ascii.eqlIgnoreCase(std.fs.path.extension(file.path), ".ink")) {
+            var ink_widget = dvui_editor.dvui.InkEditorWidget.init(@src(), file);
+            defer ink_widget.deinit();
+            ink_widget.processEvents();
         } else if (dvui_editor.dvui.CodeEditorWidget.supportsPath(file.path)) {
             var code_widget = dvui_editor.dvui.CodeEditorWidget.init(@src(), file);
             defer code_widget.deinit();
