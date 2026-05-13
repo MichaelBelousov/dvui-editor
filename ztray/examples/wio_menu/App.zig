@@ -3,7 +3,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const wio = @import("wio");
-const ztray = @import("ztray");
+const zmenu = @import("zmenu");
 
 const menu_def = @import("menu_def.zig");
 
@@ -30,7 +30,7 @@ pub fn main(init: std.process.Init) !void {
         .size = .{ .width = 560, .height = 360 },
     });
 
-    ztray.installMainMenu(gpa, menu_def.menu_bar, .{
+    zmenu.installMainMenu(gpa, menu_def.menu_bar, .{
         .windows_hwnd = if (builtin.os.tag == .windows) @ptrCast(window.backend.window) else null,
     }) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
@@ -51,7 +51,7 @@ fn loop() !bool {
         }
     }
 
-    if (ztray.pollAction(menu_def.DemoAction)) |action| {
+    if (zmenu.pollAction(menu_def.DemoAction)) |action| {
         switch (action) {
             .say_hello => std.log.info("Hello from native menu", .{}),
             .about => std.log.info("ztray native menu example using wio.", .{}),

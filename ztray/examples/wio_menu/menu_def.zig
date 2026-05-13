@@ -1,12 +1,12 @@
 //! Menu used by the ztray + wio native shell menu example.
-const ztray = @import("ztray");
+const zmenu = @import("zmenu");
 
-pub const DemoAction = enum(ztray.ActionId) {
+pub const DemoAction = enum(zmenu.ActionId) {
     say_hello = 0,
     about = 1,
 };
 
-const file_items = [_]ztray.Item{
+const file_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "Say Hello",
         .action_id = @intFromEnum(DemoAction.say_hello),
@@ -14,16 +14,16 @@ const file_items = [_]ztray.Item{
     } },
 };
 
-const help_items = [_]ztray.Item{
+const help_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "About",
         .action_id = @intFromEnum(DemoAction.about),
     } },
 };
 
-const menus = [_]ztray.Menu{
+const menus = [_]zmenu.Menu{
     .{ .title = "File", .items = &file_items },
     .{ .title = "Help", .items = &help_items },
 };
 
-pub const menu_bar: ztray.MenuBar = .{ .menus = &menus };
+pub const menu_bar: zmenu.MenuBar = .{ .menus = &menus };

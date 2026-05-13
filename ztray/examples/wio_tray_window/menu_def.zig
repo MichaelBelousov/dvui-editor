@@ -1,12 +1,13 @@
 //! Menubar and tray menus for the wio + native shell + tray example.
+const zmenu = @import("zmenu");
 const ztray = @import("ztray");
 
-pub const MenuBarAction = enum(ztray.ActionId) {
+pub const MenuBarAction = enum(zmenu.ActionId) {
     say_hello = 0,
     about = 1,
 };
 
-const file_items = [_]ztray.Item{
+const file_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "Say Hello",
         .action_id = @intFromEnum(MenuBarAction.say_hello),
@@ -14,26 +15,26 @@ const file_items = [_]ztray.Item{
     } },
 };
 
-const help_items = [_]ztray.Item{
+const help_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "About",
         .action_id = @intFromEnum(MenuBarAction.about),
     } },
 };
 
-const menus = [_]ztray.Menu{
+const menus = [_]zmenu.Menu{
     .{ .title = "File", .items = &file_items },
     .{ .title = "Help", .items = &help_items },
 };
 
-pub const menu_bar: ztray.MenuBar = .{ .menus = &menus };
+pub const menu_bar: zmenu.MenuBar = .{ .menus = &menus };
 
 pub const TrayAction = enum(c_int) {
     hello = 1,
     quit = 2,
 };
 
-const tray_items = [_]ztray.Item{
+const tray_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "Say hello (tray)",
         .action_id = @intFromEnum(TrayAction.hello),

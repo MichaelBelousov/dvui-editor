@@ -43,17 +43,17 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         .optimize = opts.optimize,
     });
     const zwb = opts.zwindow_unix_backends;
-    const ztray_mod = ztray.createZtrayModule(ztray_dep.builder, opts.target, opts.optimize);
+    const zmenu_mod = ztray.createZmenuModule(ztray_dep.builder, opts.target, opts.optimize);
     const zwindow_mod = ztray.createZwindowModule(ztray_dep.builder, opts.target, opts.optimize, zwb);
-    const ztray_dvui_mod = ztray.createZtrayDvuiModule(
+    const zmenu_dvui_mod = ztray.createZmenuDvuiModule(
         ztray_dep.builder,
         opts.target,
         opts.optimize,
-        ztray_mod,
+        zmenu_mod,
         dvui_dep.module("dvui_sdl3"),
         dvui_dep.module("sdl3"),
     );
-    mod.addImport("ztray", ztray_dvui_mod);
+    mod.addImport("zmenu", zmenu_dvui_mod);
     mod.addImport("zwindow", zwindow_mod);
 
     const cmark_gfm = b.dependency("cmark_gfm", .{

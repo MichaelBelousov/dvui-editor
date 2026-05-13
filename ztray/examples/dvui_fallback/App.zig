@@ -8,7 +8,7 @@ pub const main = dvui.App.main;
 pub const panic = dvui.App.panic;
 const sdl3 = @import("sdl-backend").c;
 const zopts = @import("ztray_dvui_opts");
-const ztray = @import("ztray");
+const zmenu = @import("zmenu");
 
 const menu_def = @import("menu_def.zig");
 
@@ -37,20 +37,20 @@ pub const std_options: std.Options = .{
 };
 
 pub fn AppInit(win: *dvui.Window) !void {
-    use_dvui_menu = zopts.force_dvui_menu or (builtin.os.tag == .linux and ztray.appMenuRegistrarHasOwner() == false);
+    use_dvui_menu = zopts.force_dvui_menu or (builtin.os.tag == .linux and zmenu.appMenuRegistrarHasOwner() == false);
 
     if (use_dvui_menu) {
         dvui_menu_install_and_sync: {
-            ztray.dvui_menu.installMainMenu(win.gpa, menu_def.menu_bar) catch |err| {
-                std.log.err("ztray.dvui_menu installMainMenu: {s}", .{@errorName(err)});
+            zmenu.dvui_menu.installMainMenu(win.gpa, menu_def.menu_bar) catch |err| {
+                std.log.err("zmenu.dvui_menu installMainMenu: {s}", .{@errorName(err)});
                 break :dvui_menu_install_and_sync;
             };
-            ztray.dvui_menu.syncMenuShortcuts(win) catch |err| {
-                std.log.err("ztray.dvui_menu syncMenuShortcuts: {s}", .{@errorName(err)});
+            zmenu.dvui_menu.syncMenuShortcuts(win) catch |err| {
+                std.log.err("zmenu.dvui_menu syncMenuShortcuts: {s}", .{@errorName(err)});
             };
         }
     } else {
-        ztray.installMainMenu(win.gpa, menu_def.menu_bar, .{ .windows_hwnd = menuHostHwnd(win) }) catch |err| {
+        zmenu.installMainMenu(win.gpa, menu_def.menu_bar, .{ .windows_hwnd = menuHostHwnd(win) }) catch |err| {
             std.log.err("ztray installMainMenu: {s}", .{@errorName(err)});
         };
     }
@@ -58,19 +58,19 @@ pub fn AppInit(win: *dvui.Window) !void {
 
 pub fn AppDeinit() void {
     if (use_dvui_menu) {
-        ztray.dvui_menu.shutdownMenu();
+        zmenu.dvui_menu.shutdownMenu();
     }
 }
 
 pub fn AppFrame() !dvui.App.Result {
     if (use_dvui_menu) {
-        try ztray.dvui_menu.drawMenuBar();
+        try zmenu.dvui_menu.drawMenuBar();
     }
 
     const menu_action = if (use_dvui_menu)
-        ztray.dvui_menu.pollAction(menu_def.DemoAction)
+        zmenu.dvui_menu.pollAction(menu_def.DemoAction)
     else
-        ztray.pollAction(menu_def.DemoAction);
+        zmenu.pollAction(menu_def.DemoAction);
 
     if (menu_action) |action| {
         switch (action) {

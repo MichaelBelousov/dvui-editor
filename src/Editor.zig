@@ -6,7 +6,7 @@ const dvui = @import("dvui");
 const known_folders = @import("known-folders");
 const nightwatch = @import("nightwatch");
 const ProjectFolderWatcher = nightwatch.Default;
-const ztray = @import("ztray");
+const zmenu = @import("zmenu");
 
 pub const Dialogs = @import("dialogs/Dialogs.zig");
 const dvui_editor = @import("root.zig");
@@ -267,7 +267,7 @@ pub fn init(
     // };
 
     // dvui_editor.backend.setTitlebarColor(dvui.currentWindow(), dvui_editor_dark.fill.opacity(if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light));
-    ztray.installMainMenuForSdlDvuiWindow(app.gpa, native_menu.main_menu_bar, dvui.currentWindow()) catch |err| {
+    zmenu.installMainMenuForSdlDvuiWindow(app.gpa, native_menu.main_menu_bar, dvui.currentWindow()) catch |err| {
         dvui.log.err("Failed to install native menu: {any}", .{err});
     };
 
@@ -310,7 +310,7 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     const environ = dvui_editor.app.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
 
-    if (ztray.pollAction(native_menu.NativeMenuAction)) |action| {
+    if (zmenu.pollAction(native_menu.NativeMenuAction)) |action| {
         editor.queueNativeMenuAction(action);
     }
 

@@ -1,4 +1,4 @@
-const ztray = @import("ztray");
+const zmenu = @import("zmenu");
 
 /// Action ids delivered by the native menu bar (must match values passed in `main_menu_bar`).
 pub const NativeMenuAction = enum(c_int) {
@@ -14,7 +14,7 @@ pub const NativeMenuAction = enum(c_int) {
     show_dvui_demo = 9,
 };
 
-const file_menu_items = [_]ztray.Item{
+const file_menu_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "Open Folder",
         .action_id = @intFromEnum(NativeMenuAction.open_folder),
@@ -38,7 +38,7 @@ const file_menu_items = [_]ztray.Item{
     } },
 };
 
-const edit_menu_items = [_]ztray.Item{
+const edit_menu_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "Copy",
         .action_id = @intFromEnum(NativeMenuAction.copy),
@@ -64,7 +64,7 @@ const edit_menu_items = [_]ztray.Item{
     } },
 };
 
-const view_menu_items = [_]ztray.Item{
+const view_menu_items = [_]zmenu.Item{
     .{ .action = .{
         .title = "Show Explorer",
         .action_id = @intFromEnum(NativeMenuAction.toggle_explorer),
@@ -77,10 +77,10 @@ const view_menu_items = [_]ztray.Item{
     } },
 };
 
-const main_menus = [_]ztray.Menu{
+const main_menus = [_]zmenu.Menu{
     .{ .title = "File", .items = &file_menu_items },
     .{ .title = "Edit", .items = &edit_menu_items },
     .{ .title = "View", .items = &view_menu_items },
 };
 
-pub const main_menu_bar: ztray.MenuBar = .{ .menus = &main_menus };
+pub const main_menu_bar: zmenu.MenuBar = .{ .menus = &main_menus };

@@ -1,23 +1,17 @@
-//! [wio](https://github.com/ypsvlq/wio) window with ztray **native** menubar and **system tray** (icon + menu).
-//! On Windows the same top-level `HWND` is used for the menubar and tray callbacks (`windows_hwnd`).
-//! **Linux:** pass `zwindow.LinuxFrameTarget` built from `wio.backend.active` and `window.backend`.
+//! wio window with zmenu native menubar and ztray system tray (icon + menu).
 const std = @import("std");
 const builtin = @import("builtin");
 
 const wio = @import("wio");
+const zmenu = @import("zmenu");
 const ztray = @import("ztray");
 const zwindow = @import("zwindow");
 
 const menu_def = @import("menu_def.zig");
 
-pub const std_options = std.Options{
-    .log_level = .info,
-    .logFn = wio.logFn,
-};
+pub const std_options = std.Options{ .log_level = .info, .logFn = wio.logFn };
 
-comptime {
-    _ = wio;
-}
+comptime { _ = wio; }
 
 extern fn NSApplicationLoad() void;
 
@@ -51,23 +45,22 @@ pub fn main(init: std.process.Init) !void {
     const io = init.io;
 
     try wio.init(gpa, io, .{});
-
     if (builtin.os.tag == .macos) NSApplicationLoad();
 
     window = try wio.createWindow(.{
-        .title = "ztray + wio (menus + tray + window chrome)",
+        .title = "zmenu + ztray + wio",
         .scale = 1,
         .size = .{ .width = 560, .height = 360 },
     });
 
     const win_hwnd: ?*anyopaque = if (builtin.os.tag == .windows) @ptrCast(window.backend.window) else null;
 
-    ztray.installMainMenu(gpa, menu_def.menu_bar, .{ .windows_hwnd = win_hwnd }) catch |err| {
+    zmenu.installMainMenu(gpa, menu_def.menu_bar, .{ .windows_hwnd = win_hwnd }) catch |err| {
         std.log.err("installMainMenu: {s}", .{@errorName(err)});
     };
 
     ztray.installTrayIcon(gpa, .{
-        .tooltip = "ztray wio (menus + tray)",
+        .tooltip = "zmenu + ztray wio",
         .icon_png = if (builtin.os.tag == .linux) null else ztray.zig_favicon_png,
         .linux_icon_name = if (builtin.os.tag == .linux) "applications-utilities" else null,
         .windows_hwnd = win_hwnd,
@@ -87,7 +80,6 @@ pub fn main(init: std.process.Init) !void {
     };
 
     applyZwindowFrameChrome();
-
     try wio.run(loop);
 }
 
@@ -118,10 +110,10 @@ fn loop() !bool {
         }
     }
 
-    if (ztray.pollAction(menu_def.MenuBarAction)) |action| {
+    if (zmenu.pollAction(menu_def.MenuBarAction)) |action| {
         switch (action) {
             .say_hello => std.log.info("Hello from native menu", .{}),
-            .about => std.log.info("ztray wio example: shell menu + tray.", .{}),
+            .about => std.log.info("zmenu + ztray wio example.", .{}),
         }
     }
 
