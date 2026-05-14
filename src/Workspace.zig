@@ -525,7 +525,12 @@ pub fn drawEditor(self: *Workspace) !void {
 
         // dvui_editor.perf.canvasPaneDrawn();
 
-        var file_widget = dvui_editor.dvui.TextEditWidget.init(@src(), file);
+        var file_widget = dvui_editor.dvui.TextEditWidget.init(@src(), .{
+            .allocator = dvui_editor.app.gpa,
+            .backing = &file.content,
+            .placeholder = "",
+            .id_extra = file.id,
+        });
 
         defer file_widget.deinit();
         file_widget.processEvents();

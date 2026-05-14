@@ -2,7 +2,6 @@ const std = @import("std");
 const Io = std.Io;
 
 const dvui_editor = @import("../root.zig");
-const TextEditWidget = @import("../widgets/TextEditWidget.zig");
 
 const TextFile = @This();
 
@@ -16,7 +15,6 @@ editor: EditorData = .{},
 pub const EditorData = struct {
     workspace: *dvui_editor.Editor.Workspace = undefined,
     grouping: u64 = 0,
-    text_edit_widget: TextEditWidget = .{},
 };
 
 pub const InitOptions = struct {};

@@ -89,6 +89,24 @@ pub fn build(b: *std.Build) void {
     //     .target = target,
     // });
 
+    // Reusable text edit widget exported as a standalone module — its
+    // source file (src/widgets/TextEditWidget.zig) only depends on dvui +
+    // std, so other dvui apps can consume it via this build.zig *or* by
+    // referencing the source file directly with their own dvui module
+    // (handy when the consumer is on a different dvui backend).
+    const dvui_dep_for_widgets = b.dependency("dvui", .{
+        .target = target,
+        .optimize = optimize,
+        .backend = .sdl3,
+    });
+
+    const text_edit_widget_mod = b.addModule("text_edit_widget", .{
+        .root_source_file = b.path("src/widgets/TextEditWidget.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    text_edit_widget_mod.addImport("dvui", dvui_dep_for_widgets.module("dvui_sdl3"));
+
     const app_mod = editorMod(b, .{ .target = target, .optimize = optimize });
 
     const exe = b.addExecutable(.{
