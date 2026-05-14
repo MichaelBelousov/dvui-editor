@@ -1,5 +1,6 @@
 const std = @import("std");
 const dvui = @import("dvui");
+const icons = @import("icons");
 
 const dvui_editor = @import("../root.zig");
 const inkz = @import("inkz");
@@ -129,17 +130,10 @@ pub fn processEvents(self: *InkPreviewWidget) void {
 
     var col = dvui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .horizontal,
-        .padding = .{ .x = 6, .y = 6, .w = 6, .h = 6 },
+        // Extra top padding: breathing room below the floating restart control and first line.
+        .padding = .{ .x = 6, .y = 12, .w = 6, .h = 6 },
     });
     defer col.deinit();
-
-    {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
-        defer row.deinit();
-        if (dvui.button(@src(), "Restart", .{}, .{ .id_extra = file.id ^ 0x494e4b52 })) {
-            file.editor.ink_preview_content_hash = std.math.maxInt(u64);
-        }
-    }
 
     if (file.editor.ink_preview_err) |msg| {
         dvui.labelNoFmt(
@@ -163,37 +157,67 @@ pub fn processEvents(self: *InkPreviewWidget) void {
         );
     }
 
-    if (file.editor.ink_preview_done) {
-        return;
-    }
-
-    const story = file.editor.ink_preview_story orelse {
-        if (file.editor.ink_preview_err == null and content.len == 0) {
+    if (!file.editor.ink_preview_done) {
+        if (file.editor.ink_preview_story) |story| {
+            const choices = story.currentChoices();
+            if (choices.len > 0) {
+                // Snapshot labels before any button runs: chooseChoiceIndex + cont() frees the
+                // runtime's choice list, so later `choice.text` slices would be dangling in the same loop.
+                const aa = dvui_editor.editor.arena.allocator();
+                const labels = aa.alloc([]const u8, choices.len) catch return;
+                for (choices, 0..) |c, i| {
+                    labels[i] = if (c.text.len > 0)
+                        (aa.dupe(u8, c.text) catch return)
+                    else
+                        "(choice)";
+                }
+                for (labels, 0..) |label, i| {
+                    if (dvui.button(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x43484345 ^ @as(u64, @intCast(i)) })) {
+                        self.onChoice(gpa, i);
+                    }
+                }
+            } else if (story.canContinue()) {
+                if (dvui.button(@src(), "Continue", .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x434f4e54 })) {
+                    self.onContinue(gpa);
+                }
+            }
+        } else if (file.editor.ink_preview_err == null and content.len == 0) {
             dvui.labelNoFmt(@src(), "Empty document.", .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x454d5054 });
         }
-        return;
+    }
+
+    // Floating restart: parent is the scroll container with an explicit `.rect` so this widget
+    // does not participate in layout (`minSizeReportToParent` skips rect children). Text uses
+    // the full column width; the icon draws on top at the top-right.
+    const sc = &scroll.scroll.?;
+    dvui.parentSet(sc.widget());
+
+    const hit: f32 = 36;
+    const inset: f32 = 4;
+    const cr = sc.data().contentRect();
+    const restart_rect = dvui.Rect{
+        .x = @max(0, cr.w - hit - inset),
+        .y = inset,
+        .w = hit,
+        .h = hit,
     };
 
-    const choices = story.currentChoices();
-    if (choices.len > 0) {
-        // Snapshot labels before any button runs: chooseChoiceIndex + cont() frees the
-        // runtime's choice list, so later `choice.text` slices would be dangling in the same loop.
-        const aa = dvui_editor.editor.arena.allocator();
-        const labels = aa.alloc([]const u8, choices.len) catch return;
-        for (choices, 0..) |c, i| {
-            labels[i] = if (c.text.len > 0)
-                (aa.dupe(u8, c.text) catch return)
-            else
-                "(choice)";
-        }
-        for (labels, 0..) |label, i| {
-            if (dvui.button(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x43484345 ^ @as(u64, @intCast(i)) })) {
-                self.onChoice(gpa, i);
-            }
-        }
-    } else if (story.canContinue()) {
-        if (dvui.button(@src(), "Continue", .{}, .{ .expand = .horizontal, .id_extra = file.id ^ 0x434f4e54 })) {
-            self.onContinue(gpa);
-        }
+    if (dvui.buttonIcon(
+        @src(),
+        "Restart",
+        icons.tvg.lucide.@"refresh-ccw",
+        .{ .draw_focus = false },
+        .{},
+        .{
+            .id_extra = file.id ^ 0x494e4b52,
+            .rect = restart_rect,
+            .expand = .none,
+            .padding = dvui.Rect.all(4),
+            .corner_radius = dvui.Rect.all(6),
+        },
+    )) {
+        file.editor.ink_preview_content_hash = std.math.maxInt(u64);
     }
+
+    dvui.parentSet(col.widget());
 }
