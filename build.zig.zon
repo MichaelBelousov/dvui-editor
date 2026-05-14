@@ -56,8 +56,8 @@
             .hash = "cmark_gfm-0.1.0-uQgTKymaFwDK0jVZszXfDtQtW6BnS44Bp0GS55TVBD4p",
         },
         .inkz = .{
-            .url = "git+https://codeberg.org/BSF/inkz#1e6b4c56f2fa64eb271da0e43c86dc75ac597086",
-            .hash = "inkz-0.0.1-2kQZr1QuFAAOBtNn-9pRmHMcg7DfCVX9v8gPENy3SHzM",
+            .url = "git+https://codeberg.org/BSF/inkz#bb1537224ddafcd9e7babab69d3be26c79c03c26",
+            .hash = "inkz-0.0.1-2kQZrxLvFACKzbEnvnX9I1N6d3W4ruS2wLjKmySblnFU",
         },
     },
     .paths = .{
