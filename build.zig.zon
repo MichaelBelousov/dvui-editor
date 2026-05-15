@@ -31,30 +31,42 @@
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
+    // All deps are lazy so consumers (e.g. the graphl IDE on Zig 0.15.2)
+    // can `b.dependency("dvui_editor", ...)` purely for the source path
+    // of TextEditWidget.zig without triggering transitive fetches of the
+    // 0.16-only dvui / known_folders / nightwatch graphs. Building the
+    // dvui-editor binary itself (on Zig 0.16+) still works — those calls
+    // go through `b.lazyDependency(...)` which fetches on demand.
     .dependencies = .{
         .dvui = .{
             .url = "git+https://github.com/david-vanderson/dvui.git#14703fa6d6fea0c608886b5ce2071ef49323c8c0",
             .hash = "dvui-0.5.0-dev-AQFJmbHY9QA1qvhf_l3RPazRT7QOF0pGjLtU4amMq2F-",
+            .lazy = true,
         },
         .nightwatch = .{
             .url = "git+https://github.com/neurocyte/nightwatch.git#cbb9baab0d2ed66e9a0859e28c4a6a2e61a47600",
             .hash = "nightwatch-1.0.0-uXzeHzCgAgBNSi0lpwYyPXdiSnZeiExDSiu_XdZO55HI",
+            .lazy = true,
         },
         .inkz = .{
             .url = "git+https://codeberg.org/BSF/inkz.git#2ad855b9b2d7bb32114d480bd2eb40279f0a3a05",
             .hash = "inkz-0.0.1-2kQZr2nXEwCQM7_dYJ59VvzRwrVvRHACqR6LedbfLL3f",
+            .lazy = true,
         },
         .icons = .{
             .url = "git+https://github.com/nat3Github/zig-lib-icons.git#b7299b19fa11caa5be93ef49743d8fc31a4bf9a0",
             .hash = "icons-0.1.0-iJxA-VrGMwAVIStBxqDPFeC3wdnANtYyDrNfYXNz95OW",
+            .lazy = true,
         },
         .known_folders = .{
             .url = "git+https://github.com/ziglibs/known-folders.git#b242672a6e94982aadb00c1f8ef9c9e9a8abcc3f",
             .hash = "known_folders-0.0.0-Fy-PJqXKAAAbtJ18aGk-fkcZ4dFp_VFXgPENA6ZcLukl",
+            .lazy = true,
         },
         .win32 = .{
             .url = "git+https://github.com/marlersoft/zigwin32.git#ec98bb4d9eea532320a8551720a9e3ec6de64994",
             .hash = "win32-25.0.28-preview-mX5pFWMt5QPTVIGh3r2-OpPunpcCCjApyRbA6Zn6WALH",
+            .lazy = true,
         },
     },
     .paths = .{

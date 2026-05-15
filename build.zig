@@ -5,30 +5,35 @@ const EditorBuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
 };
 
-pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
+/// Returns the editor module if all required deps are available; otherwise
+/// null. All deps are pulled via `b.lazyDependency` so the editor can be
+/// consumed purely for source paths (e.g. by the graphl IDE on Zig 0.15.2)
+/// without triggering transitive 0.16-only fetches.
+pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) ?*std.Build.Module {
+    const dvui_dep = b.lazyDependency("dvui", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+        .backend = .sdl3,
+    }) orelse return null;
+    const known_folders_dep = b.lazyDependency("known_folders", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+    }) orelse return null;
+    const nightwatch_dep = b.lazyDependency("nightwatch", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+    }) orelse return null;
+
     const mod = b.createModule(.{
         .root_source_file = b.path("src/App.zig"),
         .target = opts.target,
         .optimize = opts.optimize,
     });
 
-    const dvui_dep = b.dependency("dvui", .{ .target = opts.target, .optimize = opts.optimize, .backend = .sdl3 });
-
-    // Or use a prelinked one:
     mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
-    mod.addImport("sdl-backend", dvui_dep.module("sdl3")); // for zls;
-
-    const known_folders = b.dependency("known_folders", .{
-        .target = opts.target,
-        .optimize = opts.optimize,
-    }).module("known-folders");
-    mod.addImport("known-folders", known_folders);
-
-    const nightwatch = b.dependency("nightwatch", .{
-        .target = opts.target,
-        .optimize = opts.optimize,
-    }).module("nightwatch");
-    mod.addImport("nightwatch", nightwatch);
+    mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
+    mod.addImport("known-folders", known_folders_dep.module("known-folders"));
+    mod.addImport("nightwatch", nightwatch_dep.module("nightwatch"));
 
     if (b.lazyDependency("icons", .{ .target = opts.target, .optimize = opts.optimize })) |dep| {
         mod.addImport("icons", dep.module("icons"));
@@ -42,72 +47,48 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) *std.Build.Module {
         }
         mod.linkSystemLibrary("comctl32", .{});
     }
-    // const assetpack = @import("assetpack");
-    // const assets_module = assetpack.pack(b, b.path("assets"), .{});
-    // exe.root_module.addImport("assets", assets_module);
     return mod;
 }
 
-// Although this function looks imperative, it does not perform the build
-// directly and instead it mutates the build graph (`b`) that will be then
-// executed by an external runner. The functions in `std.Build` implement a DSL
-// for defining build steps and express dependencies between them, allowing the
-// build runner to parallelize the build automatically (and the cache system to
-// know when a step doesn't need to be re-run).
 pub fn build(b: *std.Build) void {
-    // Standard target options allow the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
-    // It's also possible to define more custom flags to toggle optional features
-    // of this build script using `b.option()`. All defined flags (including
-    // target and optimize options) will be listed when running `zig build --help`
-    // in this directory.
 
-    // This creates a module, which represents a collection of source files alongside
-    // some compilation options, such as optimization mode and linked system libraries.
-    // Zig modules are the preferred way of making Zig code available to consumers.
-    // addModule defines a module that we intend to make available for importing
-    // to our consumers. We must give it a name because a Zig package can expose
-    // multiple modules and consumers will need to be able to specify which
-    // module they want to access.
-    // const mod = b.addModule("dvui_editor", .{
-    //     // The root source file is the "entry point" of this module. Users of
-    //     // this module will only be able to access public declarations contained
-    //     // in this file, which means that if you have declarations that you
-    //     // intend to expose to consumers that were defined in other files part
-    //     // of this module, you will have to make sure to re-export them from
-    //     // the root file.
-    //     .root_source_file = b.path("src/root.zig"),
-    //     // Later on we'll use this module as the root module of a test executable
-    //     // which requires us to specify a target.
-    //     .target = target,
-    // });
+    // When set, this build.zig skips every `b.lazyDependency(...)` call so
+    // it can be evaluated by consumers (e.g. the graphl IDE on Zig 0.15.2)
+    // who only want `dep.path("src/...")` and don't have the 0.16-only
+    // `dvui` / `known_folders` / `nightwatch` graphs in a buildable state.
+    //
+    // Marking the deps `.lazy = true` in build.zig.zon isn't enough on its
+    // own: once those deps have ever been fetched into the global cache,
+    // `b.lazyDependency` returns the *cached* instance and runs its
+    // build.zig, which is exactly the failure we're avoiding.
+    const paths_only = b.option(
+        bool,
+        "paths_only",
+        "Don't fetch/build any transitive deps. Only useful when consuming this package for source paths.",
+    ) orelse false;
 
-    // Reusable text edit widget exported as a standalone module — its
-    // source file (src/widgets/TextEditWidget.zig) only depends on dvui +
-    // std, so other dvui apps can consume it via this build.zig *or* by
-    // referencing the source file directly with their own dvui module
-    // (handy when the consumer is on a different dvui backend).
-    const dvui_dep_for_widgets = b.dependency("dvui", .{
-        .target = target,
-        .optimize = optimize,
-        .backend = .sdl3,
-    });
+    std.debug.print("[dvui-editor build.zig] paths_only={}\n", .{paths_only});
+    if (paths_only) return;
 
+    // Reusable text edit widget exposed as a standalone module. Uses a
+    // *lazy* dvui dep so consumers without dvui fetched yet can still
+    // resolve this build.zig successfully.
     const text_edit_widget_mod = b.addModule("text_edit_widget", .{
         .root_source_file = b.path("src/widgets/TextEditWidget.zig"),
         .target = target,
         .optimize = optimize,
     });
-    text_edit_widget_mod.addImport("dvui", dvui_dep_for_widgets.module("dvui_sdl3"));
+    if (b.lazyDependency("dvui", .{
+        .target = target,
+        .optimize = optimize,
+        .backend = .sdl3,
+    })) |dvui_dep_for_widgets| {
+        text_edit_widget_mod.addImport("dvui", dvui_dep_for_widgets.module("dvui_sdl3"));
+    }
 
-    const app_mod = editorMod(b, .{ .target = target, .optimize = optimize });
+    const app_mod = editorMod(b, .{ .target = target, .optimize = optimize }) orelse return;
 
     const exe = b.addExecutable(.{
         .name = "dvui-editor",
@@ -115,88 +96,38 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
-    // This creates a top level step. Top level steps have a name and can be
-    // invoked by name when running `zig build` (e.g. `zig build run`).
-    // This will evaluate the `run` step rather than the default step.
-    // For a top level step to actually do something, it must depend on other
-    // steps (e.g. a Run step, as we will see in a moment).
     const run_step = b.step("run", "Run the app");
-
-    // This creates a RunArtifact step in the build graph. A RunArtifact step
-    // invokes an executable compiled by Zig. Steps will only be executed by the
-    // runner if invoked directly by the user (in the case of top level steps)
-    // or if another step depends on it, so it's up to you to define when and
-    // how this Run step will be executed. In our case we want to run it when
-    // the user runs `zig build run`, so we create a dependency link.
     const run_cmd = b.addRunArtifact(exe);
     run_step.dependOn(&run_cmd.step);
-
-    // By making the run step depend on the default step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
     run_cmd.step.dependOn(b.getInstallStep());
-
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
 
-    // Creates an executable that will run `test` blocks from the provided module.
-    // Here `mod` needs to define a target, which is why earlier we made sure to
-    // set the releative field.
-    const mod_tests = b.addTest(.{
-        .root_module = app_mod,
-    });
-
-    // A run step that will run the test executable.
+    const mod_tests = b.addTest(.{ .root_module = app_mod });
     const run_mod_tests = b.addRunArtifact(mod_tests);
-
-    // Creates an executable that will run `test` blocks from the executable's
-    // root module. Note that test executables only test one module at a time,
-    // hence why we have to create two separate ones.
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
-    });
-
-    // A run step that will run the second test executable.
+    const exe_tests = b.addTest(.{ .root_module = exe.root_module });
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
-    // A top level step for running all tests. dependOn can be called multiple
-    // times and since the two run steps do not depend on one another, this will
-    // make the two of them run in parallel.
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
     const ci_step = b.step("ci", "Run CI");
     setupCi(b, ci_step);
-
-    // Just like flags, top level steps are also listed in the `--help` menu.
-    //
-    // The Zig build system is entirely implemented in userland, which means
-    // that it cannot hook into private compiler APIs. All compilation work
-    // orchestrated by the build system will result in other Zig compiler
-    // subcommands being invoked with the right flags defined. You can observe
-    // these invocations when one fails (or you pass a flag to increase
-    // verbosity) to validate assumptions and diagnose problems.
-    //
-    // Lastly, the Zig build system is relatively simple and self-contained,
-    // and reading its source code will allow you to master it.
 }
+
 pub fn setupCi(b: *std.Build, step: *std.Build.Step) void {
     const targets: []const std.Target.Query = &.{
         // macOS cross-compilation requires the Apple SDK; build natively instead.
-        // .{ .cpu_arch = .aarch64, .os_tag = .macos },
-        // .{ .cpu_arch = .x86_64,  .os_tag = .macos },
         .{ .cpu_arch = .aarch64, .os_tag = .linux },
         .{ .cpu_arch = .x86_64, .os_tag = .linux },
         .{ .cpu_arch = .x86_64, .os_tag = .windows },
-        // .{ .cpu_arch = .aarch64, .os_tag = .windows },
     };
 
     for (targets) |t| {
         const target = b.resolveTargetQuery(t);
-        const app_mod = editorMod(b, .{ .target = target, .optimize = .Debug });
+        const app_mod = editorMod(b, .{ .target = target, .optimize = .Debug }) orelse continue;
         const exe = b.addExecutable(.{
             .name = b.fmt("dvui-editor-{s}-{s}", .{
                 @tagName(t.cpu_arch.?),
