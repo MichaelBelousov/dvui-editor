@@ -1,7 +1,8 @@
 # DVUI Editor
 A simple vscode style text editor written in Zig with DVUI.
 
-![DVUI Editor](image.png)
+![DVUI Editor Markdown](dvui-editor-md.png)
+![DVUI Editor Ink](dvui-editor-ink.png)
 
 ## Credits
 - [Fizzy](https://github.com/foxnne/fizzy) for the code-base that was used as a starting point.
