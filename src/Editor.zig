@@ -100,6 +100,9 @@ project_folder_watcher: ?ProjectFolderWatcher = null,
 pending_native_menu_actions: [16]native_menu.NativeMenuAction = undefined,
 pending_native_menu_actions_len: u8 = 0,
 
+/// Transport-agnostic LSP adapter; starts and drives language servers (e.g. zls).
+lsp_manager: dvui_editor.lsp.Manager,
+
 pub fn init(
     io: Io,
     app: *App,
@@ -211,6 +214,7 @@ pub fn init(
         // },
         // .tools = try .init(app.gpa),
         .themes = .init(app.gpa),
+        .lsp_manager = .init(app.gpa, app.window),
     };
 
     editor.themes.append(dvui_editor_dark) catch {
@@ -309,6 +313,8 @@ pub fn tick(editor: *Editor) !dvui.App.Result {
     const io = dvui_editor.app.io;
     const environ = dvui_editor.app.environ;
     editor.window_opacity = if (dvui.themeGet().dark) editor.settings.window_opacity_dark else editor.settings.window_opacity_light;
+
+    editor.lsp_manager.tick();
 
     if (zmenu.pollAction(native_menu.NativeMenuAction)) |action| {
         editor.queueNativeMenuAction(action);
@@ -1072,6 +1078,7 @@ pub fn setProjectFolder(editor: *Editor, path: []const u8) !void {
         dvui_editor.app.gpa.free(folder);
     }
     editor.folder = try dvui_editor.app.gpa.dupe(u8, path);
+    editor.lsp_manager.setRootPath(editor.folder);
     editor.startProjectFolderWatcher(path);
     // try editor.recents.appendFolder(try dvui_editor.app.gpa.dupe(u8, path));
     editor.explorer.pane = .files;
@@ -1459,6 +1466,7 @@ pub fn deinit(editor: *Editor) !void {
     //     project.deinit(dvui_editor.app.gpa);
     // }
 
+    editor.lsp_manager.deinit();
     editor.stopProjectFolderWatcher();
     editor.explorer.deinit();
 

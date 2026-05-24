@@ -84,6 +84,57 @@ pub fn processEvents(self: *CodeEditorWidget) void {
         },
     );
     defer text_edit.deinit();
+
+    self.handleLsp(text_edit);
+}
+
+/// Drive LSP hover for this code buffer: request hover when the caret moves over
+/// a supported file, and surface the latest result as a tooltip over the editor.
+///
+/// Note: dvui does not expose mapping a mouse point to a byte offset, so hover
+/// is queried at the text caret. Place the caret on an identifier, then hover
+/// the mouse over the editor to see the server's response.
+fn handleLsp(self: *CodeEditorWidget, text_edit: *dvui.TextEntryWidget) void {
+    const lsp = dvui_editor.lsp;
+    if (lsp.Manager.languageForPath(self.file.path) == null) return;
+
+    const manager = &dvui_editor.editor.lsp_manager;
+    const text = text_edit.text[0..text_edit.len];
+    const cursor = @min(text_edit.textLayout.selection.cursor, text.len);
+
+    if (dvui.focusedWidgetId() == text_edit.data().id and self.file.editor.lsp_last_hover_offset != cursor) {
+        self.file.editor.lsp_last_hover_offset = cursor;
+        _ = manager.requestHover(self.file.path, text, positionFromOffset(text, cursor));
+    }
+
+    if (manager.takeHoverResult()) |hover_text| {
+        if (hover_text.len > 0) {
+            dvui.tooltip(
+                @src(),
+                .{ .active_rect = text_edit.data().contentRectScale().r },
+                "{s}",
+                .{hover_text},
+                .{ .id_extra = self.file.id },
+            );
+        }
+    }
+}
+
+/// Convert a byte offset into a zero-based line/character LSP position. Columns
+/// count bytes, which matches UTF-16 code units only for ASCII text.
+fn positionFromOffset(text: []const u8, offset: usize) dvui_editor.lsp.Client.Position {
+    var line: u32 = 0;
+    var character: u32 = 0;
+    var i: usize = 0;
+    while (i < offset and i < text.len) : (i += 1) {
+        if (text[i] == '\n') {
+            line += 1;
+            character = 0;
+        } else {
+            character += 1;
+        }
+    }
+    return .{ .line = line, .character = character };
 }
 
 /// Grammars we ship highlight queries for (mirrors linked `tree_sitter_*` symbols).

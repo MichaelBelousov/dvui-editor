@@ -32,6 +32,9 @@ pub const EditorData = struct {
     ink_preview_err: ?[]u8 = null,
     /// When true, the ink runtime has reached a terminal state; do not call `Story` methods again until rebuild.
     ink_preview_done: bool = false,
+
+    /// Caret byte offset of the last LSP hover request, used to debounce repeats.
+    lsp_last_hover_offset: usize = std.math.maxInt(usize),
 };
 
 pub const InitOptions = struct {};

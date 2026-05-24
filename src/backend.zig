@@ -6,6 +6,7 @@ const dvui = @import("dvui");
 const sdl3 = @import("sdl-backend").c;
 
 const dvui_editor = @import("root.zig");
+const lsp = @import("lsp/lsp.zig");
 const zwindow = @import("zwindow");
 
 pub const TitleBarButton = zwindow.TitleBarButton;
@@ -137,6 +138,89 @@ pub fn showOpenFolderDialog(cb: *const fn (?[][:0]const u8) void, default_folder
     defer dvui_editor.app.allocator.free(default);
     sdl3.SDL_ShowOpenFolderDialog(GenericOpenDialogCallback, @ptrCast(@alignCast(@constCast(cb))), dvui.currentWindow().backend.impl.window, default.ptr, false);
 }
+
+pub const StartLspError = error{
+    /// Spawning servers is not yet implemented on the web backend.
+    WebWorkerNotImplemented,
+} || std.process.SpawnError || std.mem.Allocator.Error;
+
+/// Start a language server and return a transport-agnostic byte stream to it.
+///
+/// On desktop this resolves `argv[0]` against PATH (so `"zls"` finds a system
+/// install) and spawns a child process, wiring its stdin/stdout as the
+/// transport. On the web this would instead post a message to spawn a Web
+/// Worker running the server and wrap its `MessagePort`; that path is not
+/// implemented yet.
+pub fn startLspServer(gpa: std.mem.Allocator, io: std.Io, argv: []const []const u8) StartLspError!lsp.Transport {
+    if (comptime builtin.target.cpu.arch.isWasm()) {
+        return error.WebWorkerNotImplemented;
+    }
+
+    const self = try gpa.create(ProcessTransport);
+    errdefer gpa.destroy(self);
+
+    const child = try std.process.spawn(io, .{
+        .argv = argv,
+        .stdin = .pipe,
+        .stdout = .pipe,
+        .stderr = .inherit,
+    });
+
+    self.* = .{ .gpa = gpa, .io = io, .child = child };
+    return .{ .ptr = self, .vtable = &ProcessTransport.vtable };
+}
+
+/// A `lsp.Transport` backed by a child process' stdin/stdout pipes.
+const ProcessTransport = struct {
+    gpa: std.mem.Allocator,
+    io: std.Io,
+    child: std.process.Child,
+    closed: bool = false,
+
+    const vtable = lsp.Transport.VTable{
+        .read = read,
+        .write = write,
+        .close = close,
+        .destroy = destroy,
+    };
+
+    fn read(ptr: *anyopaque, buffer: []u8) lsp.Transport.Error!usize {
+        const self: *ProcessTransport = @ptrCast(@alignCast(ptr));
+        const stdout = self.child.stdout orelse return 0;
+        return stdout.readStreaming(self.io, &[_][]u8{buffer}) catch |err| switch (err) {
+            error.EndOfStream => 0,
+            else => error.Failed,
+        };
+    }
+
+    fn write(ptr: *anyopaque, bytes: []const u8) lsp.Transport.Error!void {
+        const self: *ProcessTransport = @ptrCast(@alignCast(ptr));
+        const stdin = self.child.stdin orelse return error.Failed;
+        stdin.writeStreamingAll(self.io, bytes) catch return error.Failed;
+    }
+
+    fn close(ptr: *anyopaque) void {
+        const self: *ProcessTransport = @ptrCast(@alignCast(ptr));
+        if (self.closed) return;
+        self.closed = true;
+        // Close stdin so the server sees EOF, then kill to unblock any pending
+        // read on stdout (the reader thread observes a clean EOF).
+        if (self.child.stdin) |f| {
+            f.close(self.io);
+            self.child.stdin = null;
+        }
+        if (self.child.id != null) self.child.kill(self.io);
+    }
+
+    fn destroy(ptr: *anyopaque) void {
+        const self: *ProcessTransport = @ptrCast(@alignCast(ptr));
+        if (self.child.id != null) self.child.kill(self.io);
+        if (self.child.stdin) |f| f.close(self.io);
+        if (self.child.stdout) |f| f.close(self.io);
+        if (self.child.stderr) |f| f.close(self.io);
+        self.gpa.destroy(self);
+    }
+};
 
 fn GenericSaveDialogCallback(cb: ?*anyopaque, files: [*c]const [*c]const u8, _: c_int) callconv(.c) void {
     GenericDialogCallback(cb, files, .save);
