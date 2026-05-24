@@ -1,4 +1,17 @@
 const std = @import("std");
+const builtin = @import("builtin");
+
+// dvui-editor's app build uses Zig 0.16+ APIs (transitively via dvui
+// 0.5.0-dev / known_folders / nightwatch — e.g. `b.graph.environ_map`,
+// `std.process.Child.StdIo.ignore`). Zig 0.15.2 still *comptime-analyzes*
+// the bodies of every `b.lazyDependency(...)` call it sees, even with
+// `.lazy = true` and even when the runtime branch never fires, which
+// pulls those 0.16-only APIs into the analysis and fails with cryptic
+// compile errors. So we gate the entire build body behind a comptime
+// version check — on Zig < 0.16 the body is dead code and never gets
+// analyzed. Consumers on 0.15.2 (e.g. graphl/ide) keep working because
+// they only need `dep.path("src/widgets/TextEditWidget.zig")`.
+const supports_app_build = builtin.zig_version.major > 0 or builtin.zig_version.minor >= 16;
 
 const EditorBuildOptions = struct {
     target: std.Build.ResolvedTarget,
@@ -10,6 +23,11 @@ const EditorBuildOptions = struct {
 /// consumed purely for source paths (e.g. by the graphl IDE on Zig 0.15.2)
 /// without triggering transitive 0.16-only fetches.
 pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) ?*std.Build.Module {
+    // Same comptime gate as build() — on Zig < 0.16 the body is dead and
+    // not analyzed, so the `b.lazyDependency` calls below don't pull in
+    // the 0.16-only transitive build.zig files.
+    if (comptime !supports_app_build) return null;
+
     const dvui_dep = b.lazyDependency("dvui", .{
         .target = opts.target,
         .optimize = opts.optimize,
@@ -51,26 +69,24 @@ pub fn editorMod(b: *std.Build, opts: EditorBuildOptions) ?*std.Build.Module {
 }
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
-    // When set, this build.zig skips every `b.lazyDependency(...)` call so
-    // it can be evaluated by consumers (e.g. the graphl IDE on Zig 0.15.2)
-    // who only want `dep.path("src/...")` and don't have the 0.16-only
-    // `dvui` / `known_folders` / `nightwatch` graphs in a buildable state.
-    //
-    // Marking the deps `.lazy = true` in build.zig.zon isn't enough on its
-    // own: once those deps have ever been fetched into the global cache,
-    // `b.lazyDependency` returns the *cached* instance and runs its
-    // build.zig, which is exactly the failure we're avoiding.
-    const paths_only = b.option(
+    // Declared unconditionally so consumers that always pass it (e.g.
+    // graphl/ide on Zig 0.15.2) don't get an "unknown option" error.
+    // Functionally a no-op now that the Zig-version gate below handles
+    // the same case automatically.
+    _ = b.option(
         bool,
         "paths_only",
-        "Don't fetch/build any transitive deps. Only useful when consuming this package for source paths.",
-    ) orelse false;
+        "Legacy: only useful when consuming this package for source paths. The Zig-version gate now handles this automatically.",
+    );
 
-    std.debug.print("[dvui-editor build.zig] paths_only={}\n", .{paths_only});
-    if (paths_only) return;
+    // Zig version gate — see top of file. On Zig < 0.16 the rest of this
+    // body is dead code (not analyzed), which lets consumers like
+    // graphl/ide resolve this package's source paths without triggering
+    // compile of the 0.16-only transitive deps.
+    if (comptime !supports_app_build) return;
+
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
 
     // Reusable text edit widget exposed as a standalone module. Uses a
     // *lazy* dvui dep so consumers without dvui fetched yet can still
@@ -118,6 +134,9 @@ pub fn build(b: *std.Build) void {
 }
 
 pub fn setupCi(b: *std.Build, step: *std.Build.Step) void {
+    // Same comptime gate as build() / editorMod().
+    if (comptime !supports_app_build) return;
+
     const targets: []const std.Target.Query = &.{
         // macOS cross-compilation requires the Apple SDK; build natively instead.
         .{ .cpu_arch = .aarch64, .os_tag = .linux },
