@@ -275,3 +275,84 @@ fn GenericDialogCallback(cb: ?*anyopaque, files: [*c]const [*c]const u8, mode: e
 
     callback(zig_files);
 }
+
+const fake_lsp_server_py =
+    \\import sys, json
+    \\def read_msg():
+    \\    headers = b""
+    \\    while b"\r\n\r\n" not in headers:
+    \\        ch = sys.stdin.buffer.read(1)
+    \\        if not ch: return None
+    \\        headers += ch
+    \\    length = 0
+    \\    for line in headers.split(b"\r\n"):
+    \\        if line.lower().startswith(b"content-length:"):
+    \\            length = int(line.split(b":")[1].strip())
+    \\    return json.loads(sys.stdin.buffer.read(length))
+    \\def send(obj):
+    \\    data = json.dumps(obj).encode()
+    \\    sys.stdout.buffer.write(b"Content-Length: %d\r\n\r\n" % len(data))
+    \\    sys.stdout.buffer.write(data)
+    \\    sys.stdout.buffer.flush()
+    \\while True:
+    \\    msg = read_msg()
+    \\    if msg is None: break
+    \\    m, mid = msg.get("method"), msg.get("id")
+    \\    if m == "initialize":
+    \\        send({"jsonrpc":"2.0","id":mid,"result":{"capabilities":{}}})
+    \\    elif m == "textDocument/hover":
+    \\        send({"jsonrpc":"2.0","id":mid,"result":{"contents":{"kind":"markdown","value":"HOVER_OK"}}})
+    \\    elif m == "shutdown":
+    \\        send({"jsonrpc":"2.0","id":mid,"result":None})
+    \\    elif m == "exit":
+    \\        break
+    \\
+;
+
+fn waitForResponse(io: std.Io, client: *lsp.Client, id: i64) !std.json.Parsed(std.json.Value) {
+    var attempts: usize = 0;
+    while (attempts < 500) : (attempts += 1) { // ~5s budget
+        if (client.takeResponse(id)) |resp| return resp;
+        std.Io.sleep(io, std.Io.Duration.fromMilliseconds(10), .awake) catch {};
+    }
+    return error.Timeout;
+}
+
+test "lsp client drives a real server over a process transport" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const gpa = std.testing.allocator;
+
+    var threaded: std.Io.Threaded = .init(gpa, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
+
+    const script_path = "/tmp/dvui_editor_fake_lsp_test.py";
+    std.Io.Dir.cwd().writeFile(io, .{
+        .sub_path = script_path,
+        .data = fake_lsp_server_py,
+        .flags = .{},
+    }) catch return error.SkipZigTest;
+
+    const transport = startLspServer(gpa, io, &.{ "python3", script_path }) catch return error.SkipZigTest;
+    const client = try lsp.Client.create(gpa, io, transport, null);
+    defer client.deinit();
+    try client.start();
+
+    const init_id = try client.initialize(null);
+    {
+        const resp = try waitForResponse(io, client, init_id);
+        defer resp.deinit();
+        try std.testing.expect(resp.value == .object);
+        try std.testing.expect(resp.value.object.get("result") != null);
+    }
+    try client.initialized();
+
+    const hover_id = try client.hover("file:///tmp/x.zig", .{ .line = 0, .character = 0 });
+    {
+        const resp = try waitForResponse(io, client, hover_id);
+        defer resp.deinit();
+        const text = lsp.Manager.extractHoverTextForTest(gpa, resp.value) orelse return error.NoHoverText;
+        defer gpa.free(text);
+        try std.testing.expectEqualStrings("HOVER_OK", text);
+    }
+}

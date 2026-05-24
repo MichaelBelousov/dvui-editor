@@ -240,6 +240,11 @@ fn responseIsError(value: std.json.Value) bool {
     };
 }
 
+/// Test-only accessor for `extractHoverText`.
+pub fn extractHoverTextForTest(gpa: Allocator, response: std.json.Value) ?[]u8 {
+    return extractHoverText(gpa, response);
+}
+
 /// Extract human-readable text from a `textDocument/hover` result. Handles
 /// `MarkupContent`, `MarkedString`, and arrays of those. Returns owned memory,
 /// or null if there is no hover content.

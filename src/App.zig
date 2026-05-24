@@ -105,3 +105,9 @@ pub fn AppDeinit() void {
 pub fn AppFrame() !dvui.App.Result {
     return try dvui_editor.editor.tick();
 }
+
+test {
+    // Pull in tests from other source files so `zig build test` runs them.
+    _ = @import("backend.zig");
+    _ = @import("lsp/lsp.zig");
+}
